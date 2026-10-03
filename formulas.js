@@ -59,50 +59,43 @@ function calculateRouteFuel(rows, baseRate, carFormulas = [1, 2, 3, 4], isMiles 
         }
     });
 
-    let bz = Math.max(0, parseFloat(totalBzKm.toFixed(1)));
-    let city = Math.max(0, parseFloat(totalCityKm.toFixed(1)));
-    let highway = Math.max(0, parseFloat(totalHighwayKm.toFixed(1)));
-    let cityKyiv = Math.max(0, parseFloat(totalCityKyivKm.toFixed(1)));
+    let bz = totalBzKm;
+    let city = totalCityKm;
+    let highway = totalHighwayKm;
+    let cityKyiv = totalCityKyivKm;
     let motoBz = 0;
     let motoCity = 0;
 
-    // Специфічна логіка тільки для мотоциклів та квадроциклів
+    // Логіка для мотоциклів та квадроциклів (якщо авто має формули 8 або 9)
     if (carFormulas.includes(8) || carFormulas.includes(9)) {
         if (carFormulas.includes(9) && isMotoBzRoute) {
-            motoBz = Math.max(0, parseFloat((totalRawKm * 0.80).toFixed(1)));
-            motoCity = Math.max(0, parseFloat((totalRawKm * 0.20).toFixed(1)));
-            bz = 0; city = 0; highway = 0; cityKyiv = 0;
+            motoBz = totalRawKm * 0.80;
+            motoCity = totalRawKm * 0.20;
         } else if (carFormulas.includes(8)) {
-            motoBz = Math.max(0, parseFloat(totalRawKm.toFixed(1)));
+            motoBz = totalRawKm;
             motoCity = 0;
-            bz = 0; city = 0; highway = 0; cityKyiv = 0;
         }
+        bz = 0;
+        city = 0;
+        highway = 0;
+        cityKyiv = 0;
     }
 
-    const targetTotalKm = Math.max(0, parseFloat((totalRawKm).toFixed(1)));
-    let currentSum = parseFloat((bz + city + highway + cityKyiv + motoBz + motoCity).toFixed(1));
-    let diff = parseFloat((targetTotalKm - currentSum).toFixed(1));
+    // СТРИКТЕ ПРАВИЛО: жодне значення кілометрів не може бути меншим за 0
+    bz = Math.max(0, parseFloat(bz.toFixed(1)));
+    city = Math.max(0, parseFloat(city.toFixed(1)));
+    highway = Math.max(0, parseFloat(highway.toFixed(1)));
+    cityKyiv = Math.max(0, parseFloat(cityKyiv.toFixed(1)));
+    motoBz = Math.max(0, parseFloat(motoBz.toFixed(1)));
+    motoCity = Math.max(0, parseFloat(motoCity.toFixed(1)));
 
-    if (Math.abs(diff) >= 0.1) {
-        if (highway > 0) {
-            highway = Math.max(0, parseFloat((highway + diff).toFixed(1)));
-        } else if (motoBz > 0) {
-            motoBz = Math.max(0, parseFloat((motoBz + diff).toFixed(1)));
-        } else if (city > 0) {
-            city = Math.max(0, parseFloat((city + diff).toFixed(1)));
-        } else if (bz > 0) {
-            bz = Math.max(0, parseFloat((bz + diff).toFixed(1)));
-        }
-    }
-
-    // ЖОРСТКЕ ПРАВИЛО: жодне значення кілометрів не може бути меншим за 0
     let kmMap = {
-        bz: Math.max(0, bz),
-        city: Math.max(0, city),
-        highway: Math.max(0, highway),
-        cityKyiv: Math.max(0, cityKyiv),
-        motoBz: Math.max(0, motoBz),
-        motoCity: Math.max(0, motoCity),
+        bz: bz,
+        city: city,
+        highway: highway,
+        cityKyiv: cityKyiv,
+        motoBz: motoBz,
+        motoCity: motoCity,
         work: Math.max(0, totalTkm),
         cargoTransport: Math.max(0, totalTkm)
     };
