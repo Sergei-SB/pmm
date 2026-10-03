@@ -339,7 +339,7 @@ function handleCarSearchInput(val, event) {
         const matches = carsData.filter(car => 
             car.plate.toUpperCase().includes(upperVal) || 
             car.model.toUpperCase().includes(upperVal) ||
-            `${car.plate} — ${car.model}`.toUpperCase().includes(upperVal)
+            `${car.plate} — ${car.model}`.toUpperCase() === upperVal
         );
 
         if (isEnter && matches.length > 0) {
@@ -706,29 +706,29 @@ function addRouteRow(routeName = 'Виконання БЗ Харків', dateVal
 
     if (truckActive) {
         tr.innerHTML = `
-            <td><input type="text" value="${routeName}" style="width: 190px; text-align: left; padding-left: 5px;" oninput="updateRouteTotals()"></td>
-            <td><input type="text" value="${dateVal}" style="width: 45px; text-align: center;"></td>
-            <td><input type="text" class="row-cargo" value="" style="width: 38px;" oninput="updateRouteTotals()"></td>
-            <td><input type="text" value="" style="width: 38px;" oninput="updateRouteTotals()"></td>
-            <td><input type="text" value="" style="width: 38px;" oninput="updateRouteTotals()"></td>
-            <td><input type="text" class="total-col" value="${totalVal}" style="width: 45px;" oninput="updateRouteTotals()"></td>
+            <td><input type="text" value="${routeName}" class="route-input-name" oninput="updateRouteTotals()"></td>
+            <td><input type="text" value="${dateVal}" class="route-input-time" oninput="updateRouteTotals()"></td>
+            <td><input type="text" class="row-cargo route-input-sm" value="" oninput="updateRouteTotals()"></td>
+            <td><input type="text" class="route-input-sm" value="" oninput="updateRouteTotals()"></td>
+            <td><input type="text" class="route-input-sm" value="" oninput="updateRouteTotals()"></td>
+            <td><input type="text" class="total-col route-input-sm" value="${totalVal}" oninput="updateRouteTotals()"></td>
             <td><button class="delete-row-btn" onclick="this.closest('tr').remove(); updateRouteTotals();">X</button></td>
-            <td><input type="text" value="о/с" style="width: 38px; text-align: center;"></td>
-            <td><input type="text" class="row-tons" value="" style="width: 55px;" oninput="updateRouteTotals()"></td>
-            <td><input type="text" class="row-tkm" value="" style="width: 55px;" readonly></td>
-            <td><input type="text" class="row-odo" value="0" style="width: 70px;" readonly></td>
+            <td><input type="text" value="о/с" class="route-input-sm" style="text-align: center;"></td>
+            <td><input type="text" class="row-tons route-input-md" value="" oninput="updateRouteTotals()"></td>
+            <td><input type="text" class="row-tkm route-input-md" value="" readonly></td>
+            <td><input type="text" class="row-odo route-input-lg" value="0" readonly></td>
         `;
     } else {
         tr.innerHTML = `
-            <td><input type="text" value="${routeName}" style="width: 340px; text-align: left; padding-left: 5px;" oninput="updateRouteTotals()"></td>
-            <td><input type="text" value="${dateVal}" style="width: 50px;"></td>
-            <td><input type="text" value="" style="width: 40px;"></td>
-            <td><input type="text" value="" style="width: 40px;"></td>
-            <td><input type="text" value="" style="width: 40px;"></td>
-            <td><input type="text" class="total-col" value="${totalVal}" style="width: 50px;" oninput="updateRouteTotals()"></td>
+            <td><input type="text" value="${routeName}" class="route-input-name-car" oninput="updateRouteTotals()"></td>
+            <td><input type="text" value="${dateVal}" class="route-input-time" oninput="updateRouteTotals()"></td>
+            <td><input type="text" class="route-input-sm" value="" oninput="updateRouteTotals()"></td>
+            <td><input type="text" class="route-input-sm" value="" oninput="updateRouteTotals()"></td>
+            <td><input type="text" class="route-input-sm" value="" oninput="updateRouteTotals()"></td>
+            <td><input type="text" class="total-col route-input-sm" value="${totalVal}" oninput="updateRouteTotals()"></td>
             <td><button class="delete-row-btn" onclick="this.closest('tr').remove(); updateRouteTotals();">X</button></td>
-            <td><input type="text" value="о/с" style="width: 40px;"></td>
-            <td><input type="text" class="row-odo" style="width: 90px;" readonly></td>
+            <td><input type="text" value="о/с" class="route-input-sm" style="text-align: center;"></td>
+            <td><input type="text" class="row-odo route-input-lg" value="" readonly></td>
         `;
     }
 
@@ -813,19 +813,18 @@ function updateRouteTotals() {
     const truckActive = isCarTruck(car);
     const hasAdBlue = car && car.hasAdBlue;
 
-    // Динамічне призначення формул та кнопок залежно від типу техніки
     let presetButtonsHtml = `
         <button type="button" class="preset-btn" onclick="applyPresetToActiveRow('Виконання БЗ Харків')">Виконання БЗ Харків</button>
         <button type="button" class="preset-btn" onclick="applyPresetToActiveRow('Міста-мільйонники (Харків, Київ, Львів)')">Міста-мільйонники (Харків, Київ, Львів)</button>
     `;
 
     if (group === 'мотоцикл') {
-        carFormulas = [8, 9]; // Формула 8 (+35%), Формула 9 (+5%)
+        carFormulas = [8, 9];
         presetButtonsHtml = `
             <button type="button" class="preset-btn" onclick="applyPresetToActiveRow('Виконання БЗ Харків')">Виконання БЗ Харків</button>
         `;
     } else if (group === 'квадроцикл') {
-        carFormulas = [8]; // Формула 8 (+35%)
+        carFormulas = [8];
         presetButtonsHtml = `
             <button type="button" class="preset-btn" onclick="applyPresetToActiveRow('Виконання БЗ Харків')">Виконання БЗ Харків</button>
         `;
