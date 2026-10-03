@@ -572,3 +572,149 @@ input[type=number] {
 #routes-tbody input {
     text-align: center;
 }
+/* ==========================================
+   МОБІЛЬНА АДАПТАЦІЯ (ПІД ТЕЛЕФОНИ ТА ПЛАНШЕТИ)
+   ========================================== */
+
+@media (max-width: 1250px) {
+    /* Шапка та навігація */
+    .top-nav {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        padding: 10px;
+    }
+    .nav-left {
+        display: flex;
+        overflow-x: auto;
+        white-space: nowrap;
+        padding-bottom: 4px;
+        gap: 6px;
+        -webkit-overflow-scrolling: touch;
+    }
+    .nav-left::-webkit-scrollbar {
+        height: 4px;
+    }
+    .nav-left::-webkit-scrollbar-thumb {
+        background: #5d6d7e;
+        border-radius: 2px;
+    }
+    .nav-right input[type="text"] {
+        width: 100% !important;
+    }
+
+    /* Робочий простір картки автомобіля */
+    .card-workspace {
+        flex-direction: column;
+        gap: 15px;
+    }
+    .workspace-sidebar {
+        width: 100%;
+        min-width: 0;
+    }
+
+    /* Верхня панель статистики (паливо, одометри) */
+    .top-stats-row {
+        flex-direction: column;
+        gap: 15px;
+    }
+    .fuel-panels-group {
+        width: 100%;
+        justify-content: space-between;
+    }
+    .fuel-panel {
+        width: 48%;
+    }
+    .fuel-panel.adblue-single-col {
+        width: 48%;
+    }
+    .odometer-panel {
+        width: 100%;
+    }
+
+    /* Футер розрахунку палива в картці */
+    .footer-layout-flex {
+        flex-direction: column;
+        gap: 15px;
+        padding: 0;
+    }
+    .preset-buttons-group {
+        width: 100%;
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+    .preset-btn {
+        flex: 1;
+        min-width: 140px;
+    }
+    .calc-main-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+    .slash-separator {
+        display: none;
+    }
+    .calc-row {
+        grid-template-columns: 1fr 45px 80px 50px 15px 70px;
+        font-size: 12px;
+    }
+
+    /* Деталі автомобіля / звіт */
+    .details-bottom-grid {
+        flex-direction: column;
+    }
+    .details-stats-row {
+        flex-direction: column;
+    }
+    .stat-card {
+        width: 100%;
+    }
+}
+
+@media (max-width: 600px) {
+    body {
+        font-size: 12px;
+    }
+    .view-section {
+        padding: 10px;
+    }
+    .card-header-panel {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        padding: 8px 10px;
+    }
+    .car-title-box {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+    }
+    .search-box {
+        width: 100%;
+    }
+    .search-box input[type="text"] {
+        width: 100% !important;
+    }
+    
+    /* Зменшення відступів та полів для мобільних */
+    .fuel-panel {
+        width: 100%;
+    }
+    .fuel-panels-group {
+        flex-direction: column;
+        gap: 10px;
+    }
+    .fuel-panel.adblue-single-col {
+        width: 100%;
+    }
+}
+
+/* Універсальна сенсорна прокрутка для усіх таблиць на телефонах */
+.table-container, 
+.routes-container, 
+.print-scroll-box {
+    -webkit-overflow-scrolling: touch;
+    overflow-x: auto;
+    width: 100%;
+}
