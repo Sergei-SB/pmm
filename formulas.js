@@ -2,6 +2,7 @@
 // ФОРМУЛИ ТА РОЗРАХУНКИ ВИТРАТИ ПАЛИВА ЗА НОМЕРАМИ (formulas.js)
 // ==========================================
 
+// Словник доступних формул за їх номерами
 const formulaDefinitions = {
     1: { label: "БЗ:", coeff: 1.20, textOp: "+ 20%", type: "bz" },
     2: { label: "Місто:", coeff: 1.05, textOp: "+ 5%", type: "city" },
@@ -10,6 +11,7 @@ const formulaDefinitions = {
     5: { label: "Виконана робота:", type: "work" },
     6: { label: "Перевезення вантажу:", type: "cargoTransport" },
     7: { label: "Витрата AdBlue:", type: "adblue" },
+    // Нові формули для мотоциклів та квадроциклів
     8: { label: "БЗ (мото/квадро):", coeff: 1.35, textOp: "+ 35%", type: "motoBz" },
     9: { label: "Місто (мото):", coeff: 1.05, textOp: "+ 5%", type: "motoCity" }
 };
@@ -43,14 +45,27 @@ function calculateRouteFuel(rows, baseRate, carFormulas = [1, 2, 3, 4], isMiles 
             totalCityKm += tripVal * 0.26;
             totalHighwayKm += tripVal * 0.59;
             totalCityKyivKm += tripVal * 0.09;
+            totalMotoBzKm += tripVal * 0.80;
+            totalMotoCityKm += tripVal * 0.20;
+        } else if (routeName.includes("виконання бз харків") || routeName.includes("виконання бз")) {
+            totalBzKm += tripVal * 0.33;
+            totalCityKm += tripVal * 0.18;
+            totalHighwayKm += tripVal * 0.49;
+            totalCityKyivKm += 0;
+            // Для мотоцикла/квадроцикла за вашим правилом:
+            totalMotoBzKm += tripVal * 0.80; // Перекривається логікою формул нижче
+            totalMotoCityKm += tripVal * 0.20;
         } else {
             totalBzKm += tripVal * 0.33;
             totalCityKm += tripVal * 0.18;
             totalHighwayKm += tripVal * 0.49;
             totalCityKyivKm += 0;
+            totalMotoBzKm += tripVal * 0.80;
+            totalMotoCityKm += tripVal * 0.20;
         }
     });
 
+    // Перевіряємо, чи це специфічна кнопка "Виконання БЗ Харків" для мотоцикла чи квадроцикла
     let isMotoBzRoute = false;
     rows.forEach(row => {
         const nameInput = row.querySelector('input[type="text"]');
@@ -59,35 +74,34 @@ function calculateRouteFuel(rows, baseRate, carFormulas = [1, 2, 3, 4], isMiles 
         }
     });
 
-    let bz = totalBzKm;
-    let city = totalCityKm;
-    let highway = totalHighwayKm;
-    let cityKyiv = totalCityKyivKm;
-    let motoBz = 0;
+    let bz = parseFloat(totalBzKm.toFixed(1));
+    let city = parseFloat(totalCityKm.toFixed(1));
+    let highway = parseFloat(totalHighwayKm.toFixed(1));
+    let cityKyiv = parseFloat(totalCityKyivKm.toFixed(1));
+    let motoBz = parseFloat(totalRawKm.toFixed(1)); // За замовчуванням для квадроцикла 100% (або перекриється)
     let motoCity = 0;
 
-    // Логіка для мотоциклів та квадроциклів (якщо авто має формули 8 або 9)
-    if (carFormulas.includes(8) || carFormulas.includes(9)) {
-        if (carFormulas.includes(9) && isMotoBzRoute) {
-            motoBz = totalRawKm * 0.80;
-            motoCity = totalRawKm * 0.20;
-        } else if (carFormulas.includes(8)) {
-            motoBz = totalRawKm;
-            motoCity = 0;
-        }
-        bz = 0;
-        city = 0;
-        highway = 0;
-        cityKyiv = 0;
+    // Якщо це мотоцикл (має формулу motoCity у своєму наборі) і маршрут "Виконання БЗ Харків"
+    if (carFormulas.includes(9) && isMotoBzRoute) {
+        motoBz = parseFloat((totalRawKm * 0.80).toFixed(1));
+        motoCity = parseFloat((totalRawKm * 0.20).toFixed(1));
+    } else if (carFormulas.includes(8) && !carFormulas.includes(9) && isMotoBzRoute) {
+        // Квадроцикл: 100% на БЗ
+        motoBz = parseFloat(totalRawKm.toFixed(1));
+        motoCity = 0;
     }
 
-    // СТРИКТЕ ПРАВИЛО: жодне значення кілометрів не може бути меншим за 0
-    bz = Math.max(0, parseFloat(bz.toFixed(1)));
-    city = Math.max(0, parseFloat(city.toFixed(1)));
-    highway = Math.max(0, parseFloat(highway.toFixed(1)));
-    cityKyiv = Math.max(0, parseFloat(cityKyiv.toFixed(1)));
-    motoBz = Math.max(0, parseFloat(motoBz.toFixed(1)));
-    motoCity = Math.max(0, parseFloat(motoCity.toFixed(1)));
+    // Цільовий загальний пробіг з точністю до десятих
+    const targetTotalKm = parseFloat((totalRawKm).toFixed(1));
+    let currentSum = parseFloat((bz + city + highway + cityKyiv + motoBz + motoCity).toFixed(1));
+    let diff = parseFloat((targetTotalKm - currentSum).toFixed(1));
+
+    if (Math.abs(diff) >= 0.1) {
+        if (highway > 0) highway = parseFloat((highway + diff).toFixed(1));
+        else if (motoBz > 0) motoBz = parseFloat((motoBz + diff).toFixed(1));
+        else if (city > 0) city = parseFloat((city + diff).toFixed(1));
+        else if (bz > 0) bz = parseFloat((bz + diff).toFixed(1));
+    }
 
     let kmMap = {
         bz: bz,
@@ -96,8 +110,8 @@ function calculateRouteFuel(rows, baseRate, carFormulas = [1, 2, 3, 4], isMiles 
         cityKyiv: cityKyiv,
         motoBz: motoBz,
         motoCity: motoCity,
-        work: Math.max(0, totalTkm),
-        cargoTransport: Math.max(0, totalTkm)
+        work: totalTkm,
+        cargoTransport: totalTkm
     };
 
     let totalFuel = 0;
@@ -112,7 +126,7 @@ function calculateRouteFuel(rows, baseRate, carFormulas = [1, 2, 3, 4], isMiles 
             } else {
                 resVal = (km * baseRate / 100) * formula.coeff;
             }
-            totalFuel += Math.max(0, resVal);
+            totalFuel += resVal;
         }
     });
 
@@ -141,16 +155,16 @@ function calculateRouteFuel(rows, baseRate, carFormulas = [1, 2, 3, 4], isMiles 
             calculatedResults.push({
                 id: fId,
                 label: formula.label,
-                km: Math.max(0, km),
+                km: km,
                 textOp: formula.textOp || "",
                 type: formula.type,
-                resVal: Math.max(0, resVal)
+                resVal: resVal
             });
         }
     });
 
     return {
         calculatedResults,
-        totalFuel: Math.max(0, totalFuel)
+        totalFuel
     };
 }
