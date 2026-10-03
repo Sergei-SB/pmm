@@ -49,25 +49,37 @@ function calculateRouteFuel(rows, baseRate, carFormulas = [1, 2, 3, 4], isMiles 
         }
     });
 
-    let bz = parseFloat(totalBzKm.toFixed(1));
-    let city = parseFloat(totalCityKm.toFixed(1));
-    let highway = parseFloat(totalHighwayKm.toFixed(1));
-    let cityKyiv = parseFloat(totalCityKyivKm.toFixed(1));
-    
-    // Жорсткий захист: за замовчуванням 0 для всіх звичайних авто
+    let isMotoBzRoute = false;
+    rows.forEach(row => {
+        const nameInput = row.querySelector('input[type="text"]');
+        if (nameInput && nameInput.value.toLowerCase().includes("виконання бз харків")) {
+            isMotoBzRoute = true;
+        }
+    });
+
+    // СУВОРЕ РОЗДІЛЕННЯ: якщо це стандартний автомобіль (є формули 1-4), 
+    // мото-формули примусово дорівнюють 0, щоб уникнути подвійного рахунку пробігу!
+    const isStandardCar = carFormulas.includes(1) || carFormulas.includes(2) || carFormulas.includes(3) || carFormulas.includes(4);
+
+    let bz = 0;
+    let city = 0;
+    let highway = 0;
+    let cityKyiv = 0;
     let motoBz = 0;
     let motoCity = 0;
 
-    // Рахуємо мотоциклетні кілометри ТІЛЬКИ якщо у машини є формула 8 або 9
-    if (carFormulas.includes(8) || carFormulas.includes(9)) {
-        let isMotoBzRoute = false;
-        rows.forEach(row => {
-            const nameInput = row.querySelector('input[type="text"]');
-            if (nameInput && nameInput.value.toLowerCase().includes("виконання бз харків")) {
-                isMotoBzRoute = true;
-            }
-        });
-
+    if (isStandardCar) {
+        bz = parseFloat(totalBzKm.toFixed(1));
+        city = parseFloat(totalCityKm.toFixed(1));
+        highway = parseFloat(totalHighwayKm.toFixed(1));
+        cityKyiv = parseFloat(totalCityKyivKm.toFixed(1));
+        motoBz = 0;
+        motoCity = 0;
+    } else if (carFormulas.includes(8) || carFormulas.includes(9)) {
+        bz = 0;
+        city = 0;
+        highway = 0;
+        cityKyiv = 0;
         if (carFormulas.includes(9) && isMotoBzRoute) {
             motoBz = parseFloat((totalRawKm * 0.80).toFixed(1));
             motoCity = parseFloat((totalRawKm * 0.20).toFixed(1));
