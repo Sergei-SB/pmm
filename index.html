@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Облік палива та обладнання</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        table thead tr, 
+        .compact-base-table thead tr, 
+        .data-table thead tr {
+            background-color: #2e7d32 !important;
+            color: white !important;
+        }
+        table thead th, 
+        .compact-base-table thead th, 
+        .data-table thead th {
+            background-color: #2e7d32 !important;
+            color: white !important;
+            text-align: center !important;
+            vertical-align: middle;
+            padding: 8px 6px;
+            font-weight: bold;
+            font-size: 13px;
+            border: 1px solid #1b5e20;
+            white-space: nowrap;
+        }
+        .compact-base-table td {
+            padding: 4px 6px;
+            font-size: 13px;
+            vertical-align: middle;
+            border: 1px solid #ddd;
+        }
+        .eq-tab-btn {
+            background-color: #34495e;
+            color: white;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+        .eq-tab-btn.active {
+            background-color: #2e7d32;
+        }
+        .eq-tab-btn:hover {
+            background-color: #3d566e;
+        }
+
+        /* Стилі для кнопок верхньої навігації */
+        .nav-btn {
+            background: #34495e;
+            color: #bdc3c7;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 13px;
+            transition: all 0.2s ease;
+        }
+        .nav-btn:hover {
+            background: #4e6073;
+            color: white;
+        }
+        .nav-btn.active {
+            background: #5d6d7e !important; /* Помітно світліший відтінок для активної сторінки */
+            color: white !important;
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.4);
+        }
+
+        /* Стилі для коректного друку звіту обладнання на сторінці */
+        @media print {
+            @page {
+                size: landscape;
+                margin: 10mm;
+            }
+            body * {
+                visibility: hidden;
+            }
+            #equipment-report-view, #equipment-report-view * {
+                visibility: visible;
+            }
+            #equipment-report-view {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                background: white;
+            }
+            .report-controls button, .report-controls select, .report-controls input {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ВЕРХНЯ НАВІГАЦІЯ -->
+    <header class="top-nav" style="background: #2c3e50; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center;">
+        <div class="nav-left" style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="nav-btn active" onclick="switchView('base')">База (Реєстр)</button>
+            <button class="nav-btn" onclick="switchView('card')">Картка авто та Маршрути</button>
+            <button class="nav-btn" onclick="switchView('report')">Звіт (10 днів)</button>
+            <button class="nav-btn" onclick="switchView('subdivisions')">Звіт по підрозділах</button>
+            <button class="nav-btn" onclick="switchView('generators')">Облік обладнання</button>
+            <button class="nav-btn" onclick="switchView('aggregates-calc')">Розрахунок агрегатів</button>
+            <button class="nav-btn" onclick="switchView('equipment-report-view')">Звіт по обладнанню</button>
+        </div>
+        <div class="nav-right" id="top-search-box">
+            <input type="text" id="base-search-input" placeholder="Пошук по авто, номеру, водію..." oninput="filterBaseTable(this.value)" style="padding: 6px; width: 250px; border-radius: 4px; border: none;" autocomplete="off">
+        </div>
+    </header>
+
+    <!-- ГОЛОВНИЙ КОНТЕЙНЕР -->
+    <main class="main-container" style="padding: 20px; background: #ecf0f1; min-height: calc(100vh - 60px);">
+
+        <!-- РОЗДІЛ 1: БАЗА АВТОМОБІЛІВ -->
+        <section id="base-view" class="view-section active">
+            <h2>Реєстр транспортних засобів</h2>
+            <div class="category-filters" style="margin-bottom: 15px;">
+                <button id="btn-cat-all" class="action-btn active" onclick="filterCarsByCategory('all')">Усі</button>
+                <button id="btn-cat-car" class="action-btn" onclick="filterCarsByCategory('легковий')">Легкові</button>
+                <button id="btn-cat-truck" class="action-btn" onclick="filterCarsByCategory('вантажний')">Вантажні</button>
+                <button id="btn-cat-moto" class="action-btn" onclick="filterCarsByCategory('мотоцикл')">Мотоцикли</button>
+                <button id="btn-cat-quad" class="action-btn" onclick="filterCarsByCategory('квадроцикл')">Квадроцикл</button>
+            </div>
+            <div class="table-container">
+                <table id="cars-table" class="compact-base-table" style="width: 100%; border-collapse: collapse; background: white;">
+                    <thead>
+                        <tr>
+                            <th>№ з/п</th>
+                            <th>Тип авто</th>
+                            <th>Номер</th>
+                            <th>Модель</th>
+                            <th>Підрозділ<br>
+                                <select id="base-subdivision-filter" onchange="renderCarsTable()" style="font-size: 10px; padding: 1px; width: 100%; border-radius: 2px; border: 1px solid #1b5e20; background: white; color: #333; cursor: pointer;">
+                                    <option value="all">Усі</option>
+                                </select>
+                            </th>
+                            <th>Витрата</th>
+                            <th>Паливо</th>
+                            <th>Примітка</th>
+                            <th>Він код</th>
+                            <th>Рік</th>
+                            <th>КПП</th>
+                            <th>Бак</th>
+                            <th>Привід</th>
+                            <th>Маса</th>
+                            <th>Повна маса</th>
+                            <th>Передачі</th>
+                            <th>Об'єм</th>
+                            <th>кВт</th>
+                            <th>№ двигуна</th>
+                            <th>Водій</th>
+                            <th>Звіт</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cars-tbody"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- РОЗДІЛ 2: КАРТКА АВТОМОБІЛЯ ТА МАРШРУТИ -->
+        <section id="card-view" class="view-section">
+            <div class="card-header-panel">
+                <div class="car-title-box">
+                    <h2 id="card-model">JEEP Grand Cherokee</h2>
+                    <span id="card-plate" class="plate-badge">AI465G</span>
+                </div>
+                <div class="search-box">
+                    <label>Пошук авто:</label>
+                    <input type="text" id="car-search-input" list="cars-list" placeholder="Введіть номер або модель..." oninput="handleCarSearchInput(this.value, event)" onkeydown="if(event.key==='Enter') handleCarSearchInput(this.value, event)" autocomplete="off">
+                    <datalist id="cars-list"></datalist>
+                </div>
+            </div>
+
+            <div class="card-workspace">
+                <div class="workspace-main">
+                    <div class="top-stats-row">
+                        <div class="fuel-panels-group">
+                            <div class="fuel-panel">
+                                <table>
+                                    <tr><th colspan="2">Паливо</th></tr>
+                                    <tr><td>На початку</td><td><input type="text" id="fuel-start" value=""></td></tr>
+                                    <tr><td id="fuel-received-label">Отримано ДП</td><td><input type="text" id="fuel-received" value=""></td></tr>
+                                    <tr><td>Залишок</td><td><span id="fuel-left">0.0</span></td></tr>
+                                    <tr><td>Витрачено</td><td><span id="fuel-spent">0.0</span></td></tr>
+                                </table>
+                            </div>
+                            <div class="fuel-panel adblue-single-col" id="adblue-panel-box" style="display: none;">
+                                <table>
+                                    <tr><th>AdBlue</th></tr>
+                                    <tr><td><input type="text" id="adblue-start" value=""></td></tr>
+                                    <tr><td><input type="text" id="adblue-received" value=""></td></tr>
+                                    <tr><td><span id="adblue-left">0.0</span></td></tr>
+                                    <tr><td><span id="adblue-spent">0.0</span></td></tr>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="transfer-btn-container">
+                            <button class="action-btn transfer-btn" onclick="transferDataToReport()">Перенос даних</button>
+                        </div>
+
+                        <div class="odometer-panel">
+                            <table>
+                                <tr><th colspan="2">Одометри</th></tr>
+                                <tr><td>Початковий одометр</td><td><input type="text" id="odo-1" value=""></td></tr>
+                                <tr><td>Кінцевий одометр</td><td><input type="text" id="odo-2" value=""></td></tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="routes-container">
+                        <table id="routes-table">
+                            <thead id="routes-thead">
+                                <tr><th>Маршрути</th><th>Час</th><th>Вантаж</th><th>Пустий</th><th>Прицеп</th><th>Всього</th><th>Дія</th><th>Груз</th><th>Одометр</th></tr>
+                            </thead>
+                            <tbody id="routes-tbody"></tbody>
+                        </table>
+                        
+                        <button class="action-btn" onclick="addRouteRow()">+ Додати рядок маршруту</button>
+
+                        <div class="fuel-summary-footer">
+                            <div class="footer-layout-flex">
+                                <div class="preset-buttons-group">
+                                    <button type="button" class="preset-btn" onclick="applyPresetToActiveRow('Виконання БЗ Харків')">Виконання БЗ Харків</button>
+                                    <button type="button" class="preset-btn" onclick="applyPresetToActiveRow('Міста-мільйонники (Харків, Київ, Львів)')">Міста-мільйонники (Харків, Київ, Львів)</button>
+                                </div>
+                                <div class="footer-right-column">
+                                    <div class="calc-main-row">
+                                        <div class="formulas-group" id="formulas-group-container"></div>
+                                        <div class="slash-separator">/</div>
+                                        <div class="total-group-inline">= <strong id="sum-fuel">0.00</strong> л &approx; <strong id="sum-fuel-round">0</strong> л</div>
+                                    </div>
+                                    <div class="fuel-summary-line">
+                                        <span>Всього пройдено: <strong id="sum-km">0</strong> км</span>
+                                        <span>Витрачено <strong id="sum-fuel-copy">0.00</strong> л &approx; <strong id="sum-fuel-round-copy">0</strong> л</span>
+                                    </div>
+                                    <div class="fuel-base-line">
+                                        <span>Витрата палива базова : <span id="base-val-text">13.0</span> л</span>
+                                    </div>
+                                    <div class="fuel-sub-line"><span id="markup-desc-text"></span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="workspace-sidebar">
+                    <table class="specs-table">
+                        <tr><td>Підрозділ, рота</td><td id="spec-subdivision">—</td></tr>
+                        <tr><td>Тип пального</td><td id="spec-fuel-type">—</td></tr>
+                        <tr><td>Примітка</td><td id="spec-note">—</td></tr>
+                        <tr><td>Він код</td><td id="spec-vin">—</td></tr>
+                        <tr><td>Рік випуску</td><td id="spec-year">—</td></tr>
+                        <tr><td>Тип коробки передач</td><td id="spec-transmission">—</td></tr>
+                        <tr><td>Ємність бензобаку, л</td><td id="spec-tank">—</td></tr>
+                        <tr><td>Привід</td><td id="spec-drive">—</td></tr>
+                        <tr><td>Маса без вантажу</td><td id="spec-empty-weight">—</td></tr>
+                        <tr><td>Повна маса</td><td id="spec-total-weight">—</td></tr>
+                        <tr><td>Кількість передач</td><td id="spec-gears">—</td></tr>
+                        <tr><td>Об'єм двигуна</td><td id="spec-engine">—</td></tr>
+                        <tr><td>кВт</td><td id="spec-kw">—</td></tr>
+                        <tr><td>№ двигуна</td><td id="spec-engine-no">—</td></tr>
+                        <tr><td>Водій / Старший водій</td><td id="spec-driver">—</td></tr>
+                        <tr><td>Витрата палива на л/100 км</td><td id="spec-consumption">—</td></tr>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- РОЗДІЛ 3: ЗВІТ (10 ДНІВ) -->
+        <section id="report-view" class="view-section">
+            <div class="card-header-panel">
+                <h2>Десятиденний звіт по автопарку</h2>
+                <div class="report-controls">
+                    <label>Період:</label>
+                    <select id="report-period-select" onchange="changeReportPeriod(this.value)"></select>
+                    <input type="text" id="report-custom-period" value="01.10-10.10" placeholder="Напр: 01.10-10.10" oninput="updateReportHeaders()" style="width: 110px; text-align: center; padding: 5px;">
+                    <button class="action-btn" onclick="saveReportData()">Зберегти звіт</button>
+                    <button class="action-btn" style="background-color: #2980b9;" onclick="exportDataToJson()">Експорт</button>
+                    <label class="action-btn" style="background-color: #8e44ad; cursor: pointer; display: inline-block; padding: 8px 14px; border-radius: 3px; font-weight: bold; color: white;">
+                        Імпорт <input type="file" id="import-json-file" accept=".json" onchange="importDataFromJson(this)" style="display: none;">
+                    </label>
+                </div>
+            </div>
+            <div class="table-container" style="max-height: 75vh;">
+                <table id="report-table" class="compact-report-table">
+                    <thead>
+                        <tr>
+                            <th>№</th><th>№ авто</th>
+                            <th>Підр.<br>
+                                <select id="report-subdivision-filter" onchange="renderReportTable()" style="font-size: 10px; padding: 1px; width: 100%; border-radius: 2px; border: 1px solid #1b5e20; background: white; color: #333; cursor: pointer;">
+                                    <option value="all">Усі</option>
+                                </select>
+                            </th>
+                            <th>Тип пал.</th><th>Автомобіль</th><th>Залишок палива<br>на <span class="rep-start">01.10</span></th><th>Залишок AdBlue<br>на <span class="rep-start">01.10</span></th><th>Одометр<br>на <span class="rep-start">01.10</span></th><th>Заправка палива<br>з <span class="rep-p">01.10-10.10</span></th><th>Заправка AdBlue<br>з <span class="rep-p">01.10-10.10</span></th><th>Мастило<br>з <span class="rep-p">01.10-10.10</span></th><th>Омивач<br>з <span class="rep-p">01.10-10.10</span></th><th>Примітка</th><th>№ д/л</th><th>Залишок палива<br>на <span class="rep-end">10.10</span></th><th>Залишок AdBlue<br>на <span class="rep-end">10.10</span></th><th>Одометр<br>на <span class="rep-end">10.10</span></th>
+                        </tr>
+                    </thead>
+                    <tbody id="report-tbody"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- РОЗДІЛ 4: ЗВІТ ПО ПІДРОЗДІЛАХ -->
+        <section id="subdivisions-view" class="view-section">
+            <h2 style="margin-bottom: 15px;">Зведений звіт по підрозділах</h2>
+            <p style="color: #555; margin-bottom: 20px;">Оберіть підрозділ для перегляду детальної статистики:</p>
+            <div id="subdivisions-buttons-container" style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 25px;"></div>
+            <div id="subdivisions-content-container">
+                <div style="color: #7f8c8d; font-style: italic; padding: 20px; background: #fff; border-radius: 6px; border: 1px solid #e0e0e0;">Оберіть підрозділ вище, щоб переглянути дані.</div>
+            </div>
+        </section>
+
+        <!-- РОЗДІЛ 5: ОБЛІК ОБЛАДНАННЯ (ВКЛАДКИ) -->
+        <section id="generators-view" class="view-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+                <div style="display: flex; gap: 8px; align-items: center;" id="equipment-tabs-container">
+                    <button class="eq-tab-btn active" id="tab-generators" onclick="switchEquipmentTab('generators')">Генератори</button>
+                    <button class="eq-tab-btn" id="tab-webasto" onclick="switchEquipmentTab('webasto')">Webasto</button>
+                    <button class="eq-tab-btn" id="tab-heaters" onclick="switchEquipmentTab('heaters')">Теплові пушки</button>
+                    <button class="eq-tab-btn" id="tab-chainsaws" onclick="switchEquipmentTab('chainsaws')">Бензо пили</button>
+                </div>
+                <button class="action-btn" style="background-color: #27ae60; font-weight: bold; padding: 6px 12px;" onclick="addCurrentEquipmentRow()">+ Додати позицію</button>
+            </div>
+
+            <div class="table-container" style="max-height: 78vh; overflow-y: auto;" id="equipment-table-wrapper">
+                <!-- Таблиця рендериться динамічно -->
+            </div>
+        </section>
+
+        <!-- РОЗДІЛ 6: КАРТКА ТАХА / ДЕТАЛІ -->
+        <section id="car-details-view" class="view-section">
+            <div class="card-header-panel">
+                <div class="car-title-box">
+                    <button class="action-btn" onclick="switchView('base')" style="background-color: #34495e; margin-right: 15px;">← Назад до бази</button>
+                    <h2 id="detail-car-title">Автомобіль</h2>
+                </div>
+                <div class="car-summary-badge-box">
+                    <span>Підрозділ: <strong id="detail-car-sub">—</strong></span> | 
+                    <span>Водій: <strong id="detail-car-driver">—</strong></span>
+                </div>
+            </div>
+
+            <div class="details-workspace" style="display: flex; flex-direction: column; gap: 20px;">
+                <div class="details-stats-row" style="display: flex; gap: 15px; flex-wrap: wrap;">
+                    <div class="stat-card" style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px; flex: 1; min-width: 170px; text-align: center;">
+                        <h4 style="color: #7f8c8d; margin-bottom: 5px;">Загальний пробіг</h4>
+                        <strong id="det-total-mileage" style="font-size: 20px; color: #2c3e50;">0 км</strong>
+                    </div>
+                    <div class="stat-card" style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px; flex: 1; min-width: 170px; text-align: center;">
+                        <h4 style="color: #7f8c8d; margin-bottom: 5px;">Отримано палива</h4>
+                        <strong id="det-total-fuel" style="font-size: 20px; color: #27ae60;">0 л</strong>
+                    </div>
+                    <div class="stat-card" style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px; flex: 1; min-width: 170px; text-align: center;">
+                        <h4 style="color: #7f8c8d; margin-bottom: 5px;">Витрачено палива</h4>
+                        <strong id="det-total-spent-fuel" style="font-size: 20px; color: #c0392b;">0 л</strong>
+                    </div>
+                    <div class="stat-card" style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px; flex: 1; min-width: 170px; text-align: center;">
+                        <h4 style="color: #7f8c8d; margin-bottom: 5px;">Отримано AdBlue</h4>
+                        <strong id="det-total-adblue" style="font-size: 20px; color: #2980b9;">0 л</strong>
+                    </div>
+                    <div class="stat-card" style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px; flex: 1; min-width: 170px; text-align: center;">
+                        <h4 style="color: #7f8c8d; margin-bottom: 5px;">Звітів у базі</h4>
+                        <strong id="det-reports-count" style="font-size: 20px; color: #8e44ad;">0</strong>
+                    </div>
+                </div>
+
+                <div class="details-section" style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px;">
+                    <h3 style="margin-bottom: 10px; color: #2c3e50;">Архів звітів по періодах (10 днів / місяці)</h3>
+                    <div class="table-container" style="max-height: 250px;">
+                        <table>
+                            <thead>
+                                <tr><th>Період</th><th>Початковий одометр</th><th>Кінцевий одометр</th><th>Пройдено</th><th>Заправка палива</th><th>Витрачено палива</th><th>Заправка AdBlue</th><th>Мастило</th><th>Омивач</th><th>Примітка</th></tr>
+                            </thead>
+                            <tbody id="det-periods-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="details-bottom-grid" style="display: flex; gap: 20px; flex-wrap: wrap;">
+                    <div style="flex: 1; background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px; min-width: 320px;">
+                        <h3 style="margin-bottom: 10px; color: #2c3e50;">Повна технічна характеристика</h3>
+                        <table class="specs-table" style="width: 100%;">
+                            <tr><td>Він код</td><td id="det-vin">—</td></tr>
+                            <tr><td>Рік випуску</td><td id="det-year">—</td></tr>
+                            <tr><td>Тип коробки передач</td><td id="det-transmission">—</td></tr>
+                            <tr><td>Ємність бензобаку</td><td id="det-tank">—</td></tr>
+                            <tr><td>Привід</td><td id="det-drive">—</td></tr>
+                            <tr><td>Маса без вантажу</td><td id="det-empty-weight">—</td></tr>
+                            <tr><td>Повна маса</td><td id="det-total-weight">—</td></tr>
+                            <tr><td>Кількість передач</td><td id="det-gears">—</td></tr>
+                            <tr><td>Об'єм двигуна</td><td id="det-engine">—</td></tr>
+                            <tr><td>Потужність (кВт)</td><td id="det-kw">—</td></tr>
+                            <tr><td>№ двигуна</td><td id="det-engine-no">—</td></tr>
+                            <tr><td>Норма витрати</td><td id="det-consumption">—</td></tr>
+                        </table>
+                    </div>
+
+                    <div style="flex: 1; display: flex; flex-direction: column; gap: 20px; min-width: 320px;">
+                        <div style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px;">
+                            <h3 style="margin-bottom: 10px; color: #2c3e50;">📁 Папка документів та сканів авто</h3>
+                            <input type="file" id="car-doc-file-input" multiple onchange="uploadCarDocument(this)" style="margin-bottom: 10px; font-size: 12px;">
+                            <div id="car-docs-list" style="border: 1px solid #bdc3c7; padding: 10px; min-height: 80px; border-radius: 4px; background: #f9f9f9; font-size: 13px;"></div>
+                        </div>
+
+                        <div style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px;">
+                            <h3 style="margin-bottom: 10px; color: #2c3e50;">Обслуговування (ТО та Мастила)</h3>
+                            <textarea id="det-maintenance-note" placeholder="Введіть дані про останнє ТО..." style="width: 100%; height: 60px; padding: 8px; border: 1px solid #bdc3c7; border-radius: 4px; font-size: 13px; resize: vertical;"></textarea>
+                            <button class="action-btn" style="margin-top: 8px; padding: 6px 12px; font-size: 12px;" onclick="alert('Дані ТО збережено!')">Зберегти примітку ТО</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- РОЗДІЛ: РОЗРАХУНОК АГРЕГАТІВ -->
+        <section id="aggregates-calc-view" class="view-section">
+            <h2 style="margin-bottom: 15px;"></h2>
+            <div id="aggregates-calc-container"></div>
+        </section>
+
+        <!-- РОЗДІЛ: ЗВІТ ПО ОБЛАДНАННЮ -->
+        <section id="equipment-report-view" class="view-section">
+            <div class="card-header-panel">
+                <h2>Звіт по паливу та роботі обладнання</h2>
+                <div class="report-controls" style="display: flex; align-items: center; gap: 8px;">
+                    <label>Період:</label>
+                    <select id="eq-report-period-select" onchange="changeEqReportPeriod(this.value)"></select>
+                    <input type="text" id="eq-report-custom-period" value="01.10-10.10" placeholder="Напр: 01.10-10.10" oninput="renderEquipmentReportView()" style="width: 110px; text-align: center; padding: 5px;">
+                    <button class="action-btn" onclick="saveEquipmentReportData()">Зберегти звіт</button>
+                    <button class="action-btn" style="background-color: #2980b9;" onclick="printEquipmentReport()">🖨 Друк звіту</button>
+                </div>
+            </div>
+            <div class="table-container" style="max-height: 75vh;">
+                <table id="equipment-report-table" class="compact-report-table" style="width: 100%; border-collapse: collapse; background: white;">
+                    <thead>
+                        <tr>
+                            <th rowspan="2" style="padding: 6px 4px; width: 40px;">№ з/п</th>
+                            <th rowspan="2" style="padding: 6px 4px; width: 110px;">Тип обладнання</th>
+                            <th rowspan="2" style="padding: 6px 4px; width: 90px;">
+                                Підрозділ<br>
+                                <select id="equipment-subdivision-filter" onchange="renderEquipmentReportView()" style="font-size: 10px; padding: 1px; width: 100%; border-radius: 2px; border: 1px solid #1b5e20; background: white; color: #333; cursor: pointer;">
+                                    <option value="all">Усі</option>
+                                </select>
+                            </th>
+                            <th rowspan="2" style="padding: 6px 4px;">Модель</th>
+                            <th rowspan="2" style="padding: 6px 4px; width: 65px;">Тип палива</th>
+                            <th colspan="2" style="padding: 6px 4px;">Залишок палива з попереднього періоду</th>
+                            <th colspan="2" style="padding: 6px 4px;">01.10-10.10</th>
+                            <th colspan="2" style="padding: 6px 4px;">11.10-20.10</th>
+                            <th colspan="2" style="padding: 6px 4px;">21.10-31.10</th>
+                        </tr>
+                        <tr>
+                            <th style="padding: 4px; font-size: 10px;">Пальне</th>
+                            <th style="padding: 4px; width: 45px; font-size: 10px;">Мастило</th>
+                            <th style="padding: 4px; font-size: 10px;">Пальне</th>
+                            <th style="padding: 4px; width: 45px; font-size: 10px;">Мастило</th>
+                            <th style="padding: 4px; font-size: 10px;">Пальне</th>
+                            <th style="padding: 4px; width: 45px; font-size: 10px;">Мастило</th>
+                            <th style="padding: 4px; font-size: 10px;">Пальне</th>
+                            <th style="padding: 4px; width: 45px; font-size: 10px;">Мастило</th>
+                        </tr>
+                    </thead>
+                    <tbody id="equipment-report-tbody"></tbody>
+                </table>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Підключення скриптів -->
+    <script src="cars.js"></script>
+    <script src="formulas.js"></script>
+    <script src="report.js"></script>
+    <script src="generators.js"></script>
+    <script src="webasto.js"></script>
+    <script src="heaters.js"></script>
+    <script src="chainsaws.js"></script>
+    <script src="equipment_report.js"></script>
+    <script src="app.js"></script>
+    <script src="aggregates_calc.js"></script>
+</body>
+</html>
