@@ -2,7 +2,6 @@
 // ФОРМУЛИ ТА РОЗРАХУНКИ ВИТРАТИ ПАЛИВА ЗА НОМЕРАМИ (formulas.js)
 // ==========================================
 
-// Словник доступних формул за їх номерами
 const formulaDefinitions = {
     1: { label: "БЗ:", coeff: 1.20, textOp: "+ 20%", type: "bz" },
     2: { label: "Місто:", coeff: 1.05, textOp: "+ 5%", type: "city" },
@@ -11,7 +10,6 @@ const formulaDefinitions = {
     5: { label: "Виконана робота:", type: "work" },
     6: { label: "Перевезення вантажу:", type: "cargoTransport" },
     7: { label: "Витрата AdBlue:", type: "adblue" },
-    // Нові формули для мотоциклів та квадроциклів
     8: { label: "БЗ (мото/квадро):", coeff: 1.35, textOp: "+ 35%", type: "motoBz" },
     9: { label: "Місто (мото):", coeff: 1.05, textOp: "+ 5%", type: "motoCity" }
 };
@@ -47,13 +45,6 @@ function calculateRouteFuel(rows, baseRate, carFormulas = [1, 2, 3, 4], isMiles 
             totalCityKyivKm += tripVal * 0.09;
             totalMotoBzKm += tripVal * 0.80;
             totalMotoCityKm += tripVal * 0.20;
-        } else if (routeName.includes("виконання бз харків") || routeName.includes("виконання бз")) {
-            totalBzKm += tripVal * 0.33;
-            totalCityKm += tripVal * 0.18;
-            totalHighwayKm += tripVal * 0.49;
-            totalCityKyivKm += 0;
-            totalMotoBzKm += tripVal * 0.80; 
-            totalMotoCityKm += tripVal * 0.20;
         } else {
             totalBzKm += tripVal * 0.33;
             totalCityKm += tripVal * 0.18;
@@ -72,37 +63,35 @@ function calculateRouteFuel(rows, baseRate, carFormulas = [1, 2, 3, 4], isMiles 
         }
     });
 
-    let bz = parseFloat(totalBzKm.toFixed(1));
-    let city = parseFloat(totalCityKm.toFixed(1));
-    let cityKyiv = parseFloat(totalCityKyivKm.toFixed(1));
-    let motoBz = parseFloat(totalRawKm.toFixed(1)); 
+    // Базові значення з жорстким захистом від мінусових чисел (Math.max(0, ...))
+    let bz = Math.max(0, parseFloat(totalBzKm.toFixed(1)));
+    let city = Math.max(0, parseFloat(totalCityKm.toFixed(1)));
+    let highway = Math.max(0, parseFloat(totalHighwayKm.toFixed(1)));
+    let cityKyiv = Math.max(0, parseFloat(totalCityKyivKm.toFixed(1)));
+    let motoBz = 0;
     let motoCity = 0;
 
+    // Логіка для мотоциклів та квадроциклів
     if (carFormulas.includes(9) && isMotoBzRoute) {
-        motoBz = parseFloat((totalRawKm * 0.80).toFixed(1));
-        motoCity = parseFloat((totalRawKm * 0.20).toFixed(1));
+        motoBz = Math.max(0, parseFloat((totalRawKm * 0.80).toFixed(1)));
+        motoCity = Math.max(0, parseFloat((totalRawKm * 0.20).toFixed(1)));
+        bz = 0; city = 0; highway = 0; cityKyiv = 0;
     } else if (carFormulas.includes(8) && !carFormulas.includes(9) && isMotoBzRoute) {
-        motoBz = parseFloat(totalRawKm.toFixed(1));
+        motoBz = Math.max(0, parseFloat(totalRawKm.toFixed(1)));
         motoCity = 0;
+        bz = 0; city = 0; highway = 0; cityKyiv = 0;
     }
 
-    const targetTotalKm = parseFloat((totalRawKm).toFixed(1));
-
-    // ЗАХИСТ ВІД МІНУСОВИХ ЗНАЧЕНЬ: Траса завжди розраховується як залишок від загального пробігу
-    let highway = parseFloat((targetTotalKm - bz - city - cityKyiv - motoBz - motoCity).toFixed(1));
-    if (highway < 0) {
-        highway = 0;
-    }
-
+    // СТРИКТЕ ПРАВИЛО: жоден кілометр не може бути меншим за 0
     let kmMap = {
-        bz: bz,
-        city: city,
-        highway: highway,
-        cityKyiv: cityKyiv,
-        motoBz: motoBz,
-        motoCity: motoCity,
-        work: totalTkm,
-        cargoTransport: totalTkm
+        bz: Math.max(0, bz),
+        city: Math.max(0, city),
+        highway: Math.max(0, highway),
+        cityKyiv: Math.max(0, cityKyiv),
+        motoBz: Math.max(0, motoBz),
+        motoCity: Math.max(0, motoCity),
+        work: Math.max(0, totalTkm),
+        cargoTransport: Math.max(0, totalTkm)
     };
 
     let totalFuel = 0;
@@ -117,7 +106,7 @@ function calculateRouteFuel(rows, baseRate, carFormulas = [1, 2, 3, 4], isMiles 
             } else {
                 resVal = (km * baseRate / 100) * formula.coeff;
             }
-            totalFuel += resVal;
+            totalFuel += Math.max(0, resVal);
         }
     });
 
@@ -146,16 +135,16 @@ function calculateRouteFuel(rows, baseRate, carFormulas = [1, 2, 3, 4], isMiles 
             calculatedResults.push({
                 id: fId,
                 label: formula.label,
-                km: km,
+                km: Math.max(0, km),
                 textOp: formula.textOp || "",
                 type: formula.type,
-                resVal: resVal
+                resVal: Math.max(0, resVal)
             });
         }
     });
 
     return {
         calculatedResults,
-        totalFuel
+        totalFuel: Math.max(0, totalFuel)
     };
 }
