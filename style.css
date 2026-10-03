@@ -293,7 +293,7 @@ th {
     background: white;
 }
 
-/* Робочий простір картки (Десктоп) */
+/* Робочий простір картки (Оригінальний десктоп) */
 .card-workspace {
     display: flex;
     gap: 20px;
@@ -575,11 +575,12 @@ input[type=number] {
 
 
 /* ==========================================
-   АДАПТАЦІЯ ПІД ТЕЛЕФОНИ ТА ПЛАНШЕТИ (до 1250px)
-   Характеристики автомобіля гарантовано внизу!
+   БЕЗПЕЧНА АДАПТАЦІЯ ПІД ТЕЛЕФОНИ (до 1250px)
+   Структура сторінок і меню НЕ чіпається!
    ========================================== */
 
 @media (max-width: 1250px) {
+    /* Робоча зона картки авто стає вертикальною, характеристики внизу */
     .card-workspace {
         flex-direction: column !important;
         gap: 20px !important;
@@ -591,27 +592,8 @@ input[type=number] {
         width: 100% !important;
         min-width: 0 !important;
     }
-    .top-nav {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 10px;
-        padding: 10px;
-    }
-    .nav-left {
-        display: flex;
-        overflow-x: auto;
-        white-space: nowrap;
-        gap: 6px;
-        padding-bottom: 4px;
-        -webkit-overflow-scrolling: touch;
-    }
-    .nav-left::-webkit-scrollbar {
-        height: 4px;
-    }
-    .nav-left::-webkit-scrollbar-thumb {
-        background: #5d6d7e;
-        border-radius: 2px;
-    }
+
+    /* Верхня панель статистики */
     .top-stats-row {
         flex-direction: column;
         gap: 15px;
@@ -629,6 +611,8 @@ input[type=number] {
     .odometer-panel {
         width: 100%;
     }
+
+    /* Футер розрахунків */
     .footer-layout-flex {
         flex-direction: column;
         gap: 15px;
@@ -650,10 +634,6 @@ input[type=number] {
     .slash-separator {
         display: none;
     }
-    .calc-row {
-        grid-template-columns: 1fr 45px 80px 50px 15px 70px;
-        font-size: 12px;
-    }
 }
 
 @media (max-width: 600px) {
@@ -663,22 +643,10 @@ input[type=number] {
     .view-section {
         padding: 10px;
     }
-    .card-header-panel {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 10px;
-        padding: 8px 10px;
-    }
     .car-title-box {
         flex-direction: column;
         align-items: flex-start;
         gap: 6px;
-    }
-    .search-box {
-        width: 100%;
-    }
-    .search-box input[type="text"] {
-        width: 100% !important;
     }
     .fuel-panel {
         width: 100%;
@@ -692,7 +660,7 @@ input[type=number] {
     }
 }
 
-/* Сенсорна прокрутка для всіх таблиць */
+/* Сенсорна прокрутка таблиць на телефоні */
 .table-container, 
 .routes-container, 
 .print-scroll-box {
