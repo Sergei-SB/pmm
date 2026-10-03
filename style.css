@@ -572,3 +572,216 @@ input[type=number] {
 #routes-tbody input {
     text-align: center;
 }
+/* ========================================== */
+/* АДАПТАЦІЯ ДЛЯ МОБІЛЬНИХ ПРИСТРОЇВ (MOBILE RESPONSIVE) */
+/* ========================================== */
+
+@media (max-width: 768px) {
+    /* Навігаційна панель зверху */
+    .top-nav {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 8px 10px;
+        gap: 8px;
+    }
+
+    .nav-left {
+        display: flex;
+        overflow-x: auto;
+        gap: 6px;
+        padding-bottom: 4px;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .nav-left::-webkit-scrollbar {
+        height: 3px;
+    }
+
+    .nav-left::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 2px;
+    }
+
+    .nav-btn {
+        font-size: 11px;
+        padding: 6px 10px;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    #top-search-box {
+        width: 100%;
+    }
+
+    #base-search-input {
+        width: 100% !important;
+    }
+
+    /* Загальні відступи секцій */
+    .view-section {
+        padding: 10px 5px;
+    }
+
+    h2 {
+        font-size: 16px;
+        margin-bottom: 10px;
+    }
+
+    /* Шапка картки автомобіля */
+    .card-header-panel {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        padding: 8px 10px;
+    }
+
+    .car-title-box {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+    }
+
+    .search-box {
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 4px;
+    }
+
+    .search-box input[type="text"] {
+        width: 100% !important;
+    }
+
+    /* Робочий простір картки авто (переводимо у вертикальний стекинг) */
+    .card-workspace {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .workspace-sidebar {
+        width: 100%;
+        min-width: 0;
+    }
+
+    /* Блоки палива та одометрів у картці */
+    .top-stats-row {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .fuel-panels-group {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .fuel-panel {
+        width: 48%;
+    }
+
+    .odometer-panel {
+        width: 100%;
+    }
+
+    .transfer-btn-container {
+        width: 100%;
+    }
+
+    .transfer-btn {
+        width: 100%;
+        padding: 10px;
+    }
+
+    /* Таблиця маршрутів та футер розрахунків */
+    .routes-container {
+        padding: 5px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .footer-layout-flex {
+        flex-direction: column;
+        gap: 15px;
+        padding: 0;
+    }
+
+    .preset-buttons-group {
+        width: 100%;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .preset-btn {
+        width: calc(50% - 2px);
+        font-size: 10px;
+        padding: 6px 4px;
+    }
+
+    .calc-main-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .slash-separator {
+        display: none; /* Прибираємо великий слеш на мобільних для економії місця */
+    }
+
+    .calc-row {
+        grid-template-columns: 130px 40px 75px 45px 15px 65px;
+        font-size: 11px;
+    }
+
+    .fuel-summary-line {
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    /* Таблиці з горизонтальним скролом (Реєстр, Звіти) */
+    .table-container {
+        max-height: 70vh;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        border: 1px solid #bdc3c7;
+        background: white;
+    }
+
+    /* Звіт по підрозділах (вкладки зверху) */
+    #subdivisions-buttons-container {
+        overflow-x: auto;
+        flex-wrap: nowrap !important;
+        padding-bottom: 6px;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .sub-nav-btn {
+        padding: 8px 12px !important;
+        font-size: 12px !important;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    /* Деталі автомобіля (стор. звіту по авто) */
+    .details-stats-row {
+        flex-direction: column;
+        gap: 8px !important;
+    }
+
+    .details-bottom-grid {
+        flex-direction: column;
+        gap: 10px !important;
+    }
+
+    /* Контроли звітів */
+    .report-controls {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+    }
+
+    .report-controls select, 
+    .report-controls input, 
+    .report-controls button {
+        width: 100% !important;
+    }
+}
