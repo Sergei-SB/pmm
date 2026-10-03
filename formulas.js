@@ -52,8 +52,7 @@ function calculateRouteFuel(rows, baseRate, carFormulas = [1, 2, 3, 4], isMiles 
             totalCityKm += tripVal * 0.18;
             totalHighwayKm += tripVal * 0.49;
             totalCityKyivKm += 0;
-            // Для мотоцикла/квадроцикла за вашим правилом:
-            totalMotoBzKm += tripVal * 0.80; // Перекривається логікою формул нижче
+            totalMotoBzKm += tripVal * 0.80; 
             totalMotoCityKm += tripVal * 0.20;
         } else {
             totalBzKm += tripVal * 0.33;
@@ -65,7 +64,6 @@ function calculateRouteFuel(rows, baseRate, carFormulas = [1, 2, 3, 4], isMiles 
         }
     });
 
-    // Перевіряємо, чи це специфічна кнопка "Виконання БЗ Харків" для мотоцикла чи квадроцикла
     let isMotoBzRoute = false;
     rows.forEach(row => {
         const nameInput = row.querySelector('input[type="text"]');
@@ -76,31 +74,24 @@ function calculateRouteFuel(rows, baseRate, carFormulas = [1, 2, 3, 4], isMiles 
 
     let bz = parseFloat(totalBzKm.toFixed(1));
     let city = parseFloat(totalCityKm.toFixed(1));
-    let highway = parseFloat(totalHighwayKm.toFixed(1));
     let cityKyiv = parseFloat(totalCityKyivKm.toFixed(1));
-    let motoBz = parseFloat(totalRawKm.toFixed(1)); // За замовчуванням для квадроцикла 100% (або перекриється)
+    let motoBz = parseFloat(totalRawKm.toFixed(1)); 
     let motoCity = 0;
 
-    // Якщо це мотоцикл (має формулу motoCity у своєму наборі) і маршрут "Виконання БЗ Харків"
     if (carFormulas.includes(9) && isMotoBzRoute) {
         motoBz = parseFloat((totalRawKm * 0.80).toFixed(1));
         motoCity = parseFloat((totalRawKm * 0.20).toFixed(1));
     } else if (carFormulas.includes(8) && !carFormulas.includes(9) && isMotoBzRoute) {
-        // Квадроцикл: 100% на БЗ
         motoBz = parseFloat(totalRawKm.toFixed(1));
         motoCity = 0;
     }
 
-    // Цільовий загальний пробіг з точністю до десятих
     const targetTotalKm = parseFloat((totalRawKm).toFixed(1));
-    let currentSum = parseFloat((bz + city + highway + cityKyiv + motoBz + motoCity).toFixed(1));
-    let diff = parseFloat((targetTotalKm - currentSum).toFixed(1));
 
-    if (Math.abs(diff) >= 0.1) {
-        if (highway > 0) highway = parseFloat((highway + diff).toFixed(1));
-        else if (motoBz > 0) motoBz = parseFloat((motoBz + diff).toFixed(1));
-        else if (city > 0) city = parseFloat((city + diff).toFixed(1));
-        else if (bz > 0) bz = parseFloat((bz + diff).toFixed(1));
+    // ЗАХИСТ ВІД МІНУСОВИХ ЗНАЧЕНЬ: Траса завжди розраховується як залишок від загального пробігу
+    let highway = parseFloat((targetTotalKm - bz - city - cityKyiv - motoBz - motoCity).toFixed(1));
+    if (highway < 0) {
+        highway = 0;
     }
 
     let kmMap = {
