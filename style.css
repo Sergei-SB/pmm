@@ -573,10 +573,10 @@ input[type=number] {
     text-align: center;
 }
 /* ========================================== */
-/* АДАПТАЦІЯ ДЛЯ МОБІЛЬНИХ ПРИСТРОЇВ (MOBILE RESPONSIVE) */
+/* АДАПТАЦІЯ ДЛЯ МОБІЛЬНИХ ПРИСТРОЇВ ТА ПЛАНШЕТІВ */
 /* ========================================== */
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
     /* Навігаційна панель зверху */
     .top-nav {
         flex-direction: column;
@@ -627,7 +627,7 @@ input[type=number] {
         margin-bottom: 10px;
     }
 
-    /* Шапка картки автомобіля */
+    /* ШАПКА ТА РОБОЧИЙ ПРОСТІР КАРТКИ АВТОМОБІЛЯ */
     .card-header-panel {
         flex-direction: column;
         align-items: stretch;
@@ -652,15 +652,17 @@ input[type=number] {
         width: 100% !important;
     }
 
-    /* Робочий простір картки авто (переводимо у вертикальний стекинг) */
+    /* ГОЛОВНЕ ВИПРАВЛЕННЯ: Картка авто та опис йдуть строго один під одним */
     .card-workspace {
-        flex-direction: column;
-        gap: 10px;
+        flex-direction: column !important;
+        gap: 15px !important;
     }
 
+    .workspace-main,
     .workspace-sidebar {
-        width: 100%;
-        min-width: 0;
+        width: 100% !important;
+        flex: none !important;
+        min-width: 0 !important;
     }
 
     /* Блоки палива та одометрів у картці */
@@ -724,7 +726,7 @@ input[type=number] {
     }
 
     .slash-separator {
-        display: none; /* Прибираємо великий слеш на мобільних для економії місця */
+        display: none;
     }
 
     .calc-row {
@@ -737,7 +739,7 @@ input[type=number] {
         gap: 5px;
     }
 
-    /* Таблиці з горизонтальним скролом (Реєстр, Звіти) */
+    /* Таблиці з горизонтальним скролом */
     .table-container {
         max-height: 70vh;
         overflow-x: auto;
@@ -746,7 +748,7 @@ input[type=number] {
         background: white;
     }
 
-    /* Звіт по підрозділах (вкладки зверху) */
+    /* Звіт по підрозділах */
     #subdivisions-buttons-container {
         overflow-x: auto;
         flex-wrap: nowrap !important;
@@ -761,7 +763,7 @@ input[type=number] {
         flex-shrink: 0;
     }
 
-    /* Деталі автомобіля (стор. звіту по авто) */
+    /* Деталі автомобіля */
     .details-stats-row {
         flex-direction: column;
         gap: 8px !important;
