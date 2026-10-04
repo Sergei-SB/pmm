@@ -85,7 +85,7 @@ function getAllEquipmentItemsUnified() {
     sources.forEach(src => {
         if (Array.isArray(src.data)) {
             src.data.forEach((item, index) => {
-                const actualSub = item.locationSubdivision || item.subdivision || item.sub || 'РМТЗ';
+                const actualSub = item.locationSubdivision || item.subdivision || item.sub || '';
                 allItems.push({
                     uniqueId: `${src.type}_${item.id || index}`,
                     category: src.type,
