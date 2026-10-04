@@ -2,17 +2,18 @@
 // ЛОГІКА ОБЛІКУ WEBASTO (webasto.js)
 // ==========================================
 
-const CURRENT_WEBASTO_VERSION = 'v5_webasto_autofill';
+const CURRENT_WEB_VERSION = 'v2_full_list';
 
 let defaultWebastoData = [
-    { id: 1, model: "PNI WB300", kw: "5", fuelType: "ДП", consumption: "0.51", max5Days: "30.6", max10Days: "61.2", max30Days: "183.6", motoHoursDay: "12", subdivision: "РМТЗ", responsiblePerson: "Ковальов В.В.", locationSubdivision: "РМТЗ", serialNumber: "Без номера", note: "" },
-    { id: 2, model: "Mar-Pol M80950", kw: "8", fuelType: "ДП", consumption: "0.45", max5Days: "27.0", max10Days: "54.0", max30Days: "162.0", motoHoursDay: "12", subdivision: "РМТЗ", responsiblePerson: "Ковальов В.В.", locationSubdivision: "РМТЗ", serialNumber: "Без номера", note: "" },
-    { id: 3, model: "Master B150", kw: "8", fuelType: "ДП", consumption: "0.45", max5Days: "27.0", max10Days: "54.0", max30Days: "162.0", motoHoursDay: "12", subdivision: "РМТЗ", responsiblePerson: "Ковальов В.В.", locationSubdivision: "РМТЗ", serialNumber: "Без номера", note: "" },
-    { id: 4, model: "Kraft&Dele KD11780", kw: "8", fuelType: "ДП", consumption: "0.45", max5Days: "27.0", max10Days: "54.0", max30Days: "162.0", motoHoursDay: "12", subdivision: "РМТЗ", responsiblePerson: "Ковальов В.В.", locationSubdivision: "РМТЗ", serialNumber: "Без номера", note: "" },
-    { id: 5, model: "LF Bros EX 5.0", kw: "5", fuelType: "ДП", consumption: "0.46", max5Days: "27.6", max10Days: "55.2", max30Days: "165.6", motoHoursDay: "12", subdivision: "РМТЗ", responsiblePerson: "Ковальов В.В.", locationSubdivision: "РМТЗ", serialNumber: "Без номера", note: "" },
-    { id: 6, model: "Direltron NFO", kw: "8", fuelType: "ДП", consumption: "0.48", max5Days: "28.8", max10Days: "57.6", max30Days: "172.8", motoHoursDay: "12", subdivision: "РМТЗ", responsiblePerson: "Ковальов В.В.", locationSubdivision: "РМТЗ", serialNumber: "Без номера", note: "" },
-    { id: 7, model: "Car parking heater WF5001", kw: "5", fuelType: "ДП", consumption: "0.20", max5Days: "12.0", max10Days: "24.0", max30Days: "72.0", motoHoursDay: "12", subdivision: "РМТЗ", responsiblePerson: "Ковальов В.В.", locationSubdivision: "РМТЗ", serialNumber: "Без номера", note: "" },
-    { id: 8, model: "\"Джміль\" WF8002", kw: "8", fuelType: "ДП", consumption: "0.20", max5Days: "12.0", max10Days: "24.0", max30Days: "72.0", motoHoursDay: "12", subdivision: "РМТЗ", responsiblePerson: "Ковальов В.В.", locationSubdivision: "РМТЗ", serialNumber: "Без номера", note: "" }
+    { id: 1, model: "Webasto Air Top 2000 STC", kw: "2.0", fuelType: "ДП", consumption: "0.24", max5Days: "14.40", max10Days: "28.8", max30Days: "86.4", motoHoursDay: "12", oilNorm10Days: "0.10", subdivision: "", responsiblePerson: "Ковальов В.В.", locationSubdivision: "", serialNumber: "WB-2000-1", note: "" },
+    { id: 2, model: "PNI WB300", kw: "5.0", fuelType: "ДП", consumption: "0.30", max5Days: "18.00", max10Days: "36.0", max30Days: "108.0", motoHoursDay: "12", oilNorm10Days: "0.10", subdivision: "", responsiblePerson: "Ковальов В.В.", locationSubdivision: "", serialNumber: "PNI-300-1", note: "" },
+    { id: 3, model: "Mar-Pol M80950", kw: "5.0", fuelType: "ДП", consumption: "0.32", max5Days: "19.20", max10Days: "38.4", max30Days: "115.2", motoHoursDay: "12", oilNorm10Days: "0.10", subdivision: "", responsiblePerson: "Ковальов В.В.", locationSubdivision: "", serialNumber: "MP-80950-1", note: "" },
+    { id: 4, model: "Master B150", kw: "44", fuelType: "ДП", consumption: "1.20", max5Days: "72.00", max10Days: "144.0", max30Days: "432.0", motoHoursDay: "12", oilNorm10Days: "0.20", subdivision: "", responsiblePerson: "Ковальов В.В.", locationSubdivision: "", serialNumber: "MST-150-1", note: "" },
+    { id: 5, model: "Kraft&Dele KD11780", kw: "5.0", fuelType: "ДП", consumption: "0.30", max5Days: "18.00", max10Days: "36.0", max30Days: "108.0", motoHoursDay: "12", oilNorm10Days: "0.10", subdivision: "", responsiblePerson: "Ковальов В.В.", locationSubdivision: "", serialNumber: "KD-11780-1", note: "" },
+    { id: 6, model: "LF Bros EX 5.0", kw: "5.0", fuelType: "ДП", consumption: "0.28", max5Days: "16.80", max10Days: "33.6", max30Days: "100.8", motoHoursDay: "12", oilNorm10Days: "0.10", subdivision: "", responsiblePerson: "Ковальов В.В.", locationSubdivision: "", serialNumber: "LFB-50-1", note: "" },
+    { id: 7, model: "Direltron NFO", kw: "3.0", fuelType: "ДП", consumption: "0.25", max5Days: "15.00", max10Days: "30.0", max30Days: "90.0", motoHoursDay: "12", oilNorm10Days: "0.10", subdivision: "", responsiblePerson: "Ковальов В.В.", locationSubdivision: "", serialNumber: "DIR-NFO-1", note: "" },
+    { id: 8, model: "Car parking heater WF5001", kw: "5.0", fuelType: "ДП", consumption: "0.30", max5Days: "18.00", max10Days: "36.0", max30Days: "108.0", motoHoursDay: "12", oilNorm10Days: "0.10", subdivision: "", responsiblePerson: "Ковальов В.В.", locationSubdivision: "", serialNumber: "WF-5001-1", note: "" },
+    { id: 9, model: "\"Джміль\" WF8002", kw: "5.0", fuelType: "ДП", consumption: "0.30", max5Days: "18.00", max10Days: "36.0", max30Days: "108.0", motoHoursDay: "12", oilNorm10Days: "0.10", subdivision: "", responsiblePerson: "Ковальов В.В.", locationSubdivision: "", serialNumber: "WF-8002-1", note: "" }
 ];
 
 let webastoFilters = { model: "", subdivision: "", responsiblePerson: "", locationSubdivision: "" };
@@ -20,22 +21,92 @@ let webastoFilters = { model: "", subdivision: "", responsiblePerson: "", locati
 function getWebastoList() {
     try {
         const storedVer = localStorage.getItem('webasto_data_version');
-        const stored = localStorage.getItem('equipment_data_webasto');
-        if (stored && storedVer === CURRENT_WEBASTO_VERSION) return JSON.parse(stored);
+        const stored = localStorage.getItem('webasto_custom_data');
+        if (stored && storedVer === CURRENT_WEB_VERSION) return JSON.parse(stored);
     } catch(e) {}
-    
-    localStorage.setItem('webasto_data_version', CURRENT_WEBASTO_VERSION);
-    localStorage.setItem('equipment_data_webasto', JSON.stringify(defaultWebastoData));
+    localStorage.setItem('webasto_data_version', CURRENT_WEB_VERSION);
+    localStorage.setItem('webasto_custom_data', JSON.stringify(defaultWebastoData));
     return defaultWebastoData;
 }
 
-function saveWebastoList(list) {
-    localStorage.setItem('equipment_data_webasto', JSON.stringify(list));
+function saveWebastoList(list) { localStorage.setItem('webasto_custom_data', JSON.stringify(list)); }
+
+function printWebastoTable() {
+    const printWindow = window.open('', '_blank');
+    let list = getWebastoList().filter(item => !/знищ/ui.test(String(item.note || item.comment || '')));
+    let html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8"><title>Облік Webasto</title>
+            <style>
+                body { font-family: Arial, sans-serif; font-size: 11px; color: #000; margin: 10px; }
+                h2 { text-align: center; margin-bottom: 15px; font-size: 14px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                th, td { border: 1px solid #333; padding: 4px 6px; text-align: center; }
+                th { background-color: #2e7d32 !important; color: white !important; font-size: 11px; }
+                td:nth-child(2) { text-align: left; }
+                @media print { @page { size: landscape; margin: 10mm; } }
+            </style>
+        </head>
+        <body>
+            <h2>ОБЛІК ТА НОРМИ ВИТРАТ ПАЛИВА І МАСТИЛ WEBASTO</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>№</th><th>Модель</th><th>кВт</th><th>Тип пал.</th><th>Розхід літ./год.</th><th>Норма мастил</th>
+                        <th>Макс з. на 5 діб</th><th>Макс з. на 10 діб</th><th>Макс з. на 30 діб</th><th>Норма мотог.</th>
+                        <th>Підрозділ</th><th>Мат. Відп. Особа</th><th>Де знаходиться</th><th>Серійний номер</th><th>Примітка</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    list.forEach((item, index) => {
+        html += `<tr>
+            <td>${index + 1}</td><td>${item.model || ''}</td><td>${item.kw || ''}</td><td>${item.fuelType || ''}</td>
+            <td>${item.consumption || ''}</td><td>${item.oilNorm10Days || ''}</td><td>${item.max5Days || ''}</td>
+            <td>${item.max10Days || ''}</td><td>${item.max30Days || ''}</td><td>${item.motoHoursDay || ''}</td>
+            <td>${item.subdivision || ''}</td><td>${item.responsiblePerson || ''}</td><td>${item.locationSubdivision || ''}</td>
+            <td>${item.serialNumber || ''}</td><td>${item.note || ''}</td>
+        </tr>`;
+    });
+    html += `</tbody></table></body></html>`;
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => { printWindow.print(); printWindow.close(); }, 250);
 }
 
 function renderWebastoView() {
     const wrapper = document.getElementById('equipment-table-wrapper');
     if (!wrapper) return;
+
+    ['print-generators-btn', 'print-webasto-btn', 'print-heaters-btn', 'print-chainsaws-btn'].forEach(btnId => {
+        const oldB = document.getElementById(btnId);
+        if (oldB) oldB.remove();
+    });
+
+    const addBtn = document.querySelector('button[onclick*="addCurrentEquipmentRow"]') || document.querySelector('.equipment-actions-bar button');
+    if (addBtn) {
+        const parentBar = addBtn.parentElement;
+        if (parentBar) {
+            parentBar.style.display = 'flex';
+            parentBar.style.justifyContent = 'space-between';
+            parentBar.style.alignItems = 'center';
+            parentBar.style.width = '100%';
+
+            let printBtn = document.getElementById('universal-print-btn');
+            if (!printBtn) {
+                printBtn = document.createElement('button');
+                printBtn.id = 'universal-print-btn';
+                printBtn.className = 'action-btn print-btn';
+                parentBar.insertBefore(printBtn, addBtn);
+            }
+            printBtn.onclick = printCurrentEquipmentTable;
+            printBtn.innerHTML = '<span style="font-size: 14px; margin-right: 6px; vertical-align: middle;">🖨️</span> Друк';
+            printBtn.style.cssText = 'background-color: #337ab7; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; white-space: nowrap; margin-left: auto; margin-right: 10px;';
+        }
+    }
 
     wrapper.innerHTML = `
         <table id="webasto-table" class="compact-base-table" style="width: 100%; border-collapse: collapse; background: white; font-size: 12px;">
@@ -46,6 +117,7 @@ function renderWebastoView() {
                     <th style="padding: 6px 4px; width: 45px;">кВт</th>
                     <th style="padding: 6px 4px; width: 50px;">Тип пал.</th>
                     <th style="padding: 6px 4px; width: 55px;">Розхід літ./год.</th>
+                    <th style="padding: 6px 4px; width: 65px;">Норма мастил</th>
                     <th style="padding: 6px 4px; width: 75px;">Макс з. на 5 діб</th>
                     <th style="padding: 6px 4px; width: 75px;">Макс з. на 10 діб</th>
                     <th style="padding: 6px 4px; width: 75px;">Макс з. на 30 діб</th>
@@ -60,8 +132,8 @@ function renderWebastoView() {
             </thead>
             <tbody id="webasto-tbody"></tbody>
         </table>
-        <datalist id="webasto-autocomplete-list">
-            ${defaultWebastoData.map(d => `<option value="${d.model}">`).join('')}
+        <datalist id="webasto-model-datalist">
+            ${defaultWebastoData.map(item => `<option value="${item.model}">`).join('')}
         </datalist>
     `;
 
@@ -69,8 +141,10 @@ function renderWebastoView() {
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    let items = getWebastoList();
-    const filtered = items.filter(item => {
+    let list = getWebastoList();
+    const filtered = list.filter(item => {
+        if (/знищ/ui.test(String(item.note || item.comment || ''))) return false;
+
         if (webastoFilters.model && !String(item.model || "").toLowerCase().includes(webastoFilters.model.toLowerCase())) return false;
         if (webastoFilters.subdivision && !String(item.subdivision || "").toLowerCase().includes(webastoFilters.subdivision.toLowerCase())) return false;
         if (webastoFilters.responsiblePerson && !String(item.responsiblePerson || "").toLowerCase().includes(webastoFilters.responsiblePerson.toLowerCase())) return false;
@@ -82,96 +156,72 @@ function renderWebastoView() {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td style="text-align: center; padding: 3px 4px;">${index + 1}</td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.model || ''}" list="webasto-autocomplete-list" oninput="onWebastoModelInput(${item.id}, this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
-            <td style="padding: 3px 4px;"><input type="text" id="web-kw-${item.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.kw || ''}" oninput="updateWebProp(${item.id}, 'kw', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" id="web-fuel-${item.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.fuelType || ''}" oninput="updateWebProp(${item.id}, 'fuelType', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" id="web-cons-${item.id}" class="table-cell-input" style="text-align:center; background-color: #fff9c4; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.consumption || ''}" oninput="updateWebProp(${item.id}, 'consumption', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" id="web-m5-${item.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.max5Days || ''}" oninput="updateWebProp(${item.id}, 'max5Days', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" id="web-m10-${item.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.max10Days || ''}" oninput="updateWebProp(${item.id}, 'max10Days', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" id="web-m30-${item.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.max30Days || ''}" oninput="updateWebProp(${item.id}, 'max30Days', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" id="web-moto-${item.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.motoHoursDay || ''}" oninput="updateWebProp(${item.id}, 'motoHoursDay', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.subdivision || ''}" oninput="updateWebProp(${item.id}, 'subdivision', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.responsiblePerson || ''}" oninput="updateWebProp(${item.id}, 'responsiblePerson', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.locationSubdivision || ''}" oninput="updateWebProp(${item.id}, 'locationSubdivision', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.serialNumber || ''}" oninput="updateWebProp(${item.id}, 'serialNumber', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.note || ''}" oninput="updateWebProp(${item.id}, 'note', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
-            <td style="text-align: center; padding: 3px 4px;"><button class="delete-row-btn" style="padding: 2px 6px; font-size: 10px;" onclick="deleteWebRow(${item.id})">Видалити</button></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" list="webasto-model-datalist" value="${item.model || ''}" placeholder="Нова webasto" onchange="updateWebastoProp(${item.id}, 'model', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.kw || ''}" oninput="updateWebastoProp(${item.id}, 'kw', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.fuelType || ''}" oninput="updateWebastoProp(${item.id}, 'fuelType', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; background-color: #fff9c4; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.consumption || ''}" oninput="updateWebastoProp(${item.id}, 'consumption', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.oilNorm10Days || ''}" oninput="updateWebastoProp(${item.id}, 'oilNorm10Days', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.max5Days || ''}" oninput="updateWebastoProp(${item.id}, 'max5Days', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.max10Days || ''}" oninput="updateWebastoProp(${item.id}, 'max10Days', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.max30Days || ''}" oninput="updateWebastoProp(${item.id}, 'max30Days', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.motoHoursDay || ''}" oninput="updateWebastoProp(${item.id}, 'motoHoursDay', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.subdivision || ''}" oninput="updateWebastoProp(${item.id}, 'subdivision', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.responsiblePerson || ''}" oninput="updateWebastoProp(${item.id}, 'responsiblePerson', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.locationSubdivision || ''}" oninput="updateWebastoProp(${item.id}, 'locationSubdivision', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.serialNumber || ''}" oninput="updateWebastoProp(${item.id}, 'serialNumber', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.note || ''}" oninput="updateWebastoProp(${item.id}, 'note', this.value); if(/знищ/ui.test(this.value)) { renderWebastoView(); }" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
+            <td style="text-align: center; padding: 3px 4px;"><button class="delete-row-btn" style="padding: 2px 6px; font-size: 10px;" onclick="deleteWebastoRow(${item.id})">Видалити</button></td>
         `;
         tbody.appendChild(tr);
     });
-}
-
-function onWebastoModelInput(id, val) {
-    let items = getWebastoList();
-    const item = items.find(i => Number(i.id) === Number(id));
-    if (!item) return;
-
-    item.model = val;
-    const trimmedVal = val.trim().toLowerCase();
-    const matchedBase = defaultWebastoData.find(b => b.model && b.model.trim().toLowerCase() === trimmedVal);
-
-    if (matchedBase) {
-        item.kw = matchedBase.kw;
-        item.fuelType = matchedBase.fuelType;
-        item.consumption = matchedBase.consumption;
-        item.max5Days = matchedBase.max5Days;
-        item.max10Days = matchedBase.max10Days;
-        item.max30Days = matchedBase.max30Days;
-        item.motoHoursDay = matchedBase.motoHoursDay;
-
-        const elKw = document.getElementById(`web-kw-${id}`);
-        const elFuel = document.getElementById(`web-fuel-${id}`);
-        const elCons = document.getElementById(`web-cons-${id}`);
-        const elM5 = document.getElementById(`web-m5-${id}`);
-        const elM10 = document.getElementById(`web-m10-${id}`);
-        const elM30 = document.getElementById(`web-m30-${id}`);
-        const elMoto = document.getElementById(`web-moto-${id}`);
-
-        if (elKw) elKw.value = matchedBase.kw;
-        if (elFuel) elFuel.value = matchedBase.fuelType;
-        if (elCons) elCons.value = matchedBase.consumption;
-        if (elM5) elM5.value = matchedBase.max5Days;
-        if (elM10) elM10.value = matchedBase.max10Days;
-        if (elM30) elM30.value = matchedBase.max30Days;
-        if (elMoto) elMoto.value = matchedBase.motoHoursDay;
-    }
-    saveWebastoList(items);
 }
 
 function updateWebFilter(field, val) {
     webastoFilters[field] = val;
     renderWebastoView();
     setTimeout(() => {
-        const map = { model: 'filter-web-model', subdivision: 'filter-web-sub', responsiblePerson: 'filter-web-resp', locationSubdivision: 'filter-web-loc' };
-        const el = document.getElementById(map[field]);
+        const inputMap = { model: 'filter-web-model', subdivision: 'filter-web-sub', responsiblePerson: 'filter-web-resp', locationSubdivision: 'filter-web-loc' };
+        const el = document.getElementById(inputMap[field]);
         if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
     }, 0);
 }
 
-function updateWebProp(id, prop, val) {
-    let items = getWebastoList();
-    const item = items.find(i => Number(i.id) === Number(id));
-    if (item) { 
-        item[prop] = val; 
-        if (prop === 'locationSubdivision') {
-            item.subdivision = val;
+function updateWebastoProp(id, prop, val) {
+    let list = getWebastoList();
+    const item = list.find(i => Number(i.id) === Number(id));
+    if (item) {
+        item[prop] = val;
+        if (prop === 'locationSubdivision') item.subdivision = val;
+        if (prop === 'model') {
+            const foundRef = defaultWebastoData.find(ref => ref.model.toLowerCase().trim() === val.toLowerCase().trim());
+            if (foundRef) {
+                item.kw = foundRef.kw;
+                item.fuelType = foundRef.fuelType;
+                item.consumption = foundRef.consumption;
+                item.max5Days = foundRef.max5Days;
+                item.max10Days = foundRef.max10Days;
+                item.max30Days = foundRef.max30Days;
+                item.motoHoursDay = foundRef.motoHoursDay;
+                item.oilNorm10Days = foundRef.oilNorm10Days;
+            }
         }
-        saveWebastoList(items); 
+        saveWebastoList(list);
+        if (prop === 'model') renderWebastoView();
     }
 }
 
 function addWebastoRow() {
-    let items = getWebastoList();
-    const newId = items.length > 0 ? Math.max(...items.map(i => i.id)) + 1 : 1;
-    items.push({ id: newId, model: "Webasto Нова", kw: "5", fuelType: "ДП", consumption: "0.51", max5Days: "30.6", max10Days: "61.2", max30Days: "183.6", motoHoursDay: "12", subdivision: "РМТЗ", responsiblePerson: "", locationSubdivision: "РМТЗ", serialNumber: "", note: "" });
-    saveWebastoList(items);
+    let list = getWebastoList();
+    const newId = list.length > 0 ? Math.max(...list.map(i => i.id)) + 1 : 1;
+    list.push({ id: newId, model: "", kw: "", fuelType: "", consumption: "", max5Days: "", max10Days: "", max30Days: "", motoHoursDay: "", oilNorm10Days: "", subdivision: "РМТЗ", responsiblePerson: "Ковальов В.В.", locationSubdivision: "РМТЗ", serialNumber: "000000", note: "" });
+    saveWebastoList(list);
     renderWebastoView();
 }
 
-function deleteWebRow(id) {
-    if (!confirm("Ви впевнені, що хочете видалити цей рядок?")) return;
-    let items = getWebastoList();
-    items = items.filter(i => Number(i.id) !== Number(id));
-    saveWebastoList(items);
+function deleteWebastoRow(id) {
+    if (!confirm("Ви впевнені, що хочете видалити цей запис?")) return;
+    let list = getWebastoList();
+    list = list.filter(i => Number(i.id) !== Number(id));
+    saveWebastoList(list);
     renderWebastoView();
 }

@@ -85,7 +85,10 @@ function getAllEquipmentItemsUnified() {
     sources.forEach(src => {
         if (Array.isArray(src.data)) {
             src.data.forEach((item, index) => {
-                const actualSub = item.locationSubdivision || item.subdivision || item.sub || '';
+                const noteStr = String(item.note || "").toLowerCase();
+                if (noteStr.includes('знищ')) return; // Пропускаємо знищені позиції
+
+                const actualSub = item.locationSubdivision || item.subdivision || item.sub || 'РМТЗ';
                 allItems.push({
                     uniqueId: `${src.type}_${item.id || index}`,
                     category: src.type,

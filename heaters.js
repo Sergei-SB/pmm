@@ -2,10 +2,11 @@
 // ЛОГІКА ОБЛІКУ ТЕПЛОВИХ ПУШОК (heaters.js)
 // ==========================================
 
-const CURRENT_HEATERS_VERSION = 'v3_heaters_autofill';
+const CURRENT_HEAT_VERSION = 'v2_full_list';
 
 let defaultHeatersData = [
-    { id: 1, model: "ITA-35THL", kw: "35", fuelType: "ДП", consumption: "2.40", max5Days: "144.0", max10Days: "288.0", max30Days: "864.0", motoHoursDay: "12", subdivision: "ВМТЗ", responsiblePerson: "Ковальов В.В.", locationSubdivision: "ВМТЗ", serialNumber: "Без номера", note: "" }
+    { id: 1, model: "ITA-35THL", kw: "35", fuelType: "ДП", consumption: "2.80", max5Days: "168.00", max10Days: "336.0", max30Days: "1008.0", motoHoursDay: "12", oilNorm10Days: "0.50", subdivision: "", responsiblePerson: "Ковальов В.В.", locationSubdivision: "", serialNumber: "ITA-35-1", note: "" },
+    { id: 2, model: "Master BV 77", kw: "20", fuelType: "ДП", consumption: "1.70", max5Days: "102.00", max10Days: "204.0", max30Days: "612.0", motoHoursDay: "12", oilNorm10Days: "0.50", subdivision: "", responsiblePerson: "Ковальов В.В.", locationSubdivision: "", serialNumber: "HST-77-1", note: "" }
 ];
 
 let heatersFilters = { model: "", subdivision: "", responsiblePerson: "", locationSubdivision: "" };
@@ -13,22 +14,92 @@ let heatersFilters = { model: "", subdivision: "", responsiblePerson: "", locati
 function getHeatersList() {
     try {
         const storedVer = localStorage.getItem('heaters_data_version');
-        const stored = localStorage.getItem('equipment_data_heaters');
-        if (stored && storedVer === CURRENT_HEATERS_VERSION) return JSON.parse(stored);
+        const stored = localStorage.getItem('heaters_custom_data');
+        if (stored && storedVer === CURRENT_HEAT_VERSION) return JSON.parse(stored);
     } catch(e) {}
-    
-    localStorage.setItem('heaters_data_version', CURRENT_HEATERS_VERSION);
-    localStorage.setItem('equipment_data_heaters', JSON.stringify(defaultHeatersData));
+    localStorage.setItem('heaters_data_version', CURRENT_HEAT_VERSION);
+    localStorage.setItem('heaters_custom_data', JSON.stringify(defaultHeatersData));
     return defaultHeatersData;
 }
 
-function saveHeatersList(list) {
-    localStorage.setItem('equipment_data_heaters', JSON.stringify(list));
+function saveHeatersList(list) { localStorage.setItem('heaters_custom_data', JSON.stringify(list)); }
+
+function printHeatersTable() {
+    const printWindow = window.open('', '_blank');
+    let list = getHeatersList().filter(item => !/знищ/ui.test(String(item.note || item.comment || '')));
+    let html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8"><title>Облік теплових пушок</title>
+            <style>
+                body { font-family: Arial, sans-serif; font-size: 11px; color: #000; margin: 10px; }
+                h2 { text-align: center; margin-bottom: 15px; font-size: 14px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                th, td { border: 1px solid #333; padding: 4px 6px; text-align: center; }
+                th { background-color: #2e7d32 !important; color: white !important; font-size: 11px; }
+                td:nth-child(2) { text-align: left; }
+                @media print { @page { size: landscape; margin: 10mm; } }
+            </style>
+        </head>
+        <body>
+            <h2>ОБЛІК ТА НОРМИ ВИТРАТ ПАЛИВА І МАСТИЛ ТЕПЛОВИХ ПУШОК</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>№</th><th>Модель</th><th>кВт</th><th>Тип пал.</th><th>Розхід літ./год.</th><th>Норма мастил</th>
+                        <th>Макс з. на 5 діб</th><th>Макс з. на 10 діб</th><th>Макс з. на 30 діб</th><th>Норма мотог.</th>
+                        <th>Підрозділ</th><th>Мат. Відп. Особа</th><th>Де знаходиться</th><th>Серійний номер</th><th>Примітка</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    list.forEach((item, index) => {
+        html += `<tr>
+            <td>${index + 1}</td><td>${item.model || ''}</td><td>${item.kw || ''}</td><td>${item.fuelType || ''}</td>
+            <td>${item.consumption || ''}</td><td>${item.oilNorm10Days || ''}</td><td>${item.max5Days || ''}</td>
+            <td>${item.max10Days || ''}</td><td>${item.max30Days || ''}</td><td>${item.motoHoursDay || ''}</td>
+            <td>${item.subdivision || ''}</td><td>${item.responsiblePerson || ''}</td><td>${item.locationSubdivision || ''}</td>
+            <td>${item.serialNumber || ''}</td><td>${item.note || ''}</td>
+        </tr>`;
+    });
+    html += `</tbody></table></body></html>`;
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => { printWindow.print(); printWindow.close(); }, 250);
 }
 
 function renderHeatersView() {
     const wrapper = document.getElementById('equipment-table-wrapper');
     if (!wrapper) return;
+
+    ['print-generators-btn', 'print-webasto-btn', 'print-heaters-btn', 'print-chainsaws-btn'].forEach(btnId => {
+        const oldB = document.getElementById(btnId);
+        if (oldB) oldB.remove();
+    });
+
+    const addBtn = document.querySelector('button[onclick*="addCurrentEquipmentRow"]') || document.querySelector('.equipment-actions-bar button');
+    if (addBtn) {
+        const parentBar = addBtn.parentElement;
+        if (parentBar) {
+            parentBar.style.display = 'flex';
+            parentBar.style.justifyContent = 'space-between';
+            parentBar.style.alignItems = 'center';
+            parentBar.style.width = '100%';
+
+            let printBtn = document.getElementById('universal-print-btn');
+            if (!printBtn) {
+                printBtn = document.createElement('button');
+                printBtn.id = 'universal-print-btn';
+                printBtn.className = 'action-btn print-btn';
+                parentBar.insertBefore(printBtn, addBtn);
+            }
+            printBtn.onclick = printCurrentEquipmentTable;
+            printBtn.innerHTML = '<span style="font-size: 14px; margin-right: 6px; vertical-align: middle;">🖨️</span> Друк';
+            printBtn.style.cssText = 'background-color: #337ab7; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; white-space: nowrap; margin-left: auto; margin-right: 10px;';
+        }
+    }
 
     wrapper.innerHTML = `
         <table id="heaters-table" class="compact-base-table" style="width: 100%; border-collapse: collapse; background: white; font-size: 12px;">
@@ -39,6 +110,7 @@ function renderHeatersView() {
                     <th style="padding: 6px 4px; width: 45px;">кВт</th>
                     <th style="padding: 6px 4px; width: 50px;">Тип пал.</th>
                     <th style="padding: 6px 4px; width: 55px;">Розхід літ./год.</th>
+                    <th style="padding: 6px 4px; width: 65px;">Норма мастил</th>
                     <th style="padding: 6px 4px; width: 75px;">Макс з. на 5 діб</th>
                     <th style="padding: 6px 4px; width: 75px;">Макс з. на 10 діб</th>
                     <th style="padding: 6px 4px; width: 75px;">Макс з. на 30 діб</th>
@@ -53,8 +125,8 @@ function renderHeatersView() {
             </thead>
             <tbody id="heaters-tbody"></tbody>
         </table>
-        <datalist id="heaters-autocomplete-list">
-            ${defaultHeatersData.map(d => `<option value="${d.model}">`).join('')}
+        <datalist id="heaters-model-datalist">
+            ${defaultHeatersData.map(item => `<option value="${item.model}">`).join('')}
         </datalist>
     `;
 
@@ -62,8 +134,10 @@ function renderHeatersView() {
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    let items = getHeatersList();
-    const filtered = items.filter(item => {
+    let list = getHeatersList();
+    const filtered = list.filter(item => {
+        if (/знищ/ui.test(String(item.note || item.comment || ''))) return false;
+
         if (heatersFilters.model && !String(item.model || "").toLowerCase().includes(heatersFilters.model.toLowerCase())) return false;
         if (heatersFilters.subdivision && !String(item.subdivision || "").toLowerCase().includes(heatersFilters.subdivision.toLowerCase())) return false;
         if (heatersFilters.responsiblePerson && !String(item.responsiblePerson || "").toLowerCase().includes(heatersFilters.responsiblePerson.toLowerCase())) return false;
@@ -75,96 +149,72 @@ function renderHeatersView() {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td style="text-align: center; padding: 3px 4px;">${index + 1}</td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.model || ''}" list="heaters-autocomplete-list" oninput="onHeaterModelInput(${item.id}, this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
-            <td style="padding: 3px 4px;"><input type="text" id="heat-kw-${item.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.kw || ''}" oninput="updateHeatProp(${item.id}, 'kw', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" id="heat-fuel-${item.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.fuelType || ''}" oninput="updateHeatProp(${item.id}, 'fuelType', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" id="heat-cons-${item.id}" class="table-cell-input" style="text-align:center; background-color: #fff9c4; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.consumption || ''}" oninput="updateHeatProp(${item.id}, 'consumption', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" id="heat-m5-${item.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.max5Days || ''}" oninput="updateHeatProp(${item.id}, 'max5Days', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" id="heat-m10-${item.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.max10Days || ''}" oninput="updateHeatProp(${item.id}, 'max10Days', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" id="heat-m30-${item.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.max30Days || ''}" oninput="updateHeatProp(${item.id}, 'max30Days', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" id="heat-moto-${item.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.motoHoursDay || ''}" oninput="updateHeatProp(${item.id}, 'motoHoursDay', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.subdivision || ''}" oninput="updateHeatProp(${item.id}, 'subdivision', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.responsiblePerson || ''}" oninput="updateHeatProp(${item.id}, 'responsiblePerson', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.locationSubdivision || ''}" oninput="updateHeatProp(${item.id}, 'locationSubdivision', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.serialNumber || ''}" oninput="updateHeatProp(${item.id}, 'serialNumber', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.note || ''}" oninput="updateHeatProp(${item.id}, 'note', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
-            <td style="text-align: center; padding: 3px 4px;"><button class="delete-row-btn" style="padding: 2px 6px; font-size: 10px;" onclick="deleteHeatRow(${item.id})">Видалити</button></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" list="heaters-model-datalist" value="${item.model || ''}" placeholder="Нова теплова пушка" onchange="updateHeatersProp(${item.id}, 'model', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.kw || ''}" oninput="updateHeatersProp(${item.id}, 'kw', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.fuelType || ''}" oninput="updateHeatersProp(${item.id}, 'fuelType', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; background-color: #fff9c4; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.consumption || ''}" oninput="updateHeatersProp(${item.id}, 'consumption', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.oilNorm10Days || ''}" oninput="updateHeatersProp(${item.id}, 'oilNorm10Days', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.max5Days || ''}" oninput="updateHeatersProp(${item.id}, 'max5Days', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.max10Days || ''}" oninput="updateHeatersProp(${item.id}, 'max10Days', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.max30Days || ''}" oninput="updateHeatersProp(${item.id}, 'max30Days', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.motoHoursDay || ''}" oninput="updateHeatersProp(${item.id}, 'motoHoursDay', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.subdivision || ''}" oninput="updateHeatersProp(${item.id}, 'subdivision', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.responsiblePerson || ''}" oninput="updateHeatersProp(${item.id}, 'responsiblePerson', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.locationSubdivision || ''}" oninput="updateHeatersProp(${item.id}, 'locationSubdivision', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.serialNumber || ''}" oninput="updateHeatersProp(${item.id}, 'serialNumber', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.note || ''}" oninput="updateHeatersProp(${item.id}, 'note', this.value); if(/знищ/ui.test(this.value)) { renderHeatersView(); }" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
+            <td style="text-align: center; padding: 3px 4px;"><button class="delete-row-btn" style="padding: 2px 6px; font-size: 10px;" onclick="deleteHeatersRow(${item.id})">Видалити</button></td>
         `;
         tbody.appendChild(tr);
     });
-}
-
-function onHeaterModelInput(id, val) {
-    let items = getHeatersList();
-    const item = items.find(i => Number(i.id) === Number(id));
-    if (!item) return;
-
-    item.model = val;
-    const trimmedVal = val.trim().toLowerCase();
-    const matchedBase = defaultHeatersData.find(b => b.model && b.model.trim().toLowerCase() === trimmedVal);
-
-    if (matchedBase) {
-        item.kw = matchedBase.kw;
-        item.fuelType = matchedBase.fuelType;
-        item.consumption = matchedBase.consumption;
-        item.max5Days = matchedBase.max5Days;
-        item.max10Days = matchedBase.max10Days;
-        item.max30Days = matchedBase.max30Days;
-        item.motoHoursDay = matchedBase.motoHoursDay;
-
-        const elKw = document.getElementById(`heat-kw-${id}`);
-        const elFuel = document.getElementById(`heat-fuel-${id}`);
-        const elCons = document.getElementById(`heat-cons-${id}`);
-        const elM5 = document.getElementById(`heat-m5-${id}`);
-        const elM10 = document.getElementById(`heat-m10-${id}`);
-        const elM30 = document.getElementById(`heat-m30-${id}`);
-        const elMoto = document.getElementById(`heat-moto-${id}`);
-
-        if (elKw) elKw.value = matchedBase.kw;
-        if (elFuel) elFuel.value = matchedBase.fuelType;
-        if (elCons) elCons.value = matchedBase.consumption;
-        if (elM5) elM5.value = matchedBase.max5Days;
-        if (elM10) elM10.value = matchedBase.max10Days;
-        if (elM30) elM30.value = matchedBase.max30Days;
-        if (elMoto) elMoto.value = matchedBase.motoHoursDay;
-    }
-    saveHeatersList(items);
 }
 
 function updateHeatFilter(field, val) {
     heatersFilters[field] = val;
     renderHeatersView();
     setTimeout(() => {
-        const map = { model: 'filter-heat-model', subdivision: 'filter-heat-sub', responsiblePerson: 'filter-heat-resp', locationSubdivision: 'filter-heat-loc' };
-        const el = document.getElementById(map[field]);
+        const inputMap = { model: 'filter-heat-model', subdivision: 'filter-heat-sub', responsiblePerson: 'filter-heat-resp', locationSubdivision: 'filter-heat-loc' };
+        const el = document.getElementById(inputMap[field]);
         if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
     }, 0);
 }
 
-function updateHeatProp(id, prop, val) {
-    let items = getHeatersList();
-    const item = items.find(i => Number(i.id) === Number(id));
-    if (item) { 
-        item[prop] = val; 
-        if (prop === 'locationSubdivision') {
-            item.subdivision = val;
+function updateHeatersProp(id, prop, val) {
+    let list = getHeatersList();
+    const item = list.find(i => Number(i.id) === Number(id));
+    if (item) {
+        item[prop] = val;
+        if (prop === 'locationSubdivision') item.subdivision = val;
+        if (prop === 'model') {
+            const foundRef = defaultHeatersData.find(ref => ref.model.toLowerCase().trim() === val.toLowerCase().trim());
+            if (foundRef) {
+                item.kw = foundRef.kw;
+                item.fuelType = foundRef.fuelType;
+                item.consumption = foundRef.consumption;
+                item.max5Days = foundRef.max5Days;
+                item.max10Days = foundRef.max10Days;
+                item.max30Days = foundRef.max30Days;
+                item.motoHoursDay = foundRef.motoHoursDay;
+                item.oilNorm10Days = foundRef.oilNorm10Days;
+            }
         }
-        saveHeatersList(items); 
+        saveHeatersList(list);
+        if (prop === 'model') renderHeatersView();
     }
 }
 
 function addHeatersRow() {
-    let items = getHeatersList();
-    const newId = items.length > 0 ? Math.max(...items.map(i => i.id)) + 1 : 1;
-    items.push({ id: newId, model: "Теплова пушка Нова", kw: "35", fuelType: "ДП", consumption: "2.40", max5Days: "144.0", max10Days: "288.0", max30Days: "864.0", motoHoursDay: "12", subdivision: "РМТЗ", responsiblePerson: "", locationSubdivision: "РМТЗ", serialNumber: "", note: "" });
-    saveHeatersList(items);
+    let list = getHeatersList();
+    const newId = list.length > 0 ? Math.max(...list.map(i => i.id)) + 1 : 1;
+    list.push({ id: newId, model: "", kw: "", fuelType: "", consumption: "", max5Days: "", max10Days: "", max30Days: "", motoHoursDay: "", oilNorm10Days: "", subdivision: "РМТЗ", responsiblePerson: "Ковальов В.В.", locationSubdivision: "РМТЗ", serialNumber: "000000", note: "" });
+    saveHeatersList(list);
     renderHeatersView();
 }
 
-function deleteHeatRow(id) {
-    if (!confirm("Ви впевнені, що хочете видалити цей рядок?")) return;
-    let items = getHeatersList();
-    items = items.filter(i => Number(i.id) !== Number(id));
-    saveHeatersList(items);
+function deleteHeatersRow(id) {
+    if (!confirm("Ви впевнені, що хочете видалити цей запис?")) return;
+    let list = getHeatersList();
+    list = list.filter(i => Number(i.id) !== Number(id));
+    saveHeatersList(list);
     renderHeatersView();
 }

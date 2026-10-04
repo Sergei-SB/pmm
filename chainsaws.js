@@ -2,10 +2,12 @@
 // ЛОГІКА ОБЛІКУ БЕНЗОПИЛ (chainsaws.js)
 // ==========================================
 
-const CURRENT_CHAINSAWS_VERSION = 'v3_chainsaws_autofill';
+const CURRENT_CHAIN_VERSION = 'v2_full_list';
 
 let defaultChainsawsData = [
-    { id: 1, model: "DNIPRO-M DSG-45H", kw: "-", fuelType: "АБ", consumption: "1.10", max5Days: "66.00", max10Days: "44.0", max30Days: "132.0", motoHoursDay: "4", subdivision: "БПЛА", responsiblePerson: "Паламарчук Ігор", locationSubdivision: "ВМТЗ", serialNumber: "Без номера", note: "" }
+    { id: 1, model: "STIHL MS 180", kw: "1.4", fuelType: "АБ", consumption: "0.80", max5Days: "48.00", max10Days: "96.0", max30Days: "288.0", motoHoursDay: "12", oilNorm10Days: "0.30", subdivision: "", responsiblePerson: "Ковальов В.В.", locationSubdivision: "", serialNumber: "ST-180-1", note: "" },
+    { id: 2, model: "DNIPRO-M DSG-45H", kw: "2.0", fuelType: "АБ", consumption: "1.10", max5Days: "66.00", max10Days: "132.0", max30Days: "396.0", motoHoursDay: "12", oilNorm10Days: "0.35", subdivision: "", responsiblePerson: "Ковальов В.В.", locationSubdivision: "", serialNumber: "DN-45H-1", note: "" },
+    { id: 3, model: "Oleo-Mac GSH 51", kw: "2.2", fuelType: "АБ", consumption: "1.20", max5Days: "72.00", max10Days: "144.0", max30Days: "432.0", motoHoursDay: "12", oilNorm10Days: "0.35", subdivision: "", responsiblePerson: "Ковальов В.В.", locationSubdivision: "", serialNumber: "OM-51-1", note: "" }
 ];
 
 let chainsawsFilters = { model: "", subdivision: "", responsiblePerson: "", locationSubdivision: "" };
@@ -13,22 +15,92 @@ let chainsawsFilters = { model: "", subdivision: "", responsiblePerson: "", loca
 function getChainsawsList() {
     try {
         const storedVer = localStorage.getItem('chainsaws_data_version');
-        const stored = localStorage.getItem('equipment_data_chainsaws');
-        if (stored && storedVer === CURRENT_CHAINSAWS_VERSION) return JSON.parse(stored);
+        const stored = localStorage.getItem('chainsaws_custom_data');
+        if (stored && storedVer === CURRENT_CHAIN_VERSION) return JSON.parse(stored);
     } catch(e) {}
-    
-    localStorage.setItem('chainsaws_data_version', CURRENT_CHAINSAWS_VERSION);
-    localStorage.setItem('equipment_data_chainsaws', JSON.stringify(defaultChainsawsData));
+    localStorage.setItem('chainsaws_data_version', CURRENT_CHAIN_VERSION);
+    localStorage.setItem('chainsaws_custom_data', JSON.stringify(defaultChainsawsData));
     return defaultChainsawsData;
 }
 
-function saveChainsawsList(list) {
-    localStorage.setItem('equipment_data_chainsaws', JSON.stringify(list));
+function saveChainsawsList(list) { localStorage.setItem('chainsaws_custom_data', JSON.stringify(list)); }
+
+function printChainsawsTable() {
+    const printWindow = window.open('', '_blank');
+    let list = getChainsawsList().filter(item => !/знищ/ui.test(String(item.note || item.comment || '')));
+    let html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8"><title>Облік бензопил</title>
+            <style>
+                body { font-family: Arial, sans-serif; font-size: 11px; color: #000; margin: 10px; }
+                h2 { text-align: center; margin-bottom: 15px; font-size: 14px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                th, td { border: 1px solid #333; padding: 4px 6px; text-align: center; }
+                th { background-color: #2e7d32 !important; color: white !important; font-size: 11px; }
+                td:nth-child(2) { text-align: left; }
+                @media print { @page { size: landscape; margin: 10mm; } }
+            </style>
+        </head>
+        <body>
+            <h2>ОБЛІК ТА НОРМИ ВИТРАТ ПАЛИВА І МАСТИЛ БЕНЗОПИЛ</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>№</th><th>Модель</th><th>кВт</th><th>Тип пал.</th><th>Розхід літ./год.</th><th>Норма мастил</th>
+                        <th>Макс з. на 5 діб</th><th>Макс з. на 10 діб</th><th>Макс з. на 30 діб</th><th>Норма мотог.</th>
+                        <th>Підрозділ</th><th>Мат. Відп. Особа</th><th>Де знаходиться</th><th>Серійний номер</th><th>Примітка</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    list.forEach((item, index) => {
+        html += `<tr>
+            <td>${index + 1}</td><td>${item.model || ''}</td><td>${item.kw || ''}</td><td>${item.fuelType || ''}</td>
+            <td>${item.consumption || ''}</td><td>${item.oilNorm10Days || ''}</td><td>${item.max5Days || ''}</td>
+            <td>${item.max10Days || ''}</td><td>${item.max30Days || ''}</td><td>${item.motoHoursDay || ''}</td>
+            <td>${item.subdivision || ''}</td><td>${item.responsiblePerson || ''}</td><td>${item.locationSubdivision || ''}</td>
+            <td>${item.serialNumber || ''}</td><td>${item.note || ''}</td>
+        </tr>`;
+    });
+    html += `</tbody></table></body></html>`;
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => { printWindow.print(); printWindow.close(); }, 250);
 }
 
 function renderChainsawsView() {
     const wrapper = document.getElementById('equipment-table-wrapper');
     if (!wrapper) return;
+
+    ['print-generators-btn', 'print-webasto-btn', 'print-heaters-btn', 'print-chainsaws-btn'].forEach(btnId => {
+        const oldB = document.getElementById(btnId);
+        if (oldB) oldB.remove();
+    });
+
+    const addBtn = document.querySelector('button[onclick*="addCurrentEquipmentRow"]') || document.querySelector('.equipment-actions-bar button');
+    if (addBtn) {
+        const parentBar = addBtn.parentElement;
+        if (parentBar) {
+            parentBar.style.display = 'flex';
+            parentBar.style.justifyContent = 'space-between';
+            parentBar.style.alignItems = 'center';
+            parentBar.style.width = '100%';
+
+            let printBtn = document.getElementById('universal-print-btn');
+            if (!printBtn) {
+                printBtn = document.createElement('button');
+                printBtn.id = 'universal-print-btn';
+                printBtn.className = 'action-btn print-btn';
+                parentBar.insertBefore(printBtn, addBtn);
+            }
+            printBtn.onclick = printCurrentEquipmentTable;
+            printBtn.innerHTML = '<span style="font-size: 14px; margin-right: 6px; vertical-align: middle;">🖨️</span> Друк';
+            printBtn.style.cssText = 'background-color: #337ab7; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; white-space: nowrap; margin-left: auto; margin-right: 10px;';
+        }
+    }
 
     wrapper.innerHTML = `
         <table id="chainsaws-table" class="compact-base-table" style="width: 100%; border-collapse: collapse; background: white; font-size: 12px;">
@@ -39,6 +111,7 @@ function renderChainsawsView() {
                     <th style="padding: 6px 4px; width: 45px;">кВт</th>
                     <th style="padding: 6px 4px; width: 50px;">Тип пал.</th>
                     <th style="padding: 6px 4px; width: 55px;">Розхід літ./год.</th>
+                    <th style="padding: 6px 4px; width: 65px;">Норма мастил</th>
                     <th style="padding: 6px 4px; width: 75px;">Макс з. на 5 діб</th>
                     <th style="padding: 6px 4px; width: 75px;">Макс з. на 10 діб</th>
                     <th style="padding: 6px 4px; width: 75px;">Макс з. на 30 діб</th>
@@ -53,8 +126,8 @@ function renderChainsawsView() {
             </thead>
             <tbody id="chainsaws-tbody"></tbody>
         </table>
-        <datalist id="chainsaws-autocomplete-list">
-            ${defaultChainsawsData.map(d => `<option value="${d.model}">`).join('')}
+        <datalist id="chainsaws-model-datalist">
+            ${defaultChainsawsData.map(item => `<option value="${item.model}">`).join('')}
         </datalist>
     `;
 
@@ -62,8 +135,10 @@ function renderChainsawsView() {
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    let items = getChainsawsList();
-    const filtered = items.filter(item => {
+    let list = getChainsawsList();
+    const filtered = list.filter(item => {
+        if (/знищ/ui.test(String(item.note || item.comment || ''))) return false;
+
         if (chainsawsFilters.model && !String(item.model || "").toLowerCase().includes(chainsawsFilters.model.toLowerCase())) return false;
         if (chainsawsFilters.subdivision && !String(item.subdivision || "").toLowerCase().includes(chainsawsFilters.subdivision.toLowerCase())) return false;
         if (chainsawsFilters.responsiblePerson && !String(item.responsiblePerson || "").toLowerCase().includes(chainsawsFilters.responsiblePerson.toLowerCase())) return false;
@@ -75,96 +150,72 @@ function renderChainsawsView() {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td style="text-align: center; padding: 3px 4px;">${index + 1}</td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.model || ''}" list="chainsaws-autocomplete-list" oninput="onChainsawModelInput(${item.id}, this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
-            <td style="padding: 3px 4px;"><input type="text" id="chain-kw-${item.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.kw || ''}" oninput="updateChainProp(${item.id}, 'kw', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" id="chain-fuel-${item.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.fuelType || ''}" oninput="updateChainProp(${item.id}, 'fuelType', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" id="chain-cons-${item.id}" class="table-cell-input" style="text-align:center; background-color: #fff9c4; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.consumption || ''}" oninput="updateChainProp(${item.id}, 'consumption', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" id="chain-m5-${item.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.max5Days || ''}" oninput="updateChainProp(${item.id}, 'max5Days', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" id="chain-m10-${item.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.max10Days || ''}" oninput="updateChainProp(${item.id}, 'max10Days', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" id="chain-m30-${item.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.max30Days || ''}" oninput="updateChainProp(${item.id}, 'max30Days', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" id="chain-moto-${item.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.motoHoursDay || ''}" oninput="updateChainProp(${item.id}, 'motoHoursDay', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.subdivision || ''}" oninput="updateChainProp(${item.id}, 'subdivision', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.responsiblePerson || ''}" oninput="updateChainProp(${item.id}, 'responsiblePerson', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.locationSubdivision || ''}" oninput="updateChainProp(${item.id}, 'locationSubdivision', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.serialNumber || ''}" oninput="updateChainProp(${item.id}, 'serialNumber', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.note || ''}" oninput="updateChainProp(${item.id}, 'note', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
-            <td style="text-align: center; padding: 3px 4px;"><button class="delete-row-btn" style="padding: 2px 6px; font-size: 10px;" onclick="deleteChainRow(${item.id})">Видалити</button></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" list="chainsaws-model-datalist" value="${item.model || ''}" placeholder="Нова бензопила" onchange="updateChainsawsProp(${item.id}, 'model', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.kw || ''}" oninput="updateChainsawsProp(${item.id}, 'kw', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.fuelType || ''}" oninput="updateChainsawsProp(${item.id}, 'fuelType', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; background-color: #fff9c4; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.consumption || ''}" oninput="updateChainsawsProp(${item.id}, 'consumption', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.oilNorm10Days || ''}" oninput="updateChainsawsProp(${item.id}, 'oilNorm10Days', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.max5Days || ''}" oninput="updateChainsawsProp(${item.id}, 'max5Days', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.max10Days || ''}" oninput="updateChainsawsProp(${item.id}, 'max10Days', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.max30Days || ''}" oninput="updateChainsawsProp(${item.id}, 'max30Days', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.motoHoursDay || ''}" oninput="updateChainsawsProp(${item.id}, 'motoHoursDay', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.subdivision || ''}" oninput="updateChainsawsProp(${item.id}, 'subdivision', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.responsiblePerson || ''}" oninput="updateChainsawsProp(${item.id}, 'responsiblePerson', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.locationSubdivision || ''}" oninput="updateChainsawsProp(${item.id}, 'locationSubdivision', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.serialNumber || ''}" oninput="updateChainsawsProp(${item.id}, 'serialNumber', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.note || ''}" oninput="updateChainsawsProp(${item.id}, 'note', this.value); if(/знищ/ui.test(this.value)) { renderChainsawsView(); }" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
+            <td style="text-align: center; padding: 3px 4px;"><button class="delete-row-btn" style="padding: 2px 6px; font-size: 10px;" onclick="deleteChainsawsRow(${item.id})">Видалити</button></td>
         `;
         tbody.appendChild(tr);
     });
-}
-
-function onChainsawModelInput(id, val) {
-    let items = getChainsawsList();
-    const item = items.find(i => Number(i.id) === Number(id));
-    if (!item) return;
-
-    item.model = val;
-    const trimmedVal = val.trim().toLowerCase();
-    const matchedBase = defaultChainsawsData.find(b => b.model && b.model.trim().toLowerCase() === trimmedVal);
-
-    if (matchedBase) {
-        item.kw = matchedBase.kw;
-        item.fuelType = matchedBase.fuelType;
-        item.consumption = matchedBase.consumption;
-        item.max5Days = matchedBase.max5Days;
-        item.max10Days = matchedBase.max10Days;
-        item.max30Days = matchedBase.max30Days;
-        item.motoHoursDay = matchedBase.motoHoursDay;
-
-        const elKw = document.getElementById(`chain-kw-${id}`);
-        const elFuel = document.getElementById(`chain-fuel-${id}`);
-        const elCons = document.getElementById(`chain-cons-${id}`);
-        const elM5 = document.getElementById(`chain-m5-${id}`);
-        const elM10 = document.getElementById(`chain-m10-${id}`);
-        const elM30 = document.getElementById(`chain-m30-${id}`);
-        const elMoto = document.getElementById(`chain-moto-${id}`);
-
-        if (elKw) elKw.value = matchedBase.kw;
-        if (elFuel) elFuel.value = matchedBase.fuelType;
-        if (elCons) elCons.value = matchedBase.consumption;
-        if (elM5) elM5.value = matchedBase.max5Days;
-        if (elM10) elM10.value = matchedBase.max10Days;
-        if (elM30) elM30.value = matchedBase.max30Days;
-        if (elMoto) elMoto.value = matchedBase.motoHoursDay;
-    }
-    saveChainsawsList(items);
 }
 
 function updateChainFilter(field, val) {
     chainsawsFilters[field] = val;
     renderChainsawsView();
     setTimeout(() => {
-        const map = { model: 'filter-chain-model', subdivision: 'filter-chain-sub', responsiblePerson: 'filter-chain-resp', locationSubdivision: 'filter-chain-loc' };
-        const el = document.getElementById(map[field]);
+        const inputMap = { model: 'filter-chain-model', subdivision: 'filter-chain-sub', responsiblePerson: 'filter-chain-resp', locationSubdivision: 'filter-chain-loc' };
+        const el = document.getElementById(inputMap[field]);
         if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
     }, 0);
 }
 
-function updateChainProp(id, prop, val) {
-    let items = getChainsawsList();
-    const item = items.find(i => Number(i.id) === Number(id));
-    if (item) { 
-        item[prop] = val; 
-        if (prop === 'locationSubdivision') {
-            item.subdivision = val;
+function updateChainsawsProp(id, prop, val) {
+    let list = getChainsawsList();
+    const item = list.find(i => Number(i.id) === Number(id));
+    if (item) {
+        item[prop] = val;
+        if (prop === 'locationSubdivision') item.subdivision = val;
+        if (prop === 'model') {
+            const foundRef = defaultChainsawsData.find(ref => ref.model.toLowerCase().trim() === val.toLowerCase().trim());
+            if (foundRef) {
+                item.kw = foundRef.kw;
+                item.fuelType = foundRef.fuelType;
+                item.consumption = foundRef.consumption;
+                item.max5Days = foundRef.max5Days;
+                item.max10Days = foundRef.max10Days;
+                item.max30Days = foundRef.max30Days;
+                item.motoHoursDay = foundRef.motoHoursDay;
+                item.oilNorm10Days = foundRef.oilNorm10Days;
+            }
         }
-        saveChainsawsList(items); 
+        saveChainsawsList(list);
+        if (prop === 'model') renderChainsawsView();
     }
 }
 
 function addChainsawsRow() {
-    let items = getChainsawsList();
-    const newId = items.length > 0 ? Math.max(...items.map(i => i.id)) + 1 : 1;
-    items.push({ id: newId, model: "Бензопила Нова", kw: "-", fuelType: "АБ", consumption: "1.10", max5Days: "66.00", max10Days: "44.0", max30Days: "132.0", motoHoursDay: "4", subdivision: "РМТЗ", responsiblePerson: "", locationSubdivision: "РМТЗ", serialNumber: "", note: "" });
-    saveChainsawsList(items);
+    let list = getChainsawsList();
+    const newId = list.length > 0 ? Math.max(...list.map(i => i.id)) + 1 : 1;
+    list.push({ id: newId, model: "", kw: "", fuelType: "", consumption: "", max5Days: "", max10Days: "", max30Days: "", motoHoursDay: "", oilNorm10Days: "", subdivision: "РМТЗ", responsiblePerson: "Ковальов В.В.", locationSubdivision: "РМТЗ", serialNumber: "000000", note: "" });
+    saveChainsawsList(list);
     renderChainsawsView();
 }
 
-function deleteChainRow(id) {
-    if (!confirm("Ви впевнені, що хочете видалити цей рядок?")) return;
-    let items = getChainsawsList();
-    items = items.filter(i => Number(i.id) !== Number(id));
-    saveChainsawsList(items);
+function deleteChainsawsRow(id) {
+    if (!confirm("Ви впевнені, що хочете видалити цей запис?")) return;
+    let list = getChainsawsList();
+    list = list.filter(i => Number(i.id) !== Number(id));
+    saveChainsawsList(list);
     renderChainsawsView();
 }

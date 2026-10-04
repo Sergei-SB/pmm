@@ -13,7 +13,7 @@
             color: white !important;
         }
         table thead th, 
-        .compact-base-table thead th, 
+        .compact-base-table th, 
         .data-table thead th {
             background-color: #2e7d32 !important;
             color: white !important;
@@ -31,29 +31,35 @@
             vertical-align: middle;
             border: 1px solid #ddd;
         }
+        
+        /* Стилі для вкладок обладнання (з обводкою та втиснутою тінню для активної) */
         .eq-tab-btn {
             background-color: #34495e;
-            color: white;
-            border: none;
+            color: #bdc3c7;
+            border: 1px solid transparent;
             padding: 6px 14px;
             border-radius: 4px;
             cursor: pointer;
             font-weight: bold;
             font-size: 13px;
-            transition: background 0.2s;
+            transition: all 0.2s ease;
         }
         .eq-tab-btn.active {
-            background-color: #2e7d32;
+            background-color: #34495e !important;
+            color: #ffffff !important;
+            border: 1px solid #bdc3c7 !important;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(255, 255, 255, 0.1) !important;
         }
         .eq-tab-btn:hover {
-            background-color: #3d566e;
+            background-color: #4e6073;
+            color: white;
         }
 
         /* Стилі для кнопок верхньої навігації */
         .nav-btn {
             background: #34495e;
             color: #bdc3c7;
-            border: none;
+            border: 1px solid transparent;
             padding: 8px 14px;
             border-radius: 4px;
             cursor: pointer;
@@ -65,13 +71,15 @@
             background: #4e6073;
             color: white;
         }
+        
+        /* Стиль активної кнопки навігації */
         .nav-btn.active {
-            background: #5d6d7e !important;
-            color: white !important;
-            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.4);
+            background-color: #34495e !important;
+            color: #ffffff !important;
+            border: 1px solid #bdc3c7 !important;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(255, 255, 255, 0.1) !important;
         }
 
-        /* Стилі для коректного друку звіту обладнання на сторінці */
         @media print {
             @page {
                 size: landscape;
@@ -79,19 +87,6 @@
             }
             body * {
                 visibility: hidden;
-            }
-            #equipment-report-view, #equipment-report-view * {
-                visibility: visible;
-            }
-            #equipment-report-view {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
-                background: white;
-            }
-            .report-controls button, .report-controls select, .report-controls input {
-                display: none !important;
             }
         }
     </style>
@@ -107,7 +102,7 @@
             <button class="nav-btn" onclick="switchView('subdivisions')">Звіт по підрозділах</button>
             <button class="nav-btn" onclick="switchView('generators')">Облік обладнання</button>
             <button class="nav-btn" onclick="switchView('aggregates-calc')">Розрахунок агрегатів</button>
-            <button class="nav-btn" onclick="switchView('equipment-report-view')">Звіт по обладнанню</button>
+            <button class="nav-btn" onclick="switchView('destroyed')">Знищена техніка</button>
         </div>
         <div class="nav-right" id="top-search-box" style="display: flex; align-items: center; gap: 10px;">
             <!-- Кнопка збереження (тільки дискета) -->
@@ -428,51 +423,9 @@
             <div id="aggregates-calc-container"></div>
         </section>
 
-        <!-- РОЗДІЛ: ЗВІТ ПО ОБЛАДНАННЮ -->
-        <section id="equipment-report-view" class="view-section">
-            <div class="card-header-panel">
-                <h2>Звіт по паливу та роботі обладнання</h2>
-                <div class="report-controls" style="display: flex; align-items: center; gap: 8px;">
-                    <label>Період:</label>
-                    <select id="eq-report-period-select" onchange="changeEqReportPeriod(this.value)"></select>
-                    <input type="text" id="eq-report-custom-period" value="01.10-10.10" placeholder="Напр: 01.10-10.10" oninput="renderEquipmentReportView()" style="width: 110px; text-align: center; padding: 5px;">
-                    <button class="action-btn" onclick="saveEquipmentReportData()">Зберегти звіт</button>
-                    <button class="action-btn print-btn" onclick="printEquipmentReport()" style="background-color: #337ab7; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; white-space: nowrap;"><span style="font-size: 14px; margin-right: 6px; vertical-align: middle;">🖨️</span> Друк звіту</button>
-                </div>
-            </div>
-            <div class="table-container" style="max-height: 75vh;">
-                <table id="equipment-report-table" class="compact-report-table" style="width: 100%; border-collapse: collapse; background: white;">
-                    <thead>
-                        <tr>
-                            <th rowspan="2" style="padding: 6px 4px; width: 40px;">№ з/п</th>
-                            <th rowspan="2" style="padding: 6px 4px; width: 110px;">Тип обладнання</th>
-                            <th rowspan="2" style="padding: 6px 4px; width: 90px;">
-                                Підрозділ<br>
-                                <select id="equipment-subdivision-filter" onchange="renderEquipmentReportView()" style="font-size: 10px; padding: 1px; width: 100%; border-radius: 2px; border: 1px solid #1b5e20; background: white; color: #333; cursor: pointer;">
-                                    <option value="all">Усі</option>
-                                </select>
-                            </th>
-                            <th rowspan="2" style="padding: 6px 4px;">Модель</th>
-                            <th rowspan="2" style="padding: 6px 4px; width: 65px;">Тип палива</th>
-                            <th colspan="2" style="padding: 6px 4px;">Залишок палива з попереднього періоду</th>
-                            <th colspan="2" style="padding: 6px 4px;">01.10-10.10</th>
-                            <th colspan="2" style="padding: 6px 4px;">11.10-20.10</th>
-                            <th colspan="2" style="padding: 6px 4px;">21.10-31.10</th>
-                        </tr>
-                        <tr>
-                            <th style="padding: 4px; font-size: 10px;">Пальне</th>
-                            <th style="padding: 4px; width: 45px; font-size: 10px;">Мастило</th>
-                            <th style="padding: 4px; font-size: 10px;">Пальне</th>
-                            <th style="padding: 4px; width: 45px; font-size: 10px;">Мастило</th>
-                            <th style="padding: 4px; font-size: 10px;">Пальне</th>
-                            <th style="padding: 4px; width: 45px; font-size: 10px;">Мастило</th>
-                            <th style="padding: 4px; font-size: 10px;">Пальне</th>
-                            <th style="padding: 4px; width: 45px; font-size: 10px;">Мастило</th>
-                        </tr>
-                    </thead>
-                    <tbody id="equipment-report-tbody"></tbody>
-                </table>
-            </div>
+        <!-- РОЗДІЛ: ЗНИЩЕНА ТЕХНІКА -->
+        <section id="destroyed-view" class="view-section">
+            <div id="destroyed-equipment-container"></div>
         </section>
 
     </main>
@@ -488,5 +441,6 @@
     <script src="equipment_report.js"></script>
     <script src="app.js"></script>
     <script src="aggregates_calc.js"></script>
+    <script src="destroyed_equipment.js"></script>
 </body>
 </html>

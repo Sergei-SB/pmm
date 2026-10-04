@@ -301,6 +301,32 @@ let carsData = [
         hasAdBlue: false,
         isMiles: false,
         formulas: [1, 2, 3, 4]
+    },
+    {
+        id: 12,
+        plate: "ТІ 255 G",
+        model: "CFORCE 1000 MV",
+        subdivision: "РМТЗ",
+        consumption: 9.0,
+        fuelType: "ДП",
+        note: "",
+        vin: "WMA13XZZ5",
+        year: 2020,
+        transmission: "автомат",
+        tankCapacity: 15,
+        drive: "задній",
+        emptyWeight: 178,
+        totalWeight: 250,
+        gears: 6,
+        engineVolume: 248,
+        kw: 40,
+        engineNo: "12452",
+        driver: "водій",
+        category: "quad",
+        vehicleType: "квадроцикл",
+        hasAdBlue: false,
+        isMiles: false,
+        formulas: [1, 2, 3, 4]
     }
 ];
 

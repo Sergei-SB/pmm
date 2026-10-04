@@ -39,16 +39,26 @@ body {
 
 .nav-btn {
     background-color: #34495e;
-    color: white;
-    border: none;
+    color: #bdc3c7;
+    border: 1px solid transparent;
     padding: 8px 16px;
     cursor: pointer;
     font-size: 14px;
     border-radius: 4px;
+    transition: all 0.2s ease;
 }
 
+.nav-btn:hover {
+    background: #4e6073;
+    color: white;
+}
+
+/* Стиль активної кнопки навігації */
 .nav-btn.active {
-    background-color: #2980b9;
+    background-color: #34495e !important;
+    color: #ffffff !important;
+    border: 1px solid #bdc3c7 !important;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(255, 255, 255, 0.1) !important;
     font-weight: bold;
 }
 
@@ -82,20 +92,25 @@ th, td {
     white-space: nowrap;
 }
 
+/* ФІКСАЦІЯ ШАПКИ ТАБЛИЦІ ПРИ ПРОКРУТЦІ */
 th {
-    background-color: #558B2F;
-    color: white;
+    background-color: #2e7d32 !important;
+    color: white !important;
     font-size: 11px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
 }
 
-/* КОМПАКТНА БАЗА ДАНИХ (Реєстр транспортних засобів) */
-#base-view .table-container {
-    max-height: 80vh;
+/* КОМПАКТНА БАЗА ДАНИХ ТА ОБЛАДНАННЯ (Фіксована шапка з прокруткою всередині) */
+.table-container {
+    max-height: 75vh;
     overflow-y: auto;
     overflow-x: auto;
     border: 1px solid #7f8c8d;
     width: 100%;
     margin-bottom: 15px;
+    position: relative;
 }
 
 #cars-table.compact-base-table {
@@ -104,34 +119,33 @@ th {
     font-size: 11px;
 }
 
-/* Налаштування ширини стовпчиків Реєстру (включно зі стовпчиком Звіт) */
-#cars-table.compact-base-table th:nth-child(1),  #cars-table.compact-base-table td:nth-child(1)  { width: 35px; }   /* № з/п */
-#cars-table.compact-base-table th:nth-child(2),  #cars-table.compact-base-table td:nth-child(2)  { width: 65px; }   /* Тип авто */
-#cars-table.compact-base-table th:nth-child(3),  #cars-table.compact-base-table td:nth-child(3)  { width: 70px; }   /* Номер авто */
+#cars-table.compact-base-table th:nth-child(1),  #cars-table.compact-base-table td:nth-child(1)  { width: 35px; }
+#cars-table.compact-base-table th:nth-child(2),  #cars-table.compact-base-table td:nth-child(2)  { width: 65px; }
+#cars-table.compact-base-table th:nth-child(3),  #cars-table.compact-base-table td:nth-child(3)  { width: 70px; }
 #cars-table.compact-base-table th:nth-child(4),  #cars-table.compact-base-table td:nth-child(4)  { 
-    width: 175px;   /* Модель авто */
+    width: 175px; 
     text-align: left; 
     padding-left: 6px; 
     white-space: normal; 
     word-break: break-word;
 }
-#cars-table.compact-base-table th:nth-child(5),  #cars-table.compact-base-table td:nth-child(5)  { width: 60px; }   /* Підрозділ */
-#cars-table.compact-base-table th:nth-child(6),  #cars-table.compact-base-table td:nth-child(6)  { width: 65px; }   /* Витрата палива */
-#cars-table.compact-base-table th:nth-child(7),  #cars-table.compact-base-table td:nth-child(7)  { width: 50px; }   /* Тип пального */
-#cars-table.compact-base-table th:nth-child(8),  #cars-table.compact-base-table td:nth-child(8)  { width: 95px; }   /* Примітка */
-#cars-table.compact-base-table th:nth-child(9),  #cars-table.compact-base-table td:nth-child(9)  { width: 120px; }  /* Він код */
-#cars-table.compact-base-table th:nth-child(10), #cars-table.compact-base-table td:nth-child(10) { width: 45px; }   /* Рік */
-#cars-table.compact-base-table th:nth-child(11), #cars-table.compact-base-table td:nth-child(11) { width: 75px; }   /* КПП */
-#cars-table.compact-base-table th:nth-child(12), #cars-table.compact-base-table td:nth-child(12) { width: 55px; }   /* Бачок */
-#cars-table.compact-base-table th:nth-child(13), #cars-table.compact-base-table td:nth-child(13) { width: 55px; }   /* Привід */
-#cars-table.compact-base-table th:nth-child(14), #cars-table.compact-base-table td:nth-child(14) { width: 60px; }   /* Маса */
-#cars-table.compact-base-table th:nth-child(15), #cars-table.compact-base-table td:nth-child(15) { width: 60px; }   /* Повна маса */
-#cars-table.compact-base-table th:nth-child(16), #cars-table.compact-base-table td:nth-child(16) { width: 45px; }   /* Передачі */
-#cars-table.compact-base-table th:nth-child(17), #cars-table.compact-base-table td:nth-child(17) { width: 65px; }   /* Об'єм */
-#cars-table.compact-base-table th:nth-child(18), #cars-table.compact-base-table td:nth-child(18) { width: 40px; }   /* кВт */
-#cars-table.compact-base-table th:nth-child(19), #cars-table.compact-base-table td:nth-child(19) { width: 65px; }   /* № двигуна */
-#cars-table.compact-base-table th:nth-child(20), #cars-table.compact-base-table td:nth-child(20) { width: 95px; }   /* Водій */
-#cars-table.compact-base-table th:nth-child(21), #cars-table.compact-base-table td:nth-child(21) { width: 55px; }   /* Кнопка Звіт */
+#cars-table.compact-base-table th:nth-child(5),  #cars-table.compact-base-table td:nth-child(5)  { width: 60px; }
+#cars-table.compact-base-table th:nth-child(6),  #cars-table.compact-base-table td:nth-child(6)  { width: 65px; }
+#cars-table.compact-base-table th:nth-child(7),  #cars-table.compact-base-table td:nth-child(7)  { width: 50px; }
+#cars-table.compact-base-table th:nth-child(8),  #cars-table.compact-base-table td:nth-child(8)  { width: 95px; }
+#cars-table.compact-base-table th:nth-child(9),  #cars-table.compact-base-table td:nth-child(9)  { width: 120px; }
+#cars-table.compact-base-table th:nth-child(10), #cars-table.compact-base-table td:nth-child(10) { width: 45px; }
+#cars-table.compact-base-table th:nth-child(11), #cars-table.compact-base-table td:nth-child(11) { width: 75px; }
+#cars-table.compact-base-table th:nth-child(12), #cars-table.compact-base-table td:nth-child(12) { width: 55px; }
+#cars-table.compact-base-table th:nth-child(13), #cars-table.compact-base-table td:nth-child(13) { width: 55px; }
+#cars-table.compact-base-table th:nth-child(14), #cars-table.compact-base-table td:nth-child(14) { width: 60px; }
+#cars-table.compact-base-table th:nth-child(15), #cars-table.compact-base-table td:nth-child(15) { width: 60px; }
+#cars-table.compact-base-table th:nth-child(16), #cars-table.compact-base-table td:nth-child(16) { width: 45px; }
+#cars-table.compact-base-table th:nth-child(17), #cars-table.compact-base-table td:nth-child(17) { width: 65px; }
+#cars-table.compact-base-table th:nth-child(18), #cars-table.compact-base-table td:nth-child(18) { width: 40px; }
+#cars-table.compact-base-table th:nth-child(19), #cars-table.compact-base-table td:nth-child(19) { width: 65px; }
+#cars-table.compact-base-table th:nth-child(20), #cars-table.compact-base-table td:nth-child(20) { width: 95px; }
+#cars-table.compact-base-table th:nth-child(21), #cars-table.compact-base-table td:nth-child(21) { width: 55px; }
 
 #cars-table.compact-base-table th {
     white-space: normal;
@@ -147,7 +161,6 @@ th {
     overflow: hidden;
     text-overflow: ellipsis;
 }
-
 
 /* КОМПАКТНИЙ ЗВІТ */
 #report-view .table-container {
@@ -193,7 +206,6 @@ th {
     padding: 3px 2px;
 }
 
-/* Зменшені інпути спеціально для звіту */
 .report-cell-input {
     width: 100% !important;
     min-width: 0 !important;
@@ -205,7 +217,6 @@ th {
     background: #fff;
 }
 
-/* Клікабельний номер авто в базі */
 .clickable-plate {
     color: #000000;
     font-weight: bold;
@@ -222,7 +233,6 @@ th {
     background-color: #e2e8f0;
 }
 
-/* Інпут для примітки та водія в таблиці бази */
 .table-cell-input {
     width: 100% !important;
     padding: 3px;
@@ -246,7 +256,6 @@ th {
     background: #fff;
 }
 
-/* Картка авто */
 .card-header-panel {
     display: flex;
     justify-content: space-between;
@@ -293,7 +302,6 @@ th {
     background: white;
 }
 
-/* Робочий простір картки (Оригінальний десктоп) */
 .card-workspace {
     display: flex;
     gap: 20px;
@@ -312,7 +320,6 @@ th {
     min-width: 280px;
 }
 
-/* Рядок палива, AdBlue та одометрів */
 .top-stats-row {
     display: flex;
     gap: 20px;
@@ -351,7 +358,6 @@ th {
     text-align: center;
 }
 
-/* Кнопка переносу даних */
 .transfer-btn-container {
     display: flex;
     align-items: center;
@@ -384,7 +390,6 @@ th {
     padding: 4px;
 }
 
-/* Таблиця маршрутів */
 .routes-container {
     background: white;
     border: 1px solid #bdc3c7;
@@ -416,7 +421,6 @@ th {
     border-radius: 2px;
 }
 
-/* Футер та розрахунки */
 .fuel-summary-footer {
     margin-top: 15px;
     border-top: 1px solid #bdc3c7;
@@ -573,14 +577,7 @@ input[type=number] {
     text-align: center;
 }
 
-
-/* ==========================================
-   БЕЗПЕЧНА АДАПТАЦІЯ ПІД ТЕЛЕФОНИ (до 1250px)
-   Структура сторінок і меню НЕ чіпається!
-   ========================================== */
-
 @media (max-width: 1250px) {
-    /* Робоча зона картки авто стає вертикальною, характеристики внизу */
     .card-workspace {
         flex-direction: column !important;
         gap: 20px !important;
@@ -592,8 +589,6 @@ input[type=number] {
         width: 100% !important;
         min-width: 0 !important;
     }
-
-    /* Верхня панель статистики */
     .top-stats-row {
         flex-direction: column;
         gap: 15px;
@@ -611,8 +606,6 @@ input[type=number] {
     .odometer-panel {
         width: 100%;
     }
-
-    /* Футер розрахунків */
     .footer-layout-flex {
         flex-direction: column;
         gap: 15px;
@@ -660,7 +653,6 @@ input[type=number] {
     }
 }
 
-/* Сенсорна прокрутка таблиць на телефоні */
 .table-container, 
 .routes-container, 
 .print-scroll-box {

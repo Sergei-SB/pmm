@@ -17,6 +17,59 @@ document.addEventListener("DOMContentLoaded", () => {
 
 let projectDirectoryHandle = null;
 
+function isItemDestroyed(note) {
+    return /знищ/ui.test(note || '');
+}
+
+// Перевірка, чи потрібно приховувати об'єкт у звіті за конкретний період
+function shouldHideItemInReport(itemType, itemId, itemNote, reportPeriodStr) {
+    if (!isItemDestroyed(itemNote)) return false;
+
+    let meta = { date: '' };
+    try {
+        const stored = localStorage.getItem(`destroyed_meta_${itemType}_${itemId}`);
+        if (stored) meta = JSON.parse(stored);
+    } catch(e) {}
+
+    let destMonth = null;
+    let destYear = 2026;
+
+    if (meta.date) {
+        const parts = meta.date.split('.');
+        if (parts.length >= 2) {
+            destMonth = parseInt(parts[1], 10);
+            destYear = parts[2] ? parseInt(parts[2], 10) : 2026;
+        }
+    }
+
+    // Якщо дата знищення ще не введена, вважаємо поточним місяцем (жовтень 2026)
+    if (!destMonth || isNaN(destMonth)) {
+        destMonth = 10; 
+        destYear = 2026;
+    }
+
+    let repMonth = null;
+    let repYear = 2026;
+
+    if (reportPeriodStr) {
+        const match = reportPeriodStr.match(/\.(\d{2})(?:\.(\d{4}))?/);
+        if (match) {
+            repMonth = parseInt(match[1], 10);
+            if (match[2]) repYear = parseInt(match[2], 10);
+        }
+    }
+
+    if (!repMonth || isNaN(repMonth)) {
+        repMonth = 10;
+    }
+
+    // Якщо рік звіту пізніший за рік знищення або місяць звіту пізніший за місяць знищення — приховуємо
+    if (repYear > destYear) return true;
+    if (repYear === destYear && repMonth > destMonth) return true;
+
+    return false; // До кінця місяця знищення залишаємо у звітах
+}
+
 async function restoreDirectoryHandle() {
     try {
         const storedHandle = window.projectDirHandle;
@@ -373,7 +426,7 @@ function renderReportTable() {
     if (saveBtn && !document.getElementById('print-ten-days-report-btn')) {
         const printBtn = document.createElement('button');
         printBtn.id = 'print-ten-days-report-btn';
-        printBtn.innerHTML = '<span style="font-size: 14px; margin-right: 6px; vertical-align: middle;">🖨️</span> Друк звіту';
+        printBtn.innerHTML = '<span style="font-size: 14px; margin-right: 6px; vertical-align: middle;">🖨️️</span> Друк звіту';
         printBtn.style.cssText = 'background-color: #337ab7; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; white-space: nowrap; margin-right: 5px;';
         printBtn.onclick = printTenDaysReport;
         saveBtn.parentNode.insertBefore(printBtn, saveBtn.nextSibling);
@@ -428,6 +481,7 @@ function renderReportTable() {
 
     const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
     const filteredCars = sourceCars.filter(car => {
+        if (shouldHideItemInReport('car', car.id, car.note, periodStr)) return false;
         if (selectedSub !== 'all' && (car.subdivision || '').trim() && normalizeSubdivision(car.subdivision) !== normalizeSubdivision(selectedSub)) {
             return false;
         }
@@ -656,16 +710,6 @@ function showSubdivisionDetails(subName) {
     const container = document.getElementById('subdivisions-content-container');
     if (!container) return;
 
-    const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
-    const subCars = sourceCars.filter(c => c.subdivision && normalizeSubdivision(c.subdivision) === normalizeSubdivision(subName));
-    
-    let eqItems = [];
-    try {
-        if (typeof getAllEquipmentItemsUnified === 'function') {
-            eqItems = getAllEquipmentItemsUnified().filter(i => i.subdivision && normalizeSubdivision(i.subdivision) === normalizeSubdivision(subName));
-        }
-    } catch(e) {}
-
     const periods = getSavedPeriodsList();
     const customPeriodInput = document.getElementById('sub-custom-period-input');
     const customPeriodSelect = document.getElementById('sub-custom-period-select');
@@ -675,6 +719,16 @@ function showSubdivisionDetails(subName) {
         currentCustomPeriod = customPeriodSelect ? customPeriodSelect.value : (periods[0] || "01.10-10.10");
         if (customPeriodInput) customPeriodInput.value = currentCustomPeriod;
     }
+
+    const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
+    const subCars = sourceCars.filter(c => !shouldHideItemInReport('car', c.id, c.note, currentCustomPeriod) && c.subdivision && normalizeSubdivision(c.subdivision) === normalizeSubdivision(subName));
+    
+    let eqItems = [];
+    try {
+        if (typeof getAllEquipmentItemsUnified === 'function') {
+            eqItems = getAllEquipmentItemsUnified().filter(i => !shouldHideItemInReport('equipment', i.uniqueId || i.id, i.note || i.description, currentCustomPeriod) && i.subdivision && normalizeSubdivision(i.subdivision) === normalizeSubdivision(subName));
+        }
+    } catch(e) {}
 
     let statsCustom = calculateSubStatsDetailed(subName, [currentCustomPeriod]);
     let last3Periods = periods.slice(0, 3);
@@ -825,16 +879,6 @@ function showNoSubdivisionDetails() {
     const container = document.getElementById('subdivisions-content-container');
     if (!container) return;
 
-    const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
-    const subCars = sourceCars.filter(c => !c.subdivision || c.subdivision.trim() === '');
-    
-    let eqItems = [];
-    try {
-        if (typeof getAllEquipmentItemsUnified === 'function') {
-            eqItems = getAllEquipmentItemsUnified().filter(i => !i.subdivision || i.subdivision.trim() === '');
-        }
-    } catch(e) {}
-
     const periods = getSavedPeriodsList();
     const customPeriodInput = document.getElementById('sub-custom-period-input');
     const customPeriodSelect = document.getElementById('sub-custom-period-select');
@@ -844,6 +888,16 @@ function showNoSubdivisionDetails() {
         currentCustomPeriod = customPeriodSelect ? customPeriodSelect.value : (periods[0] || "01.10-10.10");
         if (customPeriodInput) customPeriodInput.value = currentCustomPeriod;
     }
+
+    const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
+    const subCars = sourceCars.filter(c => !shouldHideItemInReport('car', c.id, c.note, currentCustomPeriod) && (!c.subdivision || c.subdivision.trim() === ''));
+    
+    let eqItems = [];
+    try {
+        if (typeof getAllEquipmentItemsUnified === 'function') {
+            eqItems = getAllEquipmentItemsUnified().filter(i => !shouldHideItemInReport('equipment', i.uniqueId || i.id, i.note || i.description, currentCustomPeriod) && (!i.subdivision || i.subdivision.trim() === ''));
+        }
+    } catch(e) {}
 
     let statsCustom = calculateNoSubStatsDetailed([currentCustomPeriod]);
     let last3Periods = periods.slice(0, 3);
@@ -993,14 +1047,6 @@ function showPolkDetails() {
     const container = document.getElementById('subdivisions-content-container');
     if (!container) return;
 
-    const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
-    let allEqItems = [];
-    try {
-        if (typeof getAllEquipmentItemsUnified === 'function') {
-            allEqItems = getAllEquipmentItemsUnified();
-        }
-    } catch(e) {}
-
     const periods = getSavedPeriodsList();
     const customPeriodInput = document.getElementById('sub-custom-period-input');
     const customPeriodSelect = document.getElementById('sub-custom-period-select');
@@ -1011,12 +1057,22 @@ function showPolkDetails() {
         if (customPeriodInput) customPeriodInput.value = currentCustomPeriod;
     }
 
+    const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
+    const activePolkCars = sourceCars.filter(c => !shouldHideItemInReport('car', c.id, c.note, currentCustomPeriod));
+    
+    let allEqItems = [];
+    try {
+        if (typeof getAllEquipmentItemsUnified === 'function') {
+            allEqItems = getAllEquipmentItemsUnified().filter(i => !shouldHideItemInReport('equipment', i.uniqueId || i.id, i.note || i.description, currentCustomPeriod));
+        }
+    } catch(e) {}
+
     let statsCustom = calculatePolkStatsDetailed([currentCustomPeriod]);
     let last3Periods = periods.slice(0, 3);
     let stats30 = calculatePolkStatsDetailed(last3Periods);
     let statsAll = calculatePolkStatsDetailed(periods);
 
-    let polkCarsHtml = sourceCars.length > 0 ? sourceCars.map(c => '<li style="margin-bottom: 4px;"><strong>' + c.plate + '</strong> — ' + c.model + ' (<span style="color: #2980b9; font-weight: bold;">' + (c.subdivision || 'Без підрозділу') + '</span>, паливо: ' + c.fuelType + ')</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає техніки</li>';
+    let polkCarsHtml = activePolkCars.length > 0 ? activePolkCars.map(c => '<li style="margin-bottom: 4px;"><strong>' + c.plate + '</strong> — ' + c.model + ' (<span style="color: #2980b9; font-weight: bold;">' + (c.subdivision || 'Без підрозділу') + '</span>, паливо: ' + c.fuelType + ')</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає техніки</li>';
     let polkEqHtml = allEqItems.length > 0 ? allEqItems.map(i => '<li style="margin-bottom: 4px;"><span style="background: #e8f8f5; padding: 1px 4px; border-radius: 3px; font-size: 11px; color: #16a085; font-weight: bold;">' + i.category + '</span> <strong>' + i.model + '</strong> (<span style="color: #2980b9; font-weight: bold;">' + (i.subdivision || 'Без підрозділу') + '</span>, паливо: ' + i.fuelType + ')</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає обладнання</li>';
     let periodsOptionsHtml = periods.map(p => '<option value="' + p + '" ' + (p === currentCustomPeriod ? 'selected' : '') + '>' + p + '</option>').join('');
 
@@ -1035,7 +1091,7 @@ function showPolkDetails() {
 
             <h3 style="color: #2c3e50; margin-top: 0; margin-bottom: 15px;">Зведений звіт по всьому <span style="color: #8e44ad;">ПОЛКУ</span></h3>
             
-            <h4 style="margin: 15px 0 8px 0; color: #7f8c8d;">Вся техніка полку (${sourceCars.length}):</h4>
+            <h4 style="margin: 15px 0 8px 0; color: #7f8c8d;">Вся техніка полку (${activePolkCars.length}):</h4>
             <div class="print-scroll-box" style="border: 1px solid #e0e0e0; padding: 10px 10px 10px 25px; border-radius: 4px; background: #f9f9f9; margin-bottom: 15px;">
                 <ol style="margin: 0; padding-left: 15px; font-size: 14px;">
                     ${polkCarsHtml}
@@ -1183,15 +1239,16 @@ function calculateSubStatsDetailed(subName, periodList) {
     let eqStat = { dpFuel: 0, abFuel: 0, adblue: 0, oilMap: {}, washerMap: {} };
 
     const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
-    const subCars = sourceCars.filter(c => c.subdivision && normalizeSubdivision(c.subdivision) === normalizeSubdivision(subName));
-    let eqItems = [];
-    try {
-        if (typeof getAllEquipmentItemsUnified === 'function') {
-            eqItems = getAllEquipmentItemsUnified().filter(i => i.subdivision && normalizeSubdivision(i.subdivision) === normalizeSubdivision(subName));
-        }
-    } catch(e) {}
 
     periodList.forEach(p => {
+        const subCars = sourceCars.filter(c => !shouldHideItemInReport('car', c.id, c.note, p) && c.subdivision && normalizeSubdivision(c.subdivision) === normalizeSubdivision(subName));
+        let eqItems = [];
+        try {
+            if (typeof getAllEquipmentItemsUnified === 'function') {
+                eqItems = getAllEquipmentItemsUnified().filter(i => !shouldHideItemInReport('equipment', i.uniqueId || i.id, i.note || i.description, p) && i.subdivision && normalizeSubdivision(i.subdivision) === normalizeSubdivision(subName));
+            }
+        } catch(e) {}
+
         try {
             const stored = localStorage.getItem('report_data_' + p);
             if (stored) {
@@ -1270,15 +1327,16 @@ function calculateNoSubStatsDetailed(periodList) {
     let eqStat = { dpFuel: 0, abFuel: 0, adblue: 0, oilMap: {}, washerMap: {} };
 
     const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
-    const subCars = sourceCars.filter(c => !c.subdivision || c.subdivision.trim() === '');
-    let eqItems = [];
-    try {
-        if (typeof getAllEquipmentItemsUnified === 'function') {
-            eqItems = getAllEquipmentItemsUnified().filter(i => !i.subdivision || i.subdivision.trim() === '');
-        }
-    } catch(e) {}
 
     periodList.forEach(p => {
+        const subCars = sourceCars.filter(c => !shouldHideItemInReport('car', c.id, c.note, p) && (!c.subdivision || c.subdivision.trim() === ''));
+        let eqItems = [];
+        try {
+            if (typeof getAllEquipmentItemsUnified === 'function') {
+                eqItems = getAllEquipmentItemsUnified().filter(i => !shouldHideItemInReport('equipment', i.uniqueId || i.id, i.note || i.description, p) && (!i.subdivision || i.subdivision.trim() === ''));
+            }
+        } catch(e) {}
+
         try {
             const stored = localStorage.getItem('report_data_' + p);
             if (stored) {
@@ -1357,19 +1415,21 @@ function calculatePolkStatsDetailed(periodList) {
     let eqStat = { dpFuel: 0, abFuel: 0, adblue: 0, oilMap: {}, washerMap: {} };
 
     const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
-    let allEqItems = [];
-    try {
-        if (typeof getAllEquipmentItemsUnified === 'function') {
-            allEqItems = getAllEquipmentItemsUnified();
-        }
-    } catch(e) {}
 
     periodList.forEach(p => {
+        const activePolkCars = sourceCars.filter(c => !shouldHideItemInReport('car', c.id, c.note, p));
+        let allEqItems = [];
+        try {
+            if (typeof getAllEquipmentItemsUnified === 'function') {
+                allEqItems = getAllEquipmentItemsUnified().filter(i => !shouldHideItemInReport('equipment', i.uniqueId || i.id, i.note || i.description, p));
+            }
+        } catch(e) {}
+
         try {
             const stored = localStorage.getItem('report_data_' + p);
             if (stored) {
                 const data = JSON.parse(stored);
-                sourceCars.forEach(car => {
+                activePolkCars.forEach(car => {
                     if (data[car.id]) {
                         const refFuel = evaluateExpression(data[car.id].refuelFuel);
                         const fType = (car.fuelType || '').toUpperCase();

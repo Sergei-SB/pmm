@@ -12,11 +12,55 @@ document.addEventListener("DOMContentLoaded", () => {
     renderCarsTable();
     populateCarSelector();
     injectCardPrintButton();
-    if (carsData.length > 0) {
-        loadCarCard(carsData[0].id);
+    initDestroyedViewFeature();
+    
+    const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
+    const activeCars = safeCars.filter(c => !isItemDestroyed(c.note));
+    if (activeCars.length > 0) {
+        loadCarCard(activeCars[0].id);
     }
     updateRouteTotals();
 });
+
+function isItemDestroyed(note) {
+    return /знищ/ui.test(note || '');
+}
+
+function initDestroyedViewFeature() {
+    if (!document.getElementById('nav-btn-destroyed')) {
+        const navButtons = document.querySelectorAll('.top-nav .nav-btn, .nav-left .nav-btn, .top-nav button');
+        let targetBtn = null;
+        navButtons.forEach(btn => {
+            if (btn.textContent.includes('Звіт по обладнанню')) {
+                targetBtn = btn;
+            }
+        });
+        
+        if (targetBtn && targetBtn.parentNode) {
+            const destBtn = document.createElement('button');
+            destBtn.id = 'nav-btn-destroyed';
+            destBtn.className = 'nav-btn';
+            destBtn.setAttribute('onclick', "switchView('destroyed-view')");
+            destBtn.innerHTML = 'Знищена техніка';
+            targetBtn.parentNode.insertBefore(destBtn, targetBtn.nextSibling);
+        }
+    }
+
+    if (!document.getElementById('destroyed-view')) {
+        const baseView = document.getElementById('base-view');
+        if (baseView && baseView.parentNode) {
+            const destView = document.createElement('div');
+            destView.id = 'destroyed-view';
+            destView.className = 'view-section';
+            destView.style.padding = '20px';
+            destView.innerHTML = `
+                <h2 style="color: #c0392b; margin-top: 0; margin-bottom: 20px;">Облік знищеної техніки та обладнання</h2>
+                <div id="destroyed-table-container"></div>
+            `;
+            baseView.parentNode.appendChild(destView);
+        }
+    }
+}
 
 function injectCardPrintButton() {
     const searchInput = document.getElementById('car-search-input');
@@ -39,7 +83,8 @@ function injectCardPrintButton() {
 }
 
 function printCarCardReport() {
-    const car = carsData.find(c => Number(c.id) === Number(currentCarId));
+    const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
+    const car = safeCars.find(c => Number(c.id) === Number(currentCarId));
     if (!car) return;
 
     const printWindow = window.open('', '_blank');
@@ -80,7 +125,6 @@ function printCarCardReport() {
     const sumFuelRound = document.getElementById('sum-fuel-round')?.textContent || '0';
     const fuelStart = document.getElementById('fuel-start')?.value || '0';
     const fuelReceived = document.getElementById('fuel-received')?.value || '0';
-    const fuelSpent = document.getElementById('fuel-spent')?.textContent || '0';
     const fuelLeft = document.getElementById('fuel-left')?.textContent || '0';
     const baseLineText = document.querySelector('.fuel-base-line')?.textContent || '';
     const subLineText = document.querySelector('.fuel-sub-line')?.textContent || '';
@@ -185,12 +229,15 @@ function printCarCardReport() {
 }
 
 function loadCarsModifications() {
+    if (typeof carsData === 'undefined' || !Array.isArray(carsData)) return;
     try {
         const stored = localStorage.getItem('cars_modifications_data');
         if (stored) {
             const mods = JSON.parse(stored);
             carsData.forEach(car => {
                 if (mods[car.id]) {
+                    if (mods[car.id].model !== undefined) car.model = mods[car.id].model;
+                    if (mods[car.id].plate !== undefined) car.plate = mods[car.id].plate;
                     if (mods[car.id].note !== undefined) car.note = mods[car.id].note;
                     if (mods[car.id].driver !== undefined) car.driver = mods[car.id].driver;
                     if (mods[car.id].engineNo !== undefined) car.engineNo = mods[car.id].engineNo;
@@ -207,9 +254,12 @@ function loadCarsModifications() {
 }
 
 function saveCarsModificationsToStorage() {
+    if (typeof carsData === 'undefined' || !Array.isArray(carsData)) return;
     let mods = {};
     carsData.forEach(car => {
         mods[car.id] = {
+            model: car.model,
+            plate: car.plate,
             note: car.note,
             driver: car.driver,
             engineNo: car.engineNo,
@@ -254,7 +304,14 @@ function switchView(viewName) {
     document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
 
     const topSearchBox = document.getElementById('top-search-box');
-    const navButtons = document.querySelectorAll('.top-nav .nav-btn, .nav-left .nav-btn');
+    const navButtons = document.querySelectorAll('.top-nav .nav-btn, .nav-left .nav-btn, .top-nav button');
+
+    navButtons.forEach(btn => {
+        const onclickAttr = btn.getAttribute('onclick') || '';
+        if (onclickAttr.includes(`switchView('${viewName}')`) || onclickAttr.includes(`switchView("${viewName}")`)) {
+            btn.classList.add('active');
+        }
+    });
 
     if (viewName === 'base') {
         document.getElementById('base-view').classList.add('active');
@@ -263,51 +320,153 @@ function switchView(viewName) {
         renderCarsTable(); 
     } else if (viewName === 'card') {
         document.getElementById('card-view').classList.add('active');
-        if (navButtons[1]) navButtons[1].classList.add('active');
         if (topSearchBox) topSearchBox.style.display = 'none';
         loadCarCard(currentCarId);
     } else if (viewName === 'report') {
         document.getElementById('report-view').classList.add('active');
-        if (navButtons[2]) navButtons[2].classList.add('active');
         if (topSearchBox) topSearchBox.style.display = 'none';
         if (typeof renderReportTable === 'function') {
             renderReportTable();
         }
     } else if (viewName === 'subdivisions') {
         document.getElementById('subdivisions-view').classList.add('active');
-        if (navButtons[3]) navButtons[3].classList.add('active');
         if (topSearchBox) topSearchBox.style.display = 'none';
         if (typeof renderSubdivisionsView === 'function') {
             renderSubdivisionsView();
         }
     } else if (viewName === 'generators') {
         document.getElementById('generators-view').classList.add('active');
-        if (navButtons[4]) navButtons[4].classList.add('active');
         if (topSearchBox) topSearchBox.style.display = 'none';
-        if (typeof switchEquipmentTab === 'function' && typeof currentActiveEquipmentTab !== 'undefined') {
-            switchEquipmentTab(currentActiveEquipmentTab);
+        
+        // Примусово відкриваємо вкладку генераторів при кожному вході в розділ
+        if (typeof switchEquipmentTab === 'function') {
+            switchEquipmentTab('generators');
         } else if (typeof renderGeneratorsView === 'function') {
             renderGeneratorsView();
         }
     } else if (viewName === 'aggregates-calc') {
         const calcView = document.getElementById('aggregates-calc-view');
         if (calcView) calcView.classList.add('active');
-        if (navButtons[5]) navButtons[5].classList.add('active');
         if (topSearchBox) topSearchBox.style.display = 'none';
         if (typeof renderAggregatesCalcView === 'function') {
             renderAggregatesCalcView();
         }
     } else if (viewName === 'equipment-report-view') {
         document.getElementById('equipment-report-view').classList.add('active');
-        if (navButtons[6]) navButtons[6].classList.add('active');
         if (topSearchBox) topSearchBox.style.display = 'none';
         if (typeof renderEquipmentReportView === 'function') {
             renderEquipmentReportView();
+        }
+    } else if (viewName === 'destroyed-view') {
+        const destView = document.getElementById('destroyed-view');
+        if (destView) destView.classList.add('active');
+        navButtons.forEach(btn => {
+            if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes('destroyed-view')) {
+                btn.classList.add('active');
+            }
+        });
+        if (topSearchBox) topSearchBox.style.display = 'none';
+        if (typeof renderDestroyedEquipmentView === 'function') {
+            renderDestroyedEquipmentView();
         }
     } else if (viewName === 'car-details') {
         document.getElementById('car-details-view').classList.add('active');
         if (topSearchBox) topSearchBox.style.display = 'none';
     }
+}
+
+function getAllEquipmentItemsUnified() {
+    let items = [];
+    
+    let genArr = [];
+    try { if (typeof getGeneratorsList === 'function') genArr = getGeneratorsList(); } catch(e) {}
+    if (!genArr || genArr.length === 0) genArr = (typeof generatorsData !== 'undefined') ? generatorsData : [];
+    if (Array.isArray(genArr)) {
+        genArr.forEach((item, index) => {
+            const uid = 'gen_' + (item.id !== undefined ? item.id : index);
+            let note = item.note || '';
+            let subdivision = item.locationSubdivision || item.subdivision || '';
+            let model = item.model || item.name || 'Генератор #' + (index + 1);
+            
+            items.push({
+                uniqueId: uid,
+                category: 'Генератор',
+                model: model,
+                subdivision: subdivision,
+                note: note,
+                rawItem: item,
+                arrayType: 'generators'
+            });
+        });
+    }
+    
+    let webArr = [];
+    try { if (typeof getWebastoList === 'function') webArr = getWebastoList(); } catch(e) {}
+    if (!webArr || webArr.length === 0) webArr = (typeof webastoData !== 'undefined') ? webastoData : [];
+    if (Array.isArray(webArr)) {
+        webArr.forEach((item, index) => {
+            const uid = 'web_' + (item.id !== undefined ? item.id : index);
+            let note = item.note || '';
+            let subdivision = item.locationSubdivision || item.subdivision || '';
+            let model = item.model || item.name || 'Webasto #' + (index + 1);
+
+            items.push({
+                uniqueId: uid,
+                category: 'Webasto',
+                model: model,
+                subdivision: subdivision,
+                note: note,
+                rawItem: item,
+                arrayType: 'webasto'
+            });
+        });
+    }
+    
+    let heatArr = [];
+    try { if (typeof getHeatersList === 'function') heatArr = getHeatersList(); } catch(e) {}
+    if (!heatArr || heatArr.length === 0) heatArr = (typeof teplovipushkiData !== 'undefined') ? teplovipushkiData : ((typeof heatersData !== 'undefined') ? heatersData : []);
+    if (Array.isArray(heatArr)) {
+        heatArr.forEach((item, index) => {
+            const uid = 'heat_' + (item.id !== undefined ? item.id : index);
+            let note = item.note || '';
+            let subdivision = item.locationSubdivision || item.subdivision || '';
+            let model = item.model || item.name || 'Пушка #' + (index + 1);
+
+            items.push({
+                uniqueId: uid,
+                category: 'Теплова пушка',
+                model: model,
+                subdivision: subdivision,
+                note: note,
+                rawItem: item,
+                arrayType: 'heaters'
+            });
+        });
+    }
+    
+    let sawArr = [];
+    try { if (typeof getChainsawsList === 'function') sawArr = getChainsawsList(); } catch(e) {}
+    if (!sawArr || sawArr.length === 0) sawArr = (typeof benzopiliData !== 'undefined') ? benzopiliData : ((typeof chainsawsData !== 'undefined') ? chainsawsData : []);
+    if (Array.isArray(sawArr)) {
+        sawArr.forEach((item, index) => {
+            const uid = 'saw_' + (item.id !== undefined ? item.id : index);
+            let note = item.note || '';
+            let subdivision = item.locationSubdivision || item.subdivision || '';
+            let model = item.model || item.name || 'Пила #' + (index + 1);
+
+            items.push({
+                uniqueId: uid,
+                category: 'Бензопила',
+                model: model,
+                subdivision: subdivision,
+                note: note,
+                rawItem: item,
+                arrayType: 'chainsaws'
+            });
+        });
+    }
+
+    return items;
 }
 
 function filterCarsByCategory(category) {
@@ -365,7 +524,8 @@ function getCarGroup(car) {
 }
 
 function updateCarVehicleType(carId, newType) {
-    const car = carsData.find(c => Number(c.id) === Number(carId));
+    const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
+    const car = safeCars.find(c => Number(c.id) === Number(carId));
     if (car) {
         car.vehicleType = newType;
         if (newType === 'мотоцикл') car.category = 'motorcycle';
@@ -383,12 +543,17 @@ function renderCarsTable(filterQuery = '') {
     if (!tbody) return;
     tbody.innerHTML = '';
 
+    const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
+    if (safeCars.length === 0) return;
+
     const subFilterEl = document.getElementById('base-subdivision-filter');
     const currentSubVal = subFilterEl ? subFilterEl.value : 'all';
 
     if (subFilterEl) {
         const subs = new Set();
-        carsData.forEach(c => { if (c.subdivision) subs.add(c.subdivision.trim()); });
+        safeCars.forEach(c => { 
+            if (!isItemDestroyed(c.note) && c.subdivision) subs.add(c.subdivision.trim()); 
+        });
         let opts = '<option value="all">Усі</option>';
         subs.forEach(sub => {
             opts += `<option value="${sub}">${sub}</option>`;
@@ -404,7 +569,9 @@ function renderCarsTable(filterQuery = '') {
     const query = filterQuery !== '' ? filterQuery : (searchInput ? searchInput.value : '');
     const upperVal = query.toUpperCase().trim();
     
-    const filteredCars = carsData.filter(car => {
+    const filteredCars = safeCars.filter(car => {
+        if (isItemDestroyed(car.note)) return false;
+
         if (selectedSub !== 'all' && (car.subdivision || '').trim() !== selectedSub) {
             return false;
         }
@@ -464,7 +631,8 @@ function renderCarsTable(filterQuery = '') {
 }
 
 function updateCarProp(carId, propName, val) {
-    const car = carsData.find(c => Number(c.id) === Number(carId));
+    const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
+    const car = safeCars.find(c => Number(c.id) === Number(carId));
     if (car) {
         car[propName] = val;
         saveCarsModificationsToStorage();
@@ -484,10 +652,13 @@ function populateCarSelector() {
     if (!datalist) return;
     
     datalist.innerHTML = '';
-    carsData.forEach(car => {
-        const option = document.createElement('option');
-        option.value = `${car.plate} — ${car.model}`;
-        datalist.appendChild(option);
+    const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
+    safeCars.forEach(car => {
+        if (!isItemDestroyed(car.note)) {
+            const option = document.createElement('option');
+            option.value = `${car.plate} — ${car.model}`;
+            datalist.appendChild(option);
+        }
     });
 }
 
@@ -496,18 +667,23 @@ function handleCarSearchInput(val, event) {
     if (!upperVal) return;
 
     const isEnter = event && event.key === 'Enter';
+    const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
 
-    let foundCar = carsData.find(car => 
-        car.plate.toUpperCase() === upperVal || 
-        car.model.toUpperCase() === upperVal ||
-        `${car.plate} — ${car.model}`.toUpperCase() === upperVal
+    let foundCar = safeCars.find(car => 
+        !isItemDestroyed(car.note) && (
+            car.plate.toUpperCase() === upperVal || 
+            car.model.toUpperCase() === upperVal ||
+            `${car.plate} — ${car.model}`.toUpperCase() === upperVal
+        )
     );
 
     if (!foundCar) {
-        const matches = carsData.filter(car => 
-            car.plate.toUpperCase().includes(upperVal) || 
-            car.model.toUpperCase().includes(upperVal) ||
-            `${car.plate} — ${car.model}`.toUpperCase().includes(upperVal)
+        const matches = safeCars.filter(car => 
+            !isItemDestroyed(car.note) && (
+                car.plate.toUpperCase().includes(upperVal) || 
+                car.model.toUpperCase().includes(upperVal) ||
+                `${car.plate} — ${car.model}`.toUpperCase().includes(upperVal)
+            )
         );
 
         if (isEnter && matches.length > 0) {
@@ -535,7 +711,8 @@ function openCarCard(carId) {
 function openCarDetails(carId) {
     activeDetailCarId = carId;
     switchView('car-details');
-    const car = carsData.find(c => Number(c.id) === Number(carId));
+    const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
+    const car = safeCars.find(c => Number(c.id) === Number(carId));
     if (!car) return;
 
     document.getElementById('detail-car-title').textContent = `${car.model} (${car.plate})`;
@@ -632,7 +809,8 @@ function uploadCarDocument(input) {
     const files = input.files;
     if (!files || files.length === 0) return;
 
-    const car = carsData.find(c => Number(c.id) === Number(activeDetailCarId));
+    const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
+    const car = safeCars.find(c => Number(c.id) === Number(activeDetailCarId));
     if (!car) return;
 
     const folderName = `Doc/${car.plate.replace(/[^a-zA-Z0-9А-Яа-яІіЇїЄє]/g, '_')}`;
@@ -753,14 +931,16 @@ function deleteCarDoc(carId, index) {
     if (folderData && folderData.files) {
         folderData.files.splice(index, 1);
         localStorage.setItem(storageKey, JSON.stringify(folderData));
-        const car = carsData.find(c => Number(c.id) === Number(carId));
+        const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
+        const car = safeCars.find(c => Number(c.id) === Number(carId));
         if (car) renderCarDocuments(car);
     }
 }
 
 function loadCarCard(carId) {
     currentCarId = carId;
-    const car = carsData.find(c => Number(c.id) === Number(carId));
+    const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
+    const car = safeCars.find(c => Number(c.id) === Number(carId));
     if (!car) return;
 
     document.getElementById('card-model').textContent = car.model;
@@ -869,7 +1049,8 @@ function addRouteRow(routeName = 'Виконання БЗ Харків', dateVal
     if (!tbody) return;
     const tr = document.createElement('tr');
     
-    const car = carsData.find(c => Number(c.id) === Number(currentCarId));
+    const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
+    const car = safeCars.find(c => Number(c.id) === Number(currentCarId));
     const truckActive = forceIsTruck !== null ? forceIsTruck : isCarTruck(car);
 
     if (truckActive) {
@@ -915,7 +1096,8 @@ function applyPresetToActiveRow(text) {
         if (rows.length > 0) {
             lastActiveRow = rows[rows.length - 1];
         } else {
-            const car = carsData.find(c => Number(c.id) === Number(currentCarId));
+            const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
+            const car = safeCars.find(c => Number(c.id) === Number(currentCarId));
             addRouteRow(text, '8:30', '', isCarTruck(car));
             return;
         }
@@ -934,7 +1116,8 @@ function updateRouteTotals() {
     let startOdo = evaluateExpression(startOdoInput);
     let currentOdo = startOdo;
 
-    const car = carsData.find(c => Number(c.id) === Number(currentCarId));
+    const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
+    const car = safeCars.find(c => Number(c.id) === Number(currentCarId));
     const isMilesCar = car && car.isMiles;
     const group = getCarGroup(car);
 
