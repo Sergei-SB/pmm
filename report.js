@@ -90,7 +90,6 @@ async function saveAllDataDirectlyToDoc() {
     }
 }
 
-// Допоміжні функції для розбору мастил та омивачів за типами у дужках
 function evaluateExpression(val) {
     if (val === undefined || val === null || val === '') return 0;
     const str = String(val).trim();
@@ -425,7 +424,7 @@ function renderReportTable() {
 
     const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
     const filteredCars = sourceCars.filter(car => {
-        if (selectedSub !== 'all' && car.subdivision && car.subdivision.trim() !== selectedSub) {
+        if (selectedSub !== 'all' && car.subdivision && normalizeSubdivision(car.subdivision) !== normalizeSubdivision(selectedSub)) {
             return false;
         }
         return true;
@@ -578,6 +577,19 @@ function updateReportTotals() {
 }
 
 // ==========================================
+// НОРМАЛІЗАЦІЯ ПІДРОЗДІЛІВ (Об'єднання РМТЗ / PMT3)
+// ==========================================
+function normalizeSubdivision(sub) {
+    if (!sub) return 'РМТЗ';
+    let trimmed = sub.trim();
+    let upper = trimmed.toUpperCase();
+    if (upper === 'PMT3' || upper === 'PMTЗ' || upper === 'РМТЗ') {
+        return 'РМТЗ';
+    }
+    return trimmed;
+}
+
+// ==========================================
 // ЗВІТ ПО ПІДРОЗДІЛАХ ТА ПОЛКУ (ВКЛАДКА)
 // ==========================================
 
@@ -602,12 +614,12 @@ function getUniqueSubdivisions() {
     const subs = new Set();
     const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
     sourceCars.forEach(car => {
-        if (car.subdivision) subs.add(car.subdivision.trim());
+        if (car.subdivision) subs.add(normalizeSubdivision(car.subdivision));
     });
     try {
         if (typeof getAllEquipmentItemsUnified === 'function') {
             getAllEquipmentItemsUnified().forEach(item => {
-                if (item.subdivision) subs.add(item.subdivision.trim());
+                if (item.subdivision) subs.add(normalizeSubdivision(item.subdivision));
             });
         }
     } catch(e) {}
@@ -629,12 +641,12 @@ function showSubdivisionDetails(subName) {
     if (!container) return;
 
     const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
-    const subCars = sourceCars.filter(c => c.subdivision && c.subdivision.trim() === subName);
+    const subCars = sourceCars.filter(c => c.subdivision && normalizeSubdivision(c.subdivision) === normalizeSubdivision(subName));
     
     let eqItems = [];
     try {
         if (typeof getAllEquipmentItemsUnified === 'function') {
-            eqItems = getAllEquipmentItemsUnified().filter(i => i.subdivision && i.subdivision.trim() === subName);
+            eqItems = getAllEquipmentItemsUnified().filter(i => i.subdivision && normalizeSubdivision(i.subdivision) === normalizeSubdivision(subName));
         }
     } catch(e) {}
 
@@ -667,7 +679,7 @@ function showSubdivisionDetails(subName) {
                     <option value="custom" ${!periods.includes(currentCustomPeriod) ? 'selected' : ''}>Власний...</option>
                 </select>
                 <input type="text" id="sub-custom-period-input" value="${currentCustomPeriod}" placeholder="01.10-10.10" oninput="showSubdivisionDetails('${subName}')" style="width: 100px; text-align: center; padding: 4px; font-size: 13px; border-radius: 4px; border: 1px solid #ccc;">
-                <button class="action-btn" style="background-color: #2980b9; padding: 5px 12px; font-size: 13px;" onclick="printSubdivisionReport()">🖨 Друк</button>
+                <button class="action-btn print-btn" onclick="printSubdivisionReport()" style="background-color: #337ab7; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; white-space: nowrap;"><span style="font-size: 14px; margin-right: 6px; vertical-align: middle;">🖨️</span> Друк звіту</button>
             </div>
 
             <h3 style="color: #2c3e50; margin-top: 0; margin-bottom: 15px;">Підрозділ: <span style="color: #2980b9;">${subName}</span></h3>
@@ -831,7 +843,7 @@ function showPolkDetails() {
                     <option value="custom" ${!periods.includes(currentCustomPeriod) ? 'selected' : ''}>Власний...</option>
                 </select>
                 <input type="text" id="sub-custom-period-input" value="${currentCustomPeriod}" placeholder="01.10-10.10" oninput="showPolkDetails()" style="width: 100px; text-align: center; padding: 4px; font-size: 13px; border-radius: 4px; border: 1px solid #ccc;">
-                <button class="action-btn" style="background-color: #2980b9; padding: 5px 12px; font-size: 13px;" onclick="printSubdivisionReport()">🖨 Друк</button>
+                <button class="action-btn print-btn" onclick="printSubdivisionReport()" style="background-color: #337ab7; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; white-space: nowrap;"><span style="font-size: 14px; margin-right: 6px; vertical-align: middle;">🖨️</span> Друк звіту</button>
             </div>
 
             <h3 style="color: #2c3e50; margin-top: 0; margin-bottom: 15px;">Зведений звіт по всьому <span style="color: #8e44ad;">ПОЛКУ</span></h3>
@@ -984,11 +996,11 @@ function calculateSubStatsDetailed(subName, periodList) {
     let eqStat = { dpFuel: 0, abFuel: 0, adblue: 0, oilMap: {}, washerMap: {} };
 
     const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
-    const subCars = sourceCars.filter(c => c.subdivision && c.subdivision.trim() === subName);
+    const subCars = sourceCars.filter(c => c.subdivision && normalizeSubdivision(c.subdivision) === normalizeSubdivision(subName));
     let eqItems = [];
     try {
         if (typeof getAllEquipmentItemsUnified === 'function') {
-            eqItems = getAllEquipmentItemsUnified().filter(i => i.subdivision && i.subdivision.trim() === subName);
+            eqItems = getAllEquipmentItemsUnified().filter(i => i.subdivision && normalizeSubdivision(i.subdivision) === normalizeSubdivision(subName));
         }
     } catch(e) {}
 

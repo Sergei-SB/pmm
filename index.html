@@ -66,7 +66,7 @@
             color: white;
         }
         .nav-btn.active {
-            background: #5d6d7e !important; /* Помітно світліший відтінок для активної сторінки */
+            background: #5d6d7e !important;
             color: white !important;
             box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.4);
         }
@@ -99,7 +99,7 @@
 <body>
 
     <!-- ВЕРХНЯ НАВІГАЦІЯ -->
-    <header class="top-nav" style="background: #2c3e50; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center;">
+    <header class="top-nav" style="background: #2c3e50; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
         <div class="nav-left" style="display: flex; gap: 8px; flex-wrap: wrap;">
             <button class="nav-btn active" onclick="switchView('base')">База (Реєстр)</button>
             <button class="nav-btn" onclick="switchView('card')">Картка авто та Маршрути</button>
@@ -109,8 +109,16 @@
             <button class="nav-btn" onclick="switchView('aggregates-calc')">Розрахунок агрегатів</button>
             <button class="nav-btn" onclick="switchView('equipment-report-view')">Звіт по обладнанню</button>
         </div>
-        <div class="nav-right" id="top-search-box">
-            <input type="text" id="base-search-input" placeholder="Пошук по авто, номеру, водію..." oninput="filterBaseTable(this.value)" style="padding: 6px; width: 250px; border-radius: 4px; border: none;" autocomplete="off">
+        <div class="nav-right" id="top-search-box" style="display: flex; align-items: center; gap: 10px;">
+            <!-- Кнопка збереження (тільки дискета) -->
+            <button id="header-direct-save-btn" onclick="saveAllDataDirectlyToDoc()" title="Зберегти всі дані" style="background-color: #27ae60; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 15px; font-weight: bold; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">💾</button>
+            
+            <!-- Кнопка Імпорт у шапці -->
+            <label id="header-direct-import-btn" title="Імпортувати дані з JSON" style="background-color: #8e44ad; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                📂 Імпорт <input type="file" id="header-import-json-file" accept=".json" onchange="importDataFromJson(this)" style="display: none;">
+            </label>
+
+            <input type="text" id="base-search-input" placeholder="Пошук по авто, номеру, водію..." oninput="filterBaseTable(this.value)" style="padding: 6px; width: 220px; border-radius: 4px; border: none;" autocomplete="off">
         </div>
     </header>
 
@@ -282,10 +290,6 @@
                     <select id="report-period-select" onchange="changeReportPeriod(this.value)"></select>
                     <input type="text" id="report-custom-period" value="01.10-10.10" placeholder="Напр: 01.10-10.10" oninput="updateReportHeaders()" style="width: 110px; text-align: center; padding: 5px;">
                     <button class="action-btn" onclick="saveReportData()">Зберегти звіт</button>
-                    <button class="action-btn" style="background-color: #2980b9;" onclick="exportDataToJson()">Експорт</button>
-                    <label class="action-btn" style="background-color: #8e44ad; cursor: pointer; display: inline-block; padding: 8px 14px; border-radius: 3px; font-weight: bold; color: white;">
-                        Імпорт <input type="file" id="import-json-file" accept=".json" onchange="importDataFromJson(this)" style="display: none;">
-                    </label>
                 </div>
             </div>
             <div class="table-container" style="max-height: 75vh;">
@@ -433,7 +437,7 @@
                     <select id="eq-report-period-select" onchange="changeEqReportPeriod(this.value)"></select>
                     <input type="text" id="eq-report-custom-period" value="01.10-10.10" placeholder="Напр: 01.10-10.10" oninput="renderEquipmentReportView()" style="width: 110px; text-align: center; padding: 5px;">
                     <button class="action-btn" onclick="saveEquipmentReportData()">Зберегти звіт</button>
-                    <button class="action-btn" style="background-color: #2980b9;" onclick="printEquipmentReport()">🖨 Друк звіту</button>
+                    <button class="action-btn print-btn" onclick="printEquipmentReport()" style="background-color: #337ab7; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; white-space: nowrap;"><span style="font-size: 14px; margin-right: 6px; vertical-align: middle;">🖨️</span> Друк звіту</button>
                 </div>
             </div>
             <div class="table-container" style="max-height: 75vh;">
