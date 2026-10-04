@@ -5,8 +5,7 @@
 const CURRENT_HEAT_VERSION = 'v2_full_list';
 
 let defaultHeatersData = [
-    { id: 1, model: "ITA-35THL", kw: "35", fuelType: "ДП", consumption: "2.80", max5Days: "168.00", max10Days: "336.0", max30Days: "1008.0", motoHoursDay: "12", oilNorm10Days: "0.50", subdivision: "", responsiblePerson: "Ковальов В.В.", locationSubdivision: "", serialNumber: "ITA-35-1", note: "" },
-    { id: 2, model: "Master BV 77", kw: "20", fuelType: "ДП", consumption: "1.70", max5Days: "102.00", max10Days: "204.0", max30Days: "612.0", motoHoursDay: "12", oilNorm10Days: "0.50", subdivision: "", responsiblePerson: "Ковальов В.В.", locationSubdivision: "", serialNumber: "HST-77-1", note: "" }
+    { id: 1, model: "ITA-35THL", kw: "35", fuelType: "ДП", consumption: "2.40", max5Days: "144.00", max10Days: "288.0", max30Days: "864.0", motoHoursDay: "12", oilNorm10Days: "0.50", subdivision: "", responsiblePerson: "Ковальов В.В.", locationSubdivision: "", serialNumber: "ITA-35-1", note: "" },
 ];
 
 let heatersFilters = { model: "", subdivision: "", responsiblePerson: "", locationSubdivision: "" };

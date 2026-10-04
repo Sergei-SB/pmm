@@ -5,9 +5,7 @@
 const CURRENT_CHAIN_VERSION = 'v2_full_list';
 
 let defaultChainsawsData = [
-    { id: 1, model: "STIHL MS 180", kw: "1.4", fuelType: "АБ", consumption: "0.80", max5Days: "48.00", max10Days: "96.0", max30Days: "288.0", motoHoursDay: "12", oilNorm10Days: "0.30", subdivision: "", responsiblePerson: "Ковальов В.В.", locationSubdivision: "", serialNumber: "ST-180-1", note: "" },
-    { id: 2, model: "DNIPRO-M DSG-45H", kw: "2.0", fuelType: "АБ", consumption: "1.10", max5Days: "66.00", max10Days: "132.0", max30Days: "396.0", motoHoursDay: "12", oilNorm10Days: "0.35", subdivision: "", responsiblePerson: "Ковальов В.В.", locationSubdivision: "", serialNumber: "DN-45H-1", note: "" },
-    { id: 3, model: "Oleo-Mac GSH 51", kw: "2.2", fuelType: "АБ", consumption: "1.20", max5Days: "72.00", max10Days: "144.0", max30Days: "432.0", motoHoursDay: "12", oilNorm10Days: "0.35", subdivision: "", responsiblePerson: "Ковальов В.В.", locationSubdivision: "", serialNumber: "OM-51-1", note: "" }
+    { id: 1, model: "DNIPRO-M DSG-45H", kw: "0.0", fuelType: "АБ", consumption: "1.10", max5Days: "22.00", max10Days: "44.0", max30Days: "132.0", motoHoursDay: "4", oilNorm10Days: "-", subdivision: "", responsiblePerson: "Ковальов В.В.", locationSubdivision: "", serialNumber: "DN-45H-1", note: "" },
 ];
 
 let chainsawsFilters = { model: "", subdivision: "", responsiblePerson: "", locationSubdivision: "" };
