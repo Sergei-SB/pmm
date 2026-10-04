@@ -2,7 +2,7 @@
 // ЛОГІКА ОБЛІКУ WEBASTO (webasto.js)
 // ==========================================
 
-const CURRENT_WEBASTO_VERSION = 'v4_webasto_unique_models';
+const CURRENT_WEBASTO_VERSION = 'v5_webasto_autofill';
 
 let defaultWebastoData = [
     { id: 1, model: "PNI WB300", kw: "5", fuelType: "ДП", consumption: "0.51", max5Days: "30.6", max10Days: "61.2", max30Days: "183.6", motoHoursDay: "12", subdivision: "РМТЗ", responsiblePerson: "Ковальов В.В.", locationSubdivision: "РМТЗ", serialNumber: "Без номера", note: "" },
@@ -60,6 +60,9 @@ function renderWebastoView() {
             </thead>
             <tbody id="webasto-tbody"></tbody>
         </table>
+        <datalist id="webasto-autocomplete-list">
+            ${defaultWebastoData.map(d => `<option value="${d.model}">`).join('')}
+        </datalist>
     `;
 
     const tbody = document.getElementById('webasto-tbody');
@@ -79,14 +82,14 @@ function renderWebastoView() {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td style="text-align: center; padding: 3px 4px;">${index + 1}</td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.model || ''}" oninput="updateWebProp(${item.id}, 'model', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.kw || ''}" oninput="updateWebProp(${item.id}, 'kw', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.fuelType || ''}" oninput="updateWebProp(${item.id}, 'fuelType', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; background-color: #fff9c4; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.consumption || ''}" oninput="updateWebProp(${item.id}, 'consumption', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.max5Days || ''}" oninput="updateWebProp(${item.id}, 'max5Days', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.max10Days || ''}" oninput="updateWebProp(${item.id}, 'max10Days', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.max30Days || ''}" oninput="updateWebProp(${item.id}, 'max30Days', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.motoHoursDay || ''}" oninput="updateWebProp(${item.id}, 'motoHoursDay', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.model || ''}" list="webasto-autocomplete-list" oninput="onWebastoModelInput(${item.id}, this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
+            <td style="padding: 3px 4px;"><input type="text" id="web-kw-${item.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.kw || ''}" oninput="updateWebProp(${item.id}, 'kw', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" id="web-fuel-${item.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.fuelType || ''}" oninput="updateWebProp(${item.id}, 'fuelType', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" id="web-cons-${item.id}" class="table-cell-input" style="text-align:center; background-color: #fff9c4; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.consumption || ''}" oninput="updateWebProp(${item.id}, 'consumption', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" id="web-m5-${item.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.max5Days || ''}" oninput="updateWebProp(${item.id}, 'max5Days', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" id="web-m10-${item.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.max10Days || ''}" oninput="updateWebProp(${item.id}, 'max10Days', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" id="web-m30-${item.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.max30Days || ''}" oninput="updateWebProp(${item.id}, 'max30Days', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" id="web-moto-${item.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.motoHoursDay || ''}" oninput="updateWebProp(${item.id}, 'motoHoursDay', this.value)"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.subdivision || ''}" oninput="updateWebProp(${item.id}, 'subdivision', this.value)"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.responsiblePerson || ''}" oninput="updateWebProp(${item.id}, 'responsiblePerson', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.locationSubdivision || ''}" oninput="updateWebProp(${item.id}, 'locationSubdivision', this.value)"></td>
@@ -96,6 +99,43 @@ function renderWebastoView() {
         `;
         tbody.appendChild(tr);
     });
+}
+
+function onWebastoModelInput(id, val) {
+    let items = getWebastoList();
+    const item = items.find(i => Number(i.id) === Number(id));
+    if (!item) return;
+
+    item.model = val;
+    const trimmedVal = val.trim().toLowerCase();
+    const matchedBase = defaultWebastoData.find(b => b.model && b.model.trim().toLowerCase() === trimmedVal);
+
+    if (matchedBase) {
+        item.kw = matchedBase.kw;
+        item.fuelType = matchedBase.fuelType;
+        item.consumption = matchedBase.consumption;
+        item.max5Days = matchedBase.max5Days;
+        item.max10Days = matchedBase.max10Days;
+        item.max30Days = matchedBase.max30Days;
+        item.motoHoursDay = matchedBase.motoHoursDay;
+
+        const elKw = document.getElementById(`web-kw-${id}`);
+        const elFuel = document.getElementById(`web-fuel-${id}`);
+        const elCons = document.getElementById(`web-cons-${id}`);
+        const elM5 = document.getElementById(`web-m5-${id}`);
+        const elM10 = document.getElementById(`web-m10-${id}`);
+        const elM30 = document.getElementById(`web-m30-${id}`);
+        const elMoto = document.getElementById(`web-moto-${id}`);
+
+        if (elKw) elKw.value = matchedBase.kw;
+        if (elFuel) elFuel.value = matchedBase.fuelType;
+        if (elCons) elCons.value = matchedBase.consumption;
+        if (elM5) elM5.value = matchedBase.max5Days;
+        if (elM10) elM10.value = matchedBase.max10Days;
+        if (elM30) elM30.value = matchedBase.max30Days;
+        if (elMoto) elMoto.value = matchedBase.motoHoursDay;
+    }
+    saveWebastoList(items);
 }
 
 function updateWebFilter(field, val) {

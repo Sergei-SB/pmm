@@ -2,7 +2,7 @@
 // ЛОГІКА ОБЛІКУ ГЕНЕРАТОРІВ ТА ДИСПЕТЧЕР ВЛАДОК (generators.js)
 // ==========================================
 
-const CURRENT_GEN_VERSION = 'v18_force_reset_locations';
+const CURRENT_GEN_VERSION = 'v19_autofill_added';
 
 let defaultGeneratorsData = [
     { id: 1, model: "Firman SDG 8500 CLE", kw: "6", fuelType: "ДП", consumption: "3.33", max5Days: "199.80", max10Days: "399.6", max30Days: "1198.8", motoHoursDay: "12", oilNorm10Days: "1.10", subdivision: "", responsiblePerson: "Беспалько М. О.", locationSubdivision: "", serialNumber: "SDG2012M2690", note: "" },
@@ -227,6 +227,9 @@ function renderGeneratorsView() {
             </thead>
             <tbody id="generators-tbody"></tbody>
         </table>
+        <datalist id="generators-autocomplete-list">
+            ${defaultGeneratorsData.map(d => `<option value="${d.model}">`).join('')}
+        </datalist>
     `;
 
     const tbody = document.getElementById('generators-tbody');
@@ -246,15 +249,15 @@ function renderGeneratorsView() {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td style="text-align: center; padding: 3px 4px;">${index + 1}</td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${gen.model || ''}" oninput="updateGeneratorProp(${gen.id}, 'model', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${gen.kw || ''}" oninput="updateGeneratorProp(${gen.id}, 'kw', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${gen.fuelType || ''}" oninput="updateGeneratorProp(${gen.id}, 'fuelType', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; background-color: #fff9c4; width: 100%; box-sizing: border-box; padding: 3px;" value="${gen.consumption || ''}" oninput="updateGeneratorProp(${gen.id}, 'consumption', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${gen.oilNorm10Days || ''}" oninput="updateGeneratorProp(${gen.id}, 'oilNorm10Days', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${gen.max5Days || ''}" oninput="updateGeneratorProp(${gen.id}, 'max5Days', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${gen.max10Days || ''}" oninput="updateGeneratorProp(${gen.id}, 'max10Days', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${gen.max30Days || ''}" oninput="updateGeneratorProp(${gen.id}, 'max30Days', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${gen.motoHoursDay || ''}" oninput="updateGeneratorProp(${gen.id}, 'motoHoursDay', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${gen.model || ''}" list="generators-autocomplete-list" oninput="onGeneratorModelInput(${gen.id}, this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
+            <td style="padding: 3px 4px;"><input type="text" id="gen-kw-${gen.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${gen.kw || ''}" oninput="updateGeneratorProp(${gen.id}, 'kw', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" id="gen-fuel-${gen.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${gen.fuelType || ''}" oninput="updateGeneratorProp(${gen.id}, 'fuelType', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" id="gen-cons-${gen.id}" class="table-cell-input" style="text-align:center; background-color: #fff9c4; width: 100%; box-sizing: border-box; padding: 3px;" value="${gen.consumption || ''}" oninput="updateGeneratorProp(${gen.id}, 'consumption', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" id="gen-oil-${gen.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${gen.oilNorm10Days || ''}" oninput="updateGeneratorProp(${gen.id}, 'oilNorm10Days', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" id="gen-m5-${gen.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${gen.max5Days || ''}" oninput="updateGeneratorProp(${gen.id}, 'max5Days', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" id="gen-m10-${gen.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${gen.max10Days || ''}" oninput="updateGeneratorProp(${gen.id}, 'max10Days', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" id="gen-m30-${gen.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${gen.max30Days || ''}" oninput="updateGeneratorProp(${gen.id}, 'max30Days', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" id="gen-moto-${gen.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${gen.motoHoursDay || ''}" oninput="updateGeneratorProp(${gen.id}, 'motoHoursDay', this.value)"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${gen.subdivision || ''}" oninput="updateGeneratorProp(${gen.id}, 'subdivision', this.value)"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${gen.responsiblePerson || ''}" oninput="updateGeneratorProp(${gen.id}, 'responsiblePerson', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${gen.locationSubdivision || ''}" oninput="updateGeneratorProp(${gen.id}, 'locationSubdivision', this.value)"></td>
@@ -264,6 +267,46 @@ function renderGeneratorsView() {
         `;
         tbody.appendChild(tr);
     });
+}
+
+function onGeneratorModelInput(id, val) {
+    let gens = getGeneratorsList();
+    const gen = gens.find(g => Number(g.id) === Number(id));
+    if (!gen) return;
+    
+    gen.model = val;
+    const trimmedVal = val.trim().toLowerCase();
+    const matchedBase = defaultGeneratorsData.find(b => b.model && b.model.trim().toLowerCase() === trimmedVal);
+    
+    if (matchedBase) {
+        gen.kw = matchedBase.kw;
+        gen.fuelType = matchedBase.fuelType;
+        gen.consumption = matchedBase.consumption;
+        gen.max5Days = matchedBase.max5Days;
+        gen.max10Days = matchedBase.max10Days;
+        gen.max30Days = matchedBase.max30Days;
+        gen.motoHoursDay = matchedBase.motoHoursDay;
+        gen.oilNorm10Days = matchedBase.oilNorm10Days;
+
+        const elKw = document.getElementById(`gen-kw-${id}`);
+        const elFuel = document.getElementById(`gen-fuel-${id}`);
+        const elCons = document.getElementById(`gen-cons-${id}`);
+        const elOil = document.getElementById(`gen-oil-${id}`);
+        const elM5 = document.getElementById(`gen-m5-${id}`);
+        const elM10 = document.getElementById(`gen-m10-${id}`);
+        const elM30 = document.getElementById(`gen-m30-${id}`);
+        const elMoto = document.getElementById(`gen-moto-${id}`);
+
+        if (elKw) elKw.value = matchedBase.kw;
+        if (elFuel) elFuel.value = matchedBase.fuelType;
+        if (elCons) elCons.value = matchedBase.consumption;
+        if (elOil) elOil.value = matchedBase.oilNorm10Days;
+        if (elM5) elM5.value = matchedBase.max5Days;
+        if (elM10) elM10.value = matchedBase.max10Days;
+        if (elM30) elM30.value = matchedBase.max30Days;
+        if (elMoto) elMoto.value = matchedBase.motoHoursDay;
+    }
+    saveGeneratorsList(gens);
 }
 
 function updateGenFilter(field, val) {

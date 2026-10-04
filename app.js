@@ -11,11 +11,178 @@ document.addEventListener("DOMContentLoaded", () => {
     loadCarsModifications();
     renderCarsTable();
     populateCarSelector();
+    injectCardPrintButton();
     if (carsData.length > 0) {
         loadCarCard(carsData[0].id);
     }
     updateRouteTotals();
 });
+
+function injectCardPrintButton() {
+    const searchInput = document.getElementById('car-search-input');
+    if (searchInput && !document.getElementById('print-car-card-btn')) {
+        const parentContainer = searchInput.parentElement;
+        if (parentContainer) {
+            parentContainer.style.display = 'flex';
+            parentContainer.style.alignItems = 'center';
+            parentContainer.style.gap = '10px';
+
+            const printBtn = document.createElement('button');
+            printBtn.id = 'print-car-card-btn';
+            printBtn.innerHTML = '<span style="font-size: 14px; margin-right: 6px; vertical-align: middle;">🖨️</span> Друк';
+            printBtn.style.cssText = 'background-color: #337ab7; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.1);';
+            printBtn.onclick = printCarCardReport;
+            
+            parentContainer.insertBefore(printBtn, parentContainer.firstChild);
+        }
+    }
+}
+
+function printCarCardReport() {
+    const car = carsData.find(c => Number(c.id) === Number(currentCarId));
+    if (!car) return;
+
+    const printWindow = window.open('', '_blank');
+    
+    let routesRowsHtml = '';
+    const rows = document.querySelectorAll('#routes-tbody tr');
+    rows.forEach((row, idx) => {
+        const inputs = row.querySelectorAll('input');
+        const routeName = inputs[0] ? inputs[0].value : '';
+        const timeVal = inputs[1] ? inputs[1].value : '';
+        const c1 = inputs[2] ? inputs[2].value : '';
+        const c2 = inputs[3] ? inputs[3].value : '';
+        const c3 = inputs[4] ? inputs[4].value : '';
+        const totalKm = inputs[5] ? inputs[5].value : '';
+        const cargoType = inputs[7] ? inputs[7].value : 'о/с';
+        const odoVal = row.querySelector('.row-odo') ? row.querySelector('.row-odo').value : '';
+
+        routesRowsHtml += `
+            <tr>
+                <td>${idx + 1}</td>
+                <td style="text-align: left; padding-left: 4px;">${routeName}</td>
+                <td>${timeVal}</td>
+                <td>${c1}</td>
+                <td>${c2}</td>
+                <td>${c3}</td>
+                <td><b>${totalKm}</b></td>
+                <td>${cargoType}</td>
+                <td>${odoVal}</td>
+            </tr>
+        `;
+    });
+
+    const formulasContainer = document.getElementById('formulas-group-container');
+    const formulasHtml = formulasContainer ? formulasContainer.innerHTML : '';
+
+    const sumKm = document.getElementById('sum-km')?.textContent || '0';
+    const sumFuel = document.getElementById('sum-fuel')?.textContent || '0';
+    const sumFuelRound = document.getElementById('sum-fuel-round')?.textContent || '0';
+    const fuelStart = document.getElementById('fuel-start')?.value || '0';
+    const fuelReceived = document.getElementById('fuel-received')?.value || '0';
+    const fuelSpent = document.getElementById('fuel-spent')?.textContent || '0';
+    const fuelLeft = document.getElementById('fuel-left')?.textContent || '0';
+    const baseLineText = document.querySelector('.fuel-base-line')?.textContent || '';
+    const subLineText = document.querySelector('.fuel-sub-line')?.textContent || '';
+
+    let html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>Картка авто та маршрути — ${car.plate}</title>
+            <style>
+                body { font-family: Arial, sans-serif; font-size: 9px; color: #000; margin: 5mm; }
+                h2 { text-align: center; margin: 0 0 4px 0; font-size: 12px; }
+                .header-info { text-align: center; margin-bottom: 6px; font-size: 10px; font-weight: bold; color: #2c3e50; }
+                .main-layout { display: flex; gap: 10px; width: 100%; }
+                .left-col { flex: 2; }
+                .right-col { flex: 1; }
+                table { width: 100%; border-collapse: collapse; margin-top: 3px; }
+                th, td { border: 1px solid #333; padding: 2px 4px; text-align: center; font-size: 9px; }
+                th { background-color: #2e7d32 !important; color: white !important; }
+                .specs-table td { text-align: left; padding: 2px 4px; font-size: 8px; }
+                .specs-table td:first-child { font-weight: bold; width: 55%; color: #333; }
+                .calc-box { border: 1px solid #333; padding: 4px; margin-top: 6px; background: #fdfdfd; font-size: 9px; }
+                .calc-row { display: flex; justify-content: space-between; margin-bottom: 1px; }
+                .summary-box { margin-top: 4px; font-weight: bold; font-size: 9px; border-top: 1px solid #333; padding-top: 3px; }
+                @media print {
+                    @page { size: landscape; margin: 5mm; }
+                    body { -webkit-print-color-adjust: exact; }
+                }
+            </style>
+        </head>
+        <body>
+            <h2>КАРТКА ТРАНСПОРТНОГО ЗАСОБУ ТА МАРШРУТИ</h2>
+            <div class="header-info">${car.model} &nbsp;|&nbsp; Держ. номер: ${car.plate} &nbsp;|&nbsp; Підрозділ: ${car.subdivision || '—'} &nbsp;|&nbsp; Водій: ${car.driver || '—'}</div>
+            
+            <div class="main-layout">
+                <div class="left-col">
+                    <div style="font-weight: bold; font-size: 9px; margin-bottom: 2px; color: #2e7d32;">МАРШРУТИ ТА ПРОБІГ:</div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>№</th>
+                                <th>Маршрути</th>
+                                <th>Час</th>
+                                <th>Вант.</th>
+                                <th>Пуст.</th>
+                                <th>Приц.</th>
+                                <th>Всього</th>
+                                <th>Груз</th>
+                                <th>Одометр</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${routesRowsHtml}
+                        </tbody>
+                    </table>
+
+                    <div class="calc-box">
+                        <div style="font-weight: bold; margin-bottom: 2px; border-bottom: 1px solid #ccc; padding-bottom: 1px;">РОЗРАХУНОК ВИТРАТИ ПАЛИВА:</div>
+                        ${formulasHtml}
+                        <div style="margin-top: 2px; color: #555; font-size: 8px;">${baseLineText} ${subLineText ? '| ' + subLineText : ''}</div>
+                    </div>
+
+                    <div class="summary-box">
+                        Всього пройдено: ${sumKm} км &nbsp;|&nbsp; Витрачено: ${sumFuel} л (&approx; ${sumFuelRound} л) &nbsp;|&nbsp; Залишок: ${fuelLeft} л (Поч: ${fuelStart} л, Отрим: ${fuelReceived} л)
+                    </div>
+                </div>
+
+                <div class="right-col">
+                    <div style="font-weight: bold; font-size: 9px; margin-bottom: 2px; color: #2980b9;">ТЕХНІЧНА ХАРАКТЕРИСТИКА:</div>
+                    <table class="specs-table">
+                        <tr><td>Підрозділ, рота</td><td>${car.subdivision || '—'}</td></tr>
+                        <tr><td>Тип пального</td><td>${car.fuelType || '—'}</td></tr>
+                        <tr><td>Примітка</td><td>${car.note || '—'}</td></tr>
+                        <tr><td>Він код</td><td>${car.vin || '—'}</td></tr>
+                        <tr><td>Рік випуску</td><td>${car.year || '—'}</td></tr>
+                        <tr><td>Тип КПП</td><td>${car.transmission || '—'}</td></tr>
+                        <tr><td>Ємність баку</td><td>${car.tankCapacity || '—'} л</td></tr>
+                        <tr><td>Привід</td><td>${car.drive || '—'}</td></tr>
+                        <tr><td>Маса без вантажу</td><td>${car.emptyWeight || '—'} кг</td></tr>
+                        <tr><td>Повна маса</td><td>${car.totalWeight || '—'} кг</td></tr>
+                        <tr><td>Кількість передач</td><td>${car.gears || '—'}</td></tr>
+                        <tr><td>Об'єм двигуна</td><td>${car.engineVolume || '—'} см³</td></tr>
+                        <tr><td>кВт</td><td>${car.kw || '—'}</td></tr>
+                        <tr><td>№ двигуна</td><td>${car.engineNo || '—'}</td></tr>
+                        <tr><td>Водій</td><td>${car.driver || '—'}</td></tr>
+                        <tr><td>Витрата палива</td><td>${car.consumption || '—'} л/100км</td></tr>
+                    </table>
+                </div>
+            </div>
+        </body>
+        </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+    }, 250);
+}
 
 function loadCarsModifications() {
     try {
@@ -30,6 +197,7 @@ function loadCarsModifications() {
                     if (mods[car.id].vin !== undefined) car.vin = mods[car.id].vin;
                     if (mods[car.id].vehicleType !== undefined) car.vehicleType = mods[car.id].vehicleType;
                     if (mods[car.id].category !== undefined) car.category = mods[car.id].category;
+                    if (mods[car.id].subdivision !== undefined) car.subdivision = mods[car.id].subdivision;
                 }
             });
         }
@@ -47,7 +215,8 @@ function saveCarsModificationsToStorage() {
             engineNo: car.engineNo,
             vin: car.vin,
             vehicleType: car.vehicleType,
-            category: car.category
+            category: car.category,
+            subdivision: car.subdivision
         };
     });
     localStorage.setItem('cars_modifications_data', JSON.stringify(mods));
@@ -64,7 +233,6 @@ function fmtKm(val, isMiles = false) {
     return parseFloat(Number(val).toFixed(dec)).toString();
 }
 
-// Безпечне обчислення математичних виразів (напр. "50+50")
 function evaluateExpression(val) {
     if (val === undefined || val === null || val === '') return 0;
     const str = String(val).trim();
@@ -237,7 +405,7 @@ function renderCarsTable(filterQuery = '') {
     const upperVal = query.toUpperCase().trim();
     
     const filteredCars = carsData.filter(car => {
-        if (selectedSub !== 'all' && car.subdivision.trim() !== selectedSub) {
+        if (selectedSub !== 'all' && (car.subdivision || '').trim() !== selectedSub) {
             return false;
         }
 
@@ -250,7 +418,7 @@ function renderCarsTable(filterQuery = '') {
         return (
             car.plate.toUpperCase().includes(upperVal) || 
             car.model.toUpperCase().includes(upperVal) ||
-            car.subdivision.toUpperCase().includes(upperVal) ||
+            (car.subdivision || '').toUpperCase().includes(upperVal) ||
             car.fuelType.toUpperCase().includes(upperVal) ||
             car.note.toUpperCase().includes(upperVal) ||
             car.driver.toUpperCase().includes(upperVal)
@@ -273,7 +441,7 @@ function renderCarsTable(filterQuery = '') {
             </td>
             <td><span class="clickable-plate" onclick="openCarCard(${car.id})">${car.plate}</span></td>
             <td>${car.model}</td>
-            <td>${car.subdivision}</td>
+            <td><input type="text" class="table-cell-input" value="${car.subdivision || ''}" oninput="updateCarProp(${car.id}, 'subdivision', this.value)" style="text-align: center;"></td>
             <td>${car.consumption} л</td>
             <td>${car.fuelType}</td>
             <td><input type="text" class="table-cell-input" value="${car.note}" oninput="updateCarProp(${car.id}, 'note', this.value)"></td>
@@ -813,19 +981,18 @@ function updateRouteTotals() {
     const truckActive = isCarTruck(car);
     const hasAdBlue = car && car.hasAdBlue;
 
-    // Динамічне призначення формул та кнопок залежно від типу техніки
     let presetButtonsHtml = `
         <button type="button" class="preset-btn" onclick="applyPresetToActiveRow('Виконання БЗ Харків')">Виконання БЗ Харків</button>
         <button type="button" class="preset-btn" onclick="applyPresetToActiveRow('Міста-мільйонники (Харків, Київ, Львів)')">Міста-мільйонники (Харків, Київ, Львів)</button>
     `;
 
     if (group === 'мотоцикл') {
-        carFormulas = [8, 9]; // Формула 8 (+35%), Формула 9 (+5%)
+        carFormulas = [8, 9];
         presetButtonsHtml = `
             <button type="button" class="preset-btn" onclick="applyPresetToActiveRow('Виконання БЗ Харків')">Виконання БЗ Харків</button>
         `;
     } else if (group === 'квадроцикл') {
-        carFormulas = [8]; // Формула 8 (+35%)
+        carFormulas = [8];
         presetButtonsHtml = `
             <button type="button" class="preset-btn" onclick="applyPresetToActiveRow('Виконання БЗ Харків')">Виконання БЗ Харків</button>
         `;

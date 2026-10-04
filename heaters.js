@@ -2,7 +2,7 @@
 // ЛОГІКА ОБЛІКУ ТЕПЛОВИХ ПУШОК (heaters.js)
 // ==========================================
 
-const CURRENT_HEATERS_VERSION = 'v2_heaters_updated';
+const CURRENT_HEATERS_VERSION = 'v3_heaters_autofill';
 
 let defaultHeatersData = [
     { id: 1, model: "ITA-35THL", kw: "35", fuelType: "ДП", consumption: "2.40", max5Days: "144.0", max10Days: "288.0", max30Days: "864.0", motoHoursDay: "12", subdivision: "ВМТЗ", responsiblePerson: "Ковальов В.В.", locationSubdivision: "ВМТЗ", serialNumber: "Без номера", note: "" }
@@ -53,6 +53,9 @@ function renderHeatersView() {
             </thead>
             <tbody id="heaters-tbody"></tbody>
         </table>
+        <datalist id="heaters-autocomplete-list">
+            ${defaultHeatersData.map(d => `<option value="${d.model}">`).join('')}
+        </datalist>
     `;
 
     const tbody = document.getElementById('heaters-tbody');
@@ -72,14 +75,14 @@ function renderHeatersView() {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td style="text-align: center; padding: 3px 4px;">${index + 1}</td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.model || ''}" oninput="updateHeatProp(${item.id}, 'model', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.kw || ''}" oninput="updateHeatProp(${item.id}, 'kw', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.fuelType || ''}" oninput="updateHeatProp(${item.id}, 'fuelType', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; background-color: #fff9c4; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.consumption || ''}" oninput="updateHeatProp(${item.id}, 'consumption', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.max5Days || ''}" oninput="updateHeatProp(${item.id}, 'max5Days', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.max10Days || ''}" oninput="updateHeatProp(${item.id}, 'max10Days', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.max30Days || ''}" oninput="updateHeatProp(${item.id}, 'max30Days', this.value)"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.motoHoursDay || ''}" oninput="updateHeatProp(${item.id}, 'motoHoursDay', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.model || ''}" list="heaters-autocomplete-list" oninput="onHeaterModelInput(${item.id}, this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
+            <td style="padding: 3px 4px;"><input type="text" id="heat-kw-${item.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.kw || ''}" oninput="updateHeatProp(${item.id}, 'kw', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" id="heat-fuel-${item.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.fuelType || ''}" oninput="updateHeatProp(${item.id}, 'fuelType', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" id="heat-cons-${item.id}" class="table-cell-input" style="text-align:center; background-color: #fff9c4; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.consumption || ''}" oninput="updateHeatProp(${item.id}, 'consumption', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" id="heat-m5-${item.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.max5Days || ''}" oninput="updateHeatProp(${item.id}, 'max5Days', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" id="heat-m10-${item.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.max10Days || ''}" oninput="updateHeatProp(${item.id}, 'max10Days', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" id="heat-m30-${item.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.max30Days || ''}" oninput="updateHeatProp(${item.id}, 'max30Days', this.value)"></td>
+            <td style="padding: 3px 4px;"><input type="text" id="heat-moto-${item.id}" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.motoHoursDay || ''}" oninput="updateHeatProp(${item.id}, 'motoHoursDay', this.value)"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.subdivision || ''}" oninput="updateHeatProp(${item.id}, 'subdivision', this.value)"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.responsiblePerson || ''}" oninput="updateHeatProp(${item.id}, 'responsiblePerson', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.locationSubdivision || ''}" oninput="updateHeatProp(${item.id}, 'locationSubdivision', this.value)"></td>
@@ -89,6 +92,43 @@ function renderHeatersView() {
         `;
         tbody.appendChild(tr);
     });
+}
+
+function onHeaterModelInput(id, val) {
+    let items = getHeatersList();
+    const item = items.find(i => Number(i.id) === Number(id));
+    if (!item) return;
+
+    item.model = val;
+    const trimmedVal = val.trim().toLowerCase();
+    const matchedBase = defaultHeatersData.find(b => b.model && b.model.trim().toLowerCase() === trimmedVal);
+
+    if (matchedBase) {
+        item.kw = matchedBase.kw;
+        item.fuelType = matchedBase.fuelType;
+        item.consumption = matchedBase.consumption;
+        item.max5Days = matchedBase.max5Days;
+        item.max10Days = matchedBase.max10Days;
+        item.max30Days = matchedBase.max30Days;
+        item.motoHoursDay = matchedBase.motoHoursDay;
+
+        const elKw = document.getElementById(`heat-kw-${id}`);
+        const elFuel = document.getElementById(`heat-fuel-${id}`);
+        const elCons = document.getElementById(`heat-cons-${id}`);
+        const elM5 = document.getElementById(`heat-m5-${id}`);
+        const elM10 = document.getElementById(`heat-m10-${id}`);
+        const elM30 = document.getElementById(`heat-m30-${id}`);
+        const elMoto = document.getElementById(`heat-moto-${id}`);
+
+        if (elKw) elKw.value = matchedBase.kw;
+        if (elFuel) elFuel.value = matchedBase.fuelType;
+        if (elCons) elCons.value = matchedBase.consumption;
+        if (elM5) elM5.value = matchedBase.max5Days;
+        if (elM10) elM10.value = matchedBase.max10Days;
+        if (elM30) elM30.value = matchedBase.max30Days;
+        if (elMoto) elMoto.value = matchedBase.motoHoursDay;
+    }
+    saveHeatersList(items);
 }
 
 function updateHeatFilter(field, val) {

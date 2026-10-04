@@ -100,7 +100,7 @@ function renderAggregatesCalcView() {
                 <div style="background: #fef9e7; padding: 12px; border-radius: 6px; border: 1px solid #f39c12;">
                     <div style="font-weight: bold; margin-bottom: 8px; font-size: 12px; color: #d35400;">Ліміт часу на день</div>
                     <label style="display: block; margin-bottom: 3px; font-size: 11px; color: #555;" title="Максимально можлива кількість годин роботи агрегата на добу">Макс. годин на день (ліміт):</label>
-                    <input type="number" id="calc-max-daily-hours" value="16" step="0.5" min="1" max="24" oninput="triggerRecalc()" style="width: 100%; padding: 6px; border-radius: 4px; border: 1px solid #f39c12; font-size: 13px; box-sizing: border-box; background: #fff; margin-bottom: 8px;">
+                    <input type="number" id="calc-max-daily-hours" value="12" step="0.5" min="1" max="24" oninput="triggerRecalc()" style="width: 100%; padding: 6px; border-radius: 4px; border: 1px solid #f39c12; font-size: 13px; box-sizing: border-box; background: #fff; margin-bottom: 8px;">
                     <div style="font-size: 10px; color: #7f8c8d; font-style: italic; line-height: 1.2;">Гарантує, що жоден день не перевищить цей ліміт годин.</div>
                 </div>
             </div>

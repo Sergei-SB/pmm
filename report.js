@@ -273,11 +273,15 @@ function changeSubCustomPeriod(val) {
     } else {
         customInput.value = val;
         const activeSubEl = document.querySelector('#subdivisions-buttons-container .action-btn.active-sub');
-        if (activeSubEl && activeSubEl.textContent.trim() === 'ПОЛК') {
-            showPolkDetails();
-        } else {
-            const currentSub = activeSubEl ? activeSubEl.textContent.trim() : (getUniqueSubdivisions()[0] || 'РМТЗ');
-            showSubdivisionDetails(currentSub);
+        if (activeSubEl) {
+            const activeSubName = activeSubEl.getAttribute('data-subname');
+            if (activeSubName === 'ПОЛК') {
+                showPolkDetails();
+            } else if (activeSubName === 'НЕ ЗАДІЯНА ТЕХНІКА') {
+                showNoSubdivisionDetails();
+            } else {
+                showSubdivisionDetails(activeSubName);
+            }
         }
     }
 }
@@ -424,7 +428,7 @@ function renderReportTable() {
 
     const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
     const filteredCars = sourceCars.filter(car => {
-        if (selectedSub !== 'all' && car.subdivision && normalizeSubdivision(car.subdivision) !== normalizeSubdivision(selectedSub)) {
+        if (selectedSub !== 'all' && (car.subdivision || '').trim() && normalizeSubdivision(car.subdivision) !== normalizeSubdivision(selectedSub)) {
             return false;
         }
         return true;
@@ -580,7 +584,7 @@ function updateReportTotals() {
 // НОРМАЛІЗАЦІЯ ПІДРОЗДІЛІВ (Об'єднання РМТЗ / PMT3)
 // ==========================================
 function normalizeSubdivision(sub) {
-    if (!sub) return 'РМТЗ';
+    if (!sub || !sub.trim()) return '';
     let trimmed = sub.trim();
     let upper = trimmed.toUpperCase();
     if (upper === 'PMT3' || upper === 'PMTЗ' || upper === 'РМТЗ') {
@@ -600,13 +604,16 @@ function renderSubdivisionsView() {
     const subs = getUniqueSubdivisions();
     let html = '';
     subs.forEach(sub => {
-        html += '<button class="action-btn sub-nav-btn" style="padding: 10px 20px; font-size: 14px; background-color: #2980b9; cursor: pointer;" onclick="showSubdivisionDetails(\'' + sub + '\')">' + sub + '</button>';
+        html += '<button class="action-btn sub-nav-btn" data-subname="' + sub + '" style="padding: 10px 20px; font-size: 14px; background-color: #2980b9; cursor: pointer;" onclick="showSubdivisionDetails(\'' + sub + '\')">' + sub + '</button>';
     });
-    html += '<button class="action-btn sub-nav-btn" style="padding: 10px 20px; font-size: 14px; background-color: #8e44ad; cursor: pointer;" onclick="showPolkDetails()">ПОЛК</button>';
+    html += '<button class="action-btn sub-nav-btn" data-subname="НЕ ЗАДІЯНА ТЕХНІКА" style="padding: 10px 20px; font-size: 14px; background-color: #7f8c8d; cursor: pointer;" onclick="showNoSubdivisionDetails()">Не задіяна техніка</button>';
+    html += '<button class="action-btn sub-nav-btn" data-subname="ПОЛК" style="padding: 10px 20px; font-size: 14px; background-color: #8e44ad; cursor: pointer;" onclick="showPolkDetails()">ПОЛК</button>';
     container.innerHTML = html;
 
     if (subs.length > 0) {
         showSubdivisionDetails(subs[0]);
+    } else {
+        showNoSubdivisionDetails();
     }
 }
 
@@ -614,25 +621,34 @@ function getUniqueSubdivisions() {
     const subs = new Set();
     const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
     sourceCars.forEach(car => {
-        if (car.subdivision) subs.add(normalizeSubdivision(car.subdivision));
+        if (car.subdivision && car.subdivision.trim() !== '') {
+            let norm = normalizeSubdivision(car.subdivision);
+            if (norm) subs.add(norm);
+        }
     });
     try {
         if (typeof getAllEquipmentItemsUnified === 'function') {
             getAllEquipmentItemsUnified().forEach(item => {
-                if (item.subdivision) subs.add(normalizeSubdivision(item.subdivision));
+                if (item.subdivision && item.subdivision.trim() !== '') {
+                    let norm = normalizeSubdivision(item.subdivision);
+                    if (norm) subs.add(norm);
+                }
             });
         }
     } catch(e) {}
-    return Array.from(subs);
+    return Array.from(subs).filter(s => s && s.trim() !== '');
 }
 
 function showSubdivisionDetails(subName) {
     document.querySelectorAll('#subdivisions-buttons-container .sub-nav-btn').forEach(btn => {
-        if (btn.textContent.trim() === subName) {
+        const bName = btn.getAttribute('data-subname');
+        if (bName === subName) {
             btn.style.backgroundColor = '#27ae60';
             btn.classList.add('active-sub');
         } else {
-            btn.style.backgroundColor = (btn.textContent.trim() === 'ПОЛК' ? '#8e44ad' : '#2980b9');
+            if (bName === 'ПОЛК') btn.style.backgroundColor = '#8e44ad';
+            else if (bName === 'НЕ ЗАДІЯНА ТЕХНІКА') btn.style.backgroundColor = '#7f8c8d';
+            else btn.style.backgroundColor = '#2980b9';
             btn.classList.remove('active-sub');
         }
     });
@@ -792,13 +808,184 @@ function showSubdivisionDetails(subName) {
     container.innerHTML = html;
 }
 
-function showPolkDetails() {
+function showNoSubdivisionDetails() {
     document.querySelectorAll('#subdivisions-buttons-container .sub-nav-btn').forEach(btn => {
-        if (btn.textContent.trim() === 'ПОЛК') {
+        const bName = btn.getAttribute('data-subname');
+        if (bName === 'НЕ ЗАДІЯНА ТЕХНІКА') {
             btn.style.backgroundColor = '#27ae60';
             btn.classList.add('active-sub');
         } else {
-            btn.style.backgroundColor = '#2980b9';
+            if (bName === 'ПОЛК') btn.style.backgroundColor = '#8e44ad';
+            else if (bName === 'НЕ ЗАДІЯНА ТЕХНІКА') btn.style.backgroundColor = '#7f8c8d';
+            else btn.style.backgroundColor = '#2980b9';
+            btn.classList.remove('active-sub');
+        }
+    });
+
+    const container = document.getElementById('subdivisions-content-container');
+    if (!container) return;
+
+    const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
+    const subCars = sourceCars.filter(c => !c.subdivision || c.subdivision.trim() === '');
+    
+    let eqItems = [];
+    try {
+        if (typeof getAllEquipmentItemsUnified === 'function') {
+            eqItems = getAllEquipmentItemsUnified().filter(i => !i.subdivision || i.subdivision.trim() === '');
+        }
+    } catch(e) {}
+
+    const periods = getSavedPeriodsList();
+    const customPeriodInput = document.getElementById('sub-custom-period-input');
+    const customPeriodSelect = document.getElementById('sub-custom-period-select');
+    
+    let currentCustomPeriod = customPeriodInput ? customPeriodInput.value.trim() : "";
+    if (!currentCustomPeriod) {
+        currentCustomPeriod = customPeriodSelect ? customPeriodSelect.value : (periods[0] || "01.10-10.10");
+        if (customPeriodInput) customPeriodInput.value = currentCustomPeriod;
+    }
+
+    let statsCustom = calculateNoSubStatsDetailed([currentCustomPeriod]);
+    let last3Periods = periods.slice(0, 3);
+    let stats30 = calculateNoSubStatsDetailed(last3Periods);
+    let statsAll = calculateNoSubStatsDetailed(periods);
+
+    let carsListHtml = subCars.length > 0 ? subCars.map(c => '<li style="margin-bottom: 4px;"><strong>' + c.plate + '</strong> — ' + c.model + ' (<span style="color: #555;">паливо: ' + c.fuelType + '</span>)</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає не задіяних автомобілів</li>';
+    let eqListHtml = eqItems.length > 0 ? eqItems.map(i => '<li style="margin-bottom: 4px;"><span style="background: #e8f8f5; padding: 1px 4px; border-radius: 3px; font-size: 11px; color: #16a085; font-weight: bold;">' + i.category + '</span> <strong>' + i.model + '</strong> (<span style="color: #555;">паливо: ' + i.fuelType + '</span>)</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає не задіяного обладнання</li>';
+    let periodsOptionsHtml = periods.map(p => '<option value="' + p + '" ' + (p === currentCustomPeriod ? 'selected' : '') + '>' + p + '</option>').join('');
+
+    let html = `
+        <div id="subdivision-print-area" style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); position: relative;">
+            
+            <div class="no-print" style="position: absolute; top: 20px; right: 20px; display: flex; align-items: center; gap: 8px; background: #f8f9fa; padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                <label style="font-weight: bold; font-size: 13px; color: #2c3e50;">Період:</label>
+                <select id="sub-custom-period-select" onchange="changeSubCustomPeriod(this.value)" style="padding: 4px; font-size: 13px; border-radius: 4px; border: 1px solid #ccc; cursor: pointer;">
+                    ${periodsOptionsHtml}
+                    <option value="custom" ${!periods.includes(currentCustomPeriod) ? 'selected' : ''}>Власний...</option>
+                </select>
+                <input type="text" id="sub-custom-period-input" value="${currentCustomPeriod}" placeholder="01.10-10.10" oninput="showNoSubdivisionDetails()" style="width: 100px; text-align: center; padding: 4px; font-size: 13px; border-radius: 4px; border: 1px solid #ccc;">
+                <button class="action-btn print-btn" onclick="printSubdivisionReport()" style="background-color: #337ab7; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; white-space: nowrap;"><span style="font-size: 14px; margin-right: 6px; vertical-align: middle;">🖨️</span> Друк звіту</button>
+            </div>
+
+            <h3 style="color: #2c3e50; margin-top: 0; margin-bottom: 15px;">Категорія: <span style="color: #7f8c8d;">Не задіяна техніка</span></h3>
+            
+            <h4 style="margin: 15px 0 8px 0; color: #7f8c8d;">Автомобілі без підрозділу (${subCars.length}):</h4>
+            <div class="print-scroll-box" style="border: 1px solid #e0e0e0; padding: 10px 10px 10px 25px; border-radius: 4px; background: #f9f9f9; margin-bottom: 15px;">
+                <ol style="margin: 0; padding-left: 15px; font-size: 14px;">
+                    ${carsListHtml}
+                </ol>
+            </div>
+
+            <h4 style="margin: 15px 0 8px 0; color: #7f8c8d;">Обладнання без підрозділу (${eqItems.length}):</h4>
+            <div class="print-scroll-box" style="border: 1px solid #e0e0e0; padding: 10px 10px 10px 25px; border-radius: 4px; background: #f9f9f9; margin-bottom: 20px;">
+                <ol style="margin: 0; padding-left: 15px; font-size: 14px;">
+                    ${eqListHtml}
+                </ol>
+            </div>
+
+            <h4 style="margin: 15px 0 10px 0; color: #2c3e50;">Отримані матеріали та рідини:</h4>
+            <table class="data-table" style="width: 100%;">
+                <thead>
+                    <tr>
+                        <th style="text-align: left; width: 220px;">Період звіту / Категорія</th>
+                        <th style="text-align: center;">Паливо ДП</th>
+                        <th style="text-align: center;">Паливо АБ</th>
+                        <th style="text-align: center;">AdBlue</th>
+                        <th style="text-align: center;">Мастило</th>
+                        <th style="text-align: center;">Омивач</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="background: #eef9ff;">
+                        <td rowspan="3" style="vertical-align: middle; border-bottom: 2px solid #2980b9;">
+                            <strong style="color: #2980b9;">Обраний період</strong> <small style="color: #7f8c8d;">(${currentCustomPeriod})</small>
+                        </td>
+                        <td style="text-align: center; color: #555; font-size: 12px;">🚗 ${statsCustom.cars.dpFuel.toFixed(1)} л</td>
+                        <td style="text-align: center; color: #555; font-size: 12px;">🚗 ${statsCustom.cars.abFuel.toFixed(1)} л</td>
+                        <td style="text-align: center; color: #555; font-size: 12px;">${statsCustom.cars.adblue.toFixed(1)} л</td>
+                        <td style="text-align: center; color: #555; font-size: 12px;">${formatFluidBreakdown(statsCustom.cars.oilMap)}</td>
+                        <td style="text-align: center; color: #555; font-size: 12px;">${formatFluidBreakdown(statsCustom.cars.washerMap)}</td>
+                    </tr>
+                    <tr style="background: #eef9ff;">
+                        <td style="text-align: center; color: #16a085; font-size: 12px;">⚙️ ${statsCustom.eq.dpFuel.toFixed(1)} л</td>
+                        <td style="text-align: center; color: #16a085; font-size: 12px;">⚙️ ${statsCustom.eq.abFuel.toFixed(1)} л</td>
+                        <td style="text-align: center; color: #888; font-size: 12px;">-</td>
+                        <td style="text-align: center; color: #16a085; font-size: 12px;">${formatFluidBreakdown(statsCustom.eq.oilMap)}</td>
+                        <td style="text-align: center; color: #888; font-size: 12px;">-</td>
+                    </tr>
+                    <tr style="background: #d4effc; font-weight: bold; border-bottom: 2px solid #2980b9;">
+                        <td style="text-align: center; color: #27ae60;">Разом: ${statsCustom.total.dpFuel.toFixed(1)} л</td>
+                        <td style="text-align: center; color: #2980b9;">Разом: ${statsCustom.total.abFuel.toFixed(1)} л</td>
+                        <td style="text-align: center; color: #2980b9;">${statsCustom.total.adblue.toFixed(1)} л</td>
+                        <td style="text-align: center; color: #8e44ad;">${formatFluidBreakdown(statsCustom.total.oilMap)}</td>
+                        <td style="text-align: center;">${formatFluidBreakdown(statsCustom.total.washerMap)}</td>
+                    </tr>
+
+                    <tr style="background: #fafafa;">
+                        <td rowspan="3" style="vertical-align: middle; border-bottom: 2px solid #ccc;">
+                            <strong>30 днів</strong> <small style="color: #7f8c8d;">(останні 3 періоди)</small>
+                        </td>
+                        <td style="text-align: center; color: #555; font-size: 12px;">🚗 ${stats30.cars.dpFuel.toFixed(1)} л</td>
+                        <td style="text-align: center; color: #555; font-size: 12px;">🚗 ${stats30.cars.abFuel.toFixed(1)} л</td>
+                        <td style="text-align: center; color: #555; font-size: 12px;">${stats30.cars.adblue.toFixed(1)} л</td>
+                        <td style="text-align: center; color: #555; font-size: 12px;">${formatFluidBreakdown(stats30.cars.oilMap)}</td>
+                        <td style="text-align: center; color: #555; font-size: 12px;">${formatFluidBreakdown(stats30.cars.washerMap)}</td>
+                    </tr>
+                    <tr style="background: #fafafa;">
+                        <td style="text-align: center; color: #16a085; font-size: 12px;">⚙️ ${stats30.eq.dpFuel.toFixed(1)} л</td>
+                        <td style="text-align: center; color: #16a085; font-size: 12px;">⚙️ ${stats30.eq.abFuel.toFixed(1)} л</td>
+                        <td style="text-align: center; color: #888; font-size: 12px;">-</td>
+                        <td style="text-align: center; color: #16a085; font-size: 12px;">${formatFluidBreakdown(stats30.eq.oilMap)}</td>
+                        <td style="text-align: center; color: #888; font-size: 12px;">-</td>
+                    </tr>
+                    <tr style="background: #f2f9f6; font-weight: bold; border-bottom: 2px solid #bdc3c7;">
+                        <td style="text-align: center; color: #27ae60;">Разом: ${stats30.total.dpFuel.toFixed(1)} л</td>
+                        <td style="text-align: center; color: #2980b9;">Разом: ${stats30.total.abFuel.toFixed(1)} л</td>
+                        <td style="text-align: center; color: #2980b9;">${stats30.total.adblue.toFixed(1)} л</td>
+                        <td style="text-align: center; color: #8e44ad;">${formatFluidBreakdown(stats30.total.oilMap)}</td>
+                        <td style="text-align: center;">${formatFluidBreakdown(stats30.total.washerMap)}</td>
+                    </tr>
+
+                    <tr style="background: #fafafa;">
+                        <td rowspan="3" style="vertical-align: middle;">
+                            <strong>Всього за всі періоди</strong>
+                        </td>
+                        <td style="text-align: center; color: #555; font-size: 12px;">🚗 ${statsAll.cars.dpFuel.toFixed(1)} л</td>
+                        <td style="text-align: center; color: #555; font-size: 12px;">🚗 ${statsAll.cars.abFuel.toFixed(1)} л</td>
+                        <td style="text-align: center; color: #555; font-size: 12px;">${statsAll.cars.adblue.toFixed(1)} л</td>
+                        <td style="text-align: center; color: #555; font-size: 12px;">${formatFluidBreakdown(statsAll.cars.oilMap)}</td>
+                        <td style="text-align: center; color: #555; font-size: 12px;">${formatFluidBreakdown(statsAll.cars.washerMap)}</td>
+                    </tr>
+                    <tr style="background: #fafafa;">
+                        <td style="text-align: center; color: #16a085; font-size: 12px;">⚙️ ${statsAll.eq.dpFuel.toFixed(1)} л</td>
+                        <td style="text-align: center; color: #16a085; font-size: 12px;">⚙️ ${statsAll.eq.abFuel.toFixed(1)} л</td>
+                        <td style="text-align: center; color: #888; font-size: 12px;">-</td>
+                        <td style="text-align: center; color: #16a085; font-size: 12px;">${formatFluidBreakdown(statsAll.eq.oilMap)}</td>
+                        <td style="text-align: center; color: #888; font-size: 12px;">-</td>
+                    </tr>
+                    <tr style="background: #d5f5e3; font-weight: bold;">
+                        <td style="text-align: center; color: #27ae60;">Разом: ${statsAll.total.dpFuel.toFixed(1)} л</td>
+                        <td style="text-align: center; color: #2980b9;">Разом: ${statsAll.total.abFuel.toFixed(1)} л</td>
+                        <td style="text-align: center; color: #2980b9;">${statsAll.total.adblue.toFixed(1)} л</td>
+                        <td style="text-align: center; color: #8e44ad;">${formatFluidBreakdown(statsAll.total.oilMap)}</td>
+                        <td style="text-align: center;">${formatFluidBreakdown(statsAll.total.washerMap)}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    `;
+    container.innerHTML = html;
+}
+
+function showPolkDetails() {
+    document.querySelectorAll('#subdivisions-buttons-container .sub-nav-btn').forEach(btn => {
+        const bName = btn.getAttribute('data-subname');
+        if (bName === 'ПОЛК') {
+            btn.style.backgroundColor = '#27ae60';
+            btn.classList.add('active-sub');
+        } else {
+            if (bName === 'НЕ ЗАДІЯНА ТЕХНІКА') btn.style.backgroundColor = '#7f8c8d';
+            else btn.style.backgroundColor = '#2980b9';
             btn.classList.remove('active-sub');
         }
     });
@@ -1001,6 +1188,93 @@ function calculateSubStatsDetailed(subName, periodList) {
     try {
         if (typeof getAllEquipmentItemsUnified === 'function') {
             eqItems = getAllEquipmentItemsUnified().filter(i => i.subdivision && normalizeSubdivision(i.subdivision) === normalizeSubdivision(subName));
+        }
+    } catch(e) {}
+
+    periodList.forEach(p => {
+        try {
+            const stored = localStorage.getItem('report_data_' + p);
+            if (stored) {
+                const data = JSON.parse(stored);
+                subCars.forEach(car => {
+                    if (data[car.id]) {
+                        const refFuel = evaluateExpression(data[car.id].refuelFuel);
+                        const fType = (car.fuelType || '').toUpperCase();
+                        if (fType.includes('ДП')) {
+                            carsStat.dpFuel += refFuel;
+                        } else {
+                            carsStat.abFuel += refFuel;
+                        }
+                        carsStat.adblue += evaluateExpression(data[car.id].refuelAdBlue);
+                        
+                        let oilParsed = parseFluidEntries(data[car.id].refuelOil);
+                        mergeFluidMaps(carsStat.oilMap, oilParsed);
+
+                        let washerParsed = parseFluidEntries(data[car.id].refuelWasher);
+                        mergeFluidMaps(carsStat.washerMap, washerParsed);
+                    }
+                });
+            }
+        } catch(e) {}
+
+        try {
+            const eqStored = localStorage.getItem('equipment_report_data_' + p);
+            if (eqStored) {
+                const eqDataMap = JSON.parse(eqStored);
+                eqItems.forEach(item => {
+                    const eqData = eqDataMap[item.uniqueId];
+                    if (eqData) {
+                        const f1 = evaluateExpression(eqData.p1Fuel);
+                        const f2 = evaluateExpression(eqData.p2Fuel);
+                        const f3 = evaluateExpression(eqData.p3Fuel);
+                        const totalEqFuel = f1 + f2 + f3;
+
+                        const fType = (item.fuelType || '').toUpperCase();
+                        if (fType.includes('ДП')) {
+                            eqStat.dpFuel += totalEqFuel;
+                        } else {
+                            eqStat.abFuel += totalEqFuel;
+                        }
+
+                        ['p1Oil', 'p2Oil', 'p3Oil'].forEach(field => {
+                            let oParsed = parseFluidEntries(eqData[field]);
+                            mergeFluidMaps(eqStat.oilMap, oParsed);
+                        });
+                    }
+                });
+            }
+        } catch(e) {}
+    });
+
+    let totalOilMap = {};
+    mergeFluidMaps(totalOilMap, carsStat.oilMap);
+    mergeFluidMaps(totalOilMap, eqStat.oilMap);
+
+    let totalWasherMap = {};
+    mergeFluidMaps(totalWasherMap, carsStat.washerMap);
+    mergeFluidMaps(totalWasherMap, eqStat.washerMap);
+
+    let totalStat = {
+        dpFuel: carsStat.dpFuel + eqStat.dpFuel,
+        abFuel: carsStat.abFuel + eqStat.abFuel,
+        adblue: carsStat.adblue + eqStat.adblue,
+        oilMap: totalOilMap,
+        washerMap: totalWasherMap
+    };
+
+    return { cars: carsStat, eq: eqStat, total: totalStat };
+}
+
+function calculateNoSubStatsDetailed(periodList) {
+    let carsStat = { dpFuel: 0, abFuel: 0, adblue: 0, oilMap: {}, washerMap: {} };
+    let eqStat = { dpFuel: 0, abFuel: 0, adblue: 0, oilMap: {}, washerMap: {} };
+
+    const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
+    const subCars = sourceCars.filter(c => !c.subdivision || c.subdivision.trim() === '');
+    let eqItems = [];
+    try {
+        if (typeof getAllEquipmentItemsUnified === 'function') {
+            eqItems = getAllEquipmentItemsUnified().filter(i => !i.subdivision || i.subdivision.trim() === '');
         }
     } catch(e) {}
 
