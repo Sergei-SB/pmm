@@ -3,7 +3,7 @@
 // ==========================================
 
 let isAdminLoggedIn = false;
-const ADMIN_PASSWORD = "1111"; // Пароль за замовчуванням (можна змінити)
+const ADMIN_PASSWORD = "02031985"; // Пароль за замовчуванням (можна змінити)
 
 function updateAdminUI() {
     const btn = document.getElementById('admin-login-btn');
