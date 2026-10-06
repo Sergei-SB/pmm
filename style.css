@@ -660,3 +660,29 @@ input[type=number] {
     overflow-x: auto;
     width: 100%;
 }
+/* Автоматична підказка повного тексту при наведенні на обрізані комірки */
+.compact-base-table td, 
+.compact-base-table th,
+#cars-table td,
+#report-table td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Комірки таблиці залишаються акуратними, обрізають текст через три крапки (...) і нічого не накладають */
+.compact-base-table td, 
+.compact-base-table th,
+#cars-table td,
+#report-table td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Прибираємо накладання тексту при наведенні, залишаючи лише легке підсвічування */
+.compact-base-table td:hover,
+#cars-table td:hover {
+    background-color: #fffde7; /* Легке жовтуватие підсвічування рядка/комірки */
+    z-index: 5;
+}

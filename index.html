@@ -54,6 +54,12 @@
             background-color: #4e6073;
             color: white;
         }
+        /* Кастомне маскування пароля емодзі середнього пальця */
+        input.custom-password-input {
+          -webkit-text-security: disc; /* Резервний варіант для деяких браузерів */
+         font-family: monospace;
+         letter-spacing: 2px;
+}
 
         /* Стилі для кнопок верхньої навігації */
         .nav-btn {
@@ -98,11 +104,11 @@
         <div class="nav-left" style="display: flex; gap: 8px; flex-wrap: wrap;">
             <button class="nav-btn active" onclick="switchView('base')">База (Реєстр)</button>
             <button class="nav-btn" onclick="switchView('card')">Картка авто та Маршрути</button>
-            <button class="nav-btn" onclick="switchView('report')">Звіт (10 днів)</button>
-            <button class="nav-btn" onclick="switchView('subdivisions')">Звіт по підрозділах</button>
-            <button class="nav-btn" onclick="switchView('generators')">Облік обладнання</button>
+            <button class="nav-btn" id="nav-btn-report" onclick="switchView('report')" style="display: none;">Звіт (10 днів)</button>
+            <button class="nav-btn" onclick="switchView('subdivisions')" style="display: none;">Звіт по підрозділах</button>
+            <button class="nav-btn" id="nav-btn-equipment" onclick="switchView('generators')" style="display: none;">Облік обладнання</button>
             <button class="nav-btn" onclick="switchView('aggregates-calc')">Розрахунок агрегатів</button>
-            <button class="nav-btn" onclick="switchView('destroyed')">Знищена техніка</button>
+            <button class="nav-btn" id="nav-btn-destroyed" onclick="switchView('destroyed')" style="display: none;">Знищена техніка</button>
         </div>
         <div class="nav-right" id="top-search-box" style="display: flex; align-items: center; gap: 10px;">
             <!-- Кнопка збереження (тільки дискета) -->
@@ -123,12 +129,18 @@
         <!-- РОЗДІЛ 1: БАЗА АВТОМОБІЛІВ -->
         <section id="base-view" class="view-section active">
             <h2>Реєстр транспортних засобів</h2>
-            <div class="category-filters" style="margin-bottom: 15px;">
-                <button id="btn-cat-all" class="action-btn active" onclick="filterCarsByCategory('all')">Усі</button>
-                <button id="btn-cat-car" class="action-btn" onclick="filterCarsByCategory('легковий')">Легкові</button>
-                <button id="btn-cat-truck" class="action-btn" onclick="filterCarsByCategory('вантажний')">Вантажні</button>
-                <button id="btn-cat-moto" class="action-btn" onclick="filterCarsByCategory('мотоцикл')">Мотоцикли</button>
-                <button id="btn-cat-quad" class="action-btn" onclick="filterCarsByCategory('квадроцикл')">Квадроцикл</button>
+            <div class="category-filters" style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button id="btn-cat-all" class="action-btn active" onclick="filterCarsByCategory('all')">Усі</button>
+                    <button id="btn-cat-car" class="action-btn" onclick="filterCarsByCategory('легковий')">Легкові</button>
+                    <button id="btn-cat-truck" class="action-btn" onclick="filterCarsByCategory('вантажний')">Вантажні</button>
+                    <button id="btn-cat-moto" class="action-btn" onclick="filterCarsByCategory('мотоцикл')">Мотоцикли</button>
+                    <button id="btn-cat-quad" class="action-btn" onclick="filterCarsByCategory('квадроцикл')">Квадроцикл</button>
+                </div>
+                <!-- Кнопка входу для адміна у потрібній зоні -->
+                <div id="admin-auth-container">
+                    <button id="admin-login-btn" onclick="toggleAdminLogin()" class="action-btn" style="background-color: #34495e; font-size: 12px; padding: 6px 14px;">🔒 Вхід для адміна</button>
+                </div>
             </div>
             <div class="table-container">
                 <table id="cars-table" class="compact-base-table" style="width: 100%; border-collapse: collapse; background: white;">
@@ -205,7 +217,7 @@
                         </div>
 
                         <div class="transfer-btn-container">
-                            <button class="action-btn transfer-btn" onclick="transferDataToReport()">Перенос даних</button>
+                            <button id="transfer-data-btn" class="action-btn transfer-btn" onclick="transferDataToReport()" style="display: none;">Перенос даних</button>
                         </div>
 
                         <div class="odometer-panel">
@@ -341,7 +353,7 @@
                 </div>
                 <div class="car-summary-badge-box">
                     <span>Підрозділ: <strong id="detail-car-sub">—</strong></span> | 
-                    <span>Водій: <strong id="detail-car-driver">—</strong></span>
+                    Підрозділ: <input type="text" id="det-input-subdivision" oninput="updateCarPropertyFromDetails('subdivision', this.value)" style="padding: 2px 5px; border-radius: 3px; border: 1px solid #bdc3c7; font-size: 13px; width: 110px;"> | Водій: <input type="text" id="det-input-driver" oninput="updateCarPropertyFromDetails('driver', this.value)" style="padding: 2px 5px; border-radius: 3px; border: 1px solid #bdc3c7; font-size: 13px; width: 140px;">
                 </div>
             </div>
 
@@ -385,18 +397,18 @@
                     <div style="flex: 1; background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px; min-width: 320px;">
                         <h3 style="margin-bottom: 10px; color: #2c3e50;">Повна технічна характеристика</h3>
                         <table class="specs-table" style="width: 100%;">
-                            <tr><td>Він код</td><td id="det-vin">—</td></tr>
-                            <tr><td>Рік випуску</td><td id="det-year">—</td></tr>
-                            <tr><td>Тип коробки передач</td><td id="det-transmission">—</td></tr>
-                            <tr><td>Ємність бензобаку</td><td id="det-tank">—</td></tr>
-                            <tr><td>Привід</td><td id="det-drive">—</td></tr>
-                            <tr><td>Маса без вантажу</td><td id="det-empty-weight">—</td></tr>
-                            <tr><td>Повна маса</td><td id="det-total-weight">—</td></tr>
-                            <tr><td>Кількість передач</td><td id="det-gears">—</td></tr>
-                            <tr><td>Об'єм двигуна</td><td id="det-engine">—</td></tr>
-                            <tr><td>Потужність (кВт)</td><td id="det-kw">—</td></tr>
-                            <tr><td>№ двигуна</td><td id="det-engine-no">—</td></tr>
-                            <tr><td>Норма витрати</td><td id="det-consumption">—</td></tr>
+                            <tr><td>Він код</td><td><input type="text" class="table-cell-input" id="det-input-vin" oninput="updateCarPropertyFromDetails('vin', this.value)"></td></tr>
+                            <tr><td>Рік випуску</td><td><input type="text" class="table-cell-input" id="det-input-year" oninput="updateCarPropertyFromDetails('year', this.value)"></td></tr>
+                            <tr><td>Тип коробки передач</td><td><input type="text" class="table-cell-input" id="det-input-transmission" oninput="updateCarPropertyFromDetails('transmission', this.value)"></td></tr>
+                            <tr><td>Ємність бензобаку</td><td><input type="text" class="table-cell-input" id="det-input-tank" oninput="updateCarPropertyFromDetails('tank', this.value)"></td></tr>
+                            <tr><td>Привід</td><td><input type="text" class="table-cell-input" id="det-input-drive" oninput="updateCarPropertyFromDetails('drive', this.value)"></td></tr>
+                            <tr><td>Маса без вантажу</td><td><input type="text" class="table-cell-input" id="det-input-emptyWeight" oninput="updateCarPropertyFromDetails('emptyWeight', this.value)"></td></tr>
+                            <tr><td>Повна маса</td><td><input type="text" class="table-cell-input" id="det-input-totalWeight" oninput="updateCarPropertyFromDetails('totalWeight', this.value)"></td></tr>
+                            <tr><td>Кількість передач</td><td><input type="text" class="table-cell-input" id="det-input-gears" oninput="updateCarPropertyFromDetails('gears', this.value)"></td></tr>
+                            <tr><td>Об'єм двигуна</td><td><input type="text" class="table-cell-input" id="det-input-engine" oninput="updateCarPropertyFromDetails('engine', this.value)"></td></tr>
+                            <tr><td>Потужність (кВт)</td><td><input type="text" class="table-cell-input" id="det-input-kw" oninput="updateCarPropertyFromDetails('kw', this.value)"></td></tr>
+                            <tr><td>№ двигуна</td><td><input type="text" class="table-cell-input" id="det-input-engineNo" oninput="updateCarPropertyFromDetails('engineNo', this.value)"></td></tr>
+                            <tr><td>Норма витрати</td><td><input type="text" class="table-cell-input" id="det-input-consumption" oninput="updateCarPropertyFromDetails('consumption', this.value)"></td></tr>
                         </table>
                     </div>
 
@@ -438,8 +450,11 @@
     <script src="webasto.js"></script>
     <script src="heaters.js"></script>
     <script src="chainsaws.js"></script>
+    <script src="utils.js"></script> <!-- Допоміжні скрипти -->
+    <script src="admin.js"></script>
     <script src="equipment_report.js"></script>
     <script src="app.js"></script>
+    <script src="app2.js"></script>
     <script src="aggregates_calc.js"></script>
     <script src="destroyed_equipment.js"></script>
 </body>
