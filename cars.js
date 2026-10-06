@@ -1,5 +1,5 @@
 // ==========================================
-// БАЗА ДАНИХ АВТОМОБІЛІВ ТА КАТЕГОРІЙ
+// БАЗА ДАНИХ АВТОМОБІЛІВ ТА КАТЕГОРІЙ (cars.js)
 // ==========================================
 
 const VEHICLE_CATEGORIES = {
@@ -17,30 +17,30 @@ const VEHICLE_CATEGORIES = {
 
 let carsData = [
     {
-        id: 1,                          // Унікальний ідентифікаційний номер автомобіля в системі
-        plate: "KI 100 G",              // Реєстраційний номер (номерний знак) транспортного засобу
-        model: "Skoda Octavia",         // Марка та модель транспортного засобу
-        subdivision: "РМТЗ",            // Підрозділ або рота (уніфіковано на кирилицю)
-        consumption: 7.5,               // Базова норма витрати палива (у літрах на 100 км пробігу)
-        fuelType: "ДП",                 // Тип пального (наприклад, дизельне паливо — ДП)
-        note: "Основний",               // Додаткова примітка або статус транспортного засобу
-        vin: "TMBJJ7NE0J0123456",       // Унікальний VIN-код (номер кузова/шасі) автомобіля
-        year: 2018,                     // Рік випуску транспортного засобу
-        transmission: "механіка",       // Тип коробки перемикання передач (механіка, автомат тощо)
-        tankCapacity: 50,               // Місткість паливного бака автомобіля у літрах
-        drive: "передній",              // Тип приводу транспортного засобу (передній, задній, повний)
-        emptyWeight: 1250,              // Маса автомобіля без навантаження (споряджена маса) у кілограмах
-        totalWeight: 1800,              // Повна допустима маса транспортного засобу у кілограмах
-        gears: 6,                       // Кількість передач у коробці перемикання передач
-        engineVolume: 1968,             // Робочий об'єм двигуна у кубічних сантиметрах (см³)
-        kw: 110,                        // Потужність двигуна в кіловатах (кВт)
-        engineNo: "CKFB123",            // Заводський номер двигуна
-        driver: "Сидоренко С.С.",       // Прізвище та ініціали закріпленого водія або старшого водія
-        category: "passenger",          // Категорія транспортного засобу в системі (наприклад, passenger — легковий)
-        vehicleType: "легковий",        // Тип транспортного засобу українською для інтерфейсу (легковий, вантажний тощо)
-        hasAdBlue: false,               // Наявність системи очищення вихлопних газів AdBlue (true / false)
-        isMiles: false,                 // Чи вимірюється пробіг у милях (true) чи в кілометрах (false)
-        formulas: [1, 2, 3, 4]          // Масив номерів формул розрахунку витрати палива для цього типу техніки
+        id: 1,
+        plate: "KI 100 G",
+        model: "Skoda Octavia",
+        subdivision: "РМТЗ",
+        consumption: 7.5,
+        fuelType: "ДП",
+        note: "Основний",
+        vin: "TMBJJ7NE0J0123456",
+        year: 2018,
+        transmission: "механіка",
+        tankCapacity: 50,
+        drive: "передній",
+        emptyWeight: 1250,
+        totalWeight: 1800,
+        gears: 6,
+        engineVolume: 1968,
+        kw: 110,
+        engineNo: "CKFB123",
+        driver: "Сидоренко С.С.",
+        category: "passenger",
+        vehicleType: "легковий",
+        hasAdBlue: false,
+        isMiles: false,
+        formulas: [1, 2, 3, 4]
     },
     {
         id: 2,
@@ -141,10 +141,10 @@ let carsData = [
         engineNo: "F33A-FTV",
         driver: "Петров П.П.",
         category: "adblue",
-        vehicleType: "легковий",
+        vehicleType: "вантажний",
         hasAdBlue: true,
         isMiles: false,
-        formulas: [1, 2, 3, 4]
+        formulas: [5, 1, 2, 3, 6, 7]
     },
     {
         id: 6,
@@ -274,7 +274,7 @@ let carsData = [
         vehicleType: "мотоцикл",
         hasAdBlue: false,
         isMiles: false,
-        formulas: [1, 2, 3, 4]
+        formulas: [8, 9]
     },
     {
         id: 11,
@@ -300,7 +300,7 @@ let carsData = [
         vehicleType: "квадроцикл",
         hasAdBlue: false,
         isMiles: false,
-        formulas: [1, 2, 3, 4]
+        formulas: [8, 9]
     },
     {
         id: 12,
@@ -326,7 +326,7 @@ let carsData = [
         vehicleType: "квадроцикл",
         hasAdBlue: false,
         isMiles: false,
-        formulas: [1, 2, 3, 4]
+        formulas: [8, 9]
     },
     {
         id: 13,
@@ -356,4 +356,26 @@ let carsData = [
     }
 ];
 
-function saveCarsToStorage() {}
+// Функція постійного збереження бази в пам'ять браузера
+function saveCarsToStorage() {
+    try {
+        localStorage.setItem('user_cars_database_v2', JSON.stringify(carsData));
+    } catch (e) {
+        console.error("Помилка збереження даних:", e);
+    }
+}
+
+// Автоматичне завантаження збереженої бази при запуску сторінки
+(function loadCarsFromStorage() {
+    try {
+        const saved = localStorage.getItem('user_cars_database_v2');
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                carsData = parsed;
+            }
+        }
+    } catch (e) {
+        console.error("Помилка завантаження даних:", e);
+    }
+})();

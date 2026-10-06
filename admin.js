@@ -3,22 +3,23 @@
 // ==========================================
 
 let isAdminLoggedIn = false;
-const ADMIN_PASSWORD = "02031985"; // Пароль за замовчуванням (можна змінити)
+const ADMIN_PASSWORD = "02031985"; // Пароль адміністратора
 
 function updateAdminUI() {
     const btn = document.getElementById('admin-login-btn');
     
-    // Усі елементи, які бачить тільки адмін (включно з кнопкою "Перенос даних")
+    // Усі елементи, які бачить тільки адмін
     const adminElements = [
         document.getElementById('nav-btn-report'),
         document.getElementById('nav-btn-equipment'),
         document.getElementById('nav-btn-destroyed'),
-        document.getElementById('transfer-data-btn') // <-- Додано сюди
+        document.getElementById('transfer-data-btn'),
+        document.getElementById('add-car-btn')
     ];
 
     adminElements.forEach(el => {
         if (el) {
-            el.style.display = isAdminLoggedIn ? (el.tagName === 'BUTTON' && el.classList.contains('transfer-btn') ? 'inline-block' : 'inline-block') : 'none';
+            el.style.display = isAdminLoggedIn ? 'inline-block' : 'none';
         }
     });
 
@@ -57,7 +58,7 @@ function updateAdminUI() {
     }
 }
 
-// Функція для виклику власного захищеного модального вікна
+// Функція для виклику власного захищеного модального вікна з маскуванням через 🖕
 function showCustomPasswordModal(callback) {
     const oldModal = document.getElementById('custom-admin-modal');
     if (oldModal) oldModal.remove();
@@ -135,7 +136,7 @@ function toggleAdminLogin() {
         });
     } else {
         isAdminLoggedIn = false;
-        alert("Ви вийшли з режиму адміністратора.");
+        alert("Вийшли з режиму адміністратора.");
         updateAdminUI();
         
         const activeView = document.querySelector('.view-section.active');
