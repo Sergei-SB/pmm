@@ -8,9 +8,10 @@ const ADMIN_PASSWORD = "02031985"; // Пароль адміністратора
 function updateAdminUI() {
     const btn = document.getElementById('admin-login-btn');
     
-    // Усі елементи, які бачить тільки адмін
+    // Усі елементи, які бачить тільки адмін (включно зі звітом по підрозділах)
     const adminElements = [
         document.getElementById('nav-btn-report'),
+        document.getElementById('nav-btn-subdivisions'), // Додано кнопку "Звіт по підрозділах"
         document.getElementById('nav-btn-equipment'),
         document.getElementById('nav-btn-destroyed'),
         document.getElementById('transfer-data-btn'),
@@ -140,7 +141,7 @@ function toggleAdminLogin() {
         updateAdminUI();
         
         const activeView = document.querySelector('.view-section.active');
-        if (activeView && (activeView.id === 'report-view' || activeView.id === 'generators-view' || activeView.id === 'destroyed-view')) {
+        if (activeView && (activeView.id === 'report-view' || activeView.id === 'subdivisions-view' || activeView.id === 'generators-view' || activeView.id === 'destroyed-view')) {
             if (typeof switchView === 'function') switchView('base');
         }
     }
