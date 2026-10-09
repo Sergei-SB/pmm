@@ -176,12 +176,28 @@
                 
         <!-- РОЗДІЛ 2: КАРТКА АВТОМОБІЛЯ ТА МАРШРУТИ -->
         <section id="card-view" class="view-section">
-            <div class="card-header-panel">
-                <div class="car-title-box">
-                    <h2 id="card-model">JEEP Grand Cherokee</h2>
+            <div class="card-header-panel" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                <!-- Назва та номер авто -->
+                <div class="car-title-box" style="display: flex; align-items: center; gap: 12px;">
+                    <h2 id="card-model" style="margin: 0;">JEEP Grand Cherokee</h2>
                     <span id="card-plate" class="plate-badge">AI465G</span>
                 </div>
-                <div class="search-box">
+
+                <!-- Період та кнопка збереження в одному рядку з назвою -->
+                <div class="card-period-box" style="display: flex; align-items: center; gap: 10px; background: #ecf0f1; padding: 6px 12px; border-radius: 4px; border: 1px solid #bdc3c7;">
+                    <label style="font-weight: bold; font-size: 13px; color: #2c3e50;">Період:</label>
+                    <button class="action-btn" onclick="navigateCardPeriod(-1)" style="background: #34495e; padding: 4px 8px; font-size: 11px; color: white; border: none; border-radius: 3px; cursor: pointer;">◄</button>
+                    <select id="card-period-select" onchange="onCardPeriodChange(this.value)" style="padding: 4px 8px; font-size: 13px; border-radius: 3px; border: 1px solid #7f8c8d; background: white; cursor: pointer; font-weight: bold;">
+                        <!-- Динамічно заповнюється періодами -->
+                    </select>
+                    <button class="action-btn" onclick="navigateCardPeriod(1)" style="background: #34495e; padding: 4px 8px; font-size: 11px; color: white; border: none; border-radius: 3px; cursor: pointer;">►</button>
+                    <button class="action-btn" onclick="saveActiveCardPeriodData()" style="background-color: #27ae60; color: white; border: none; padding: 5px 12px; border-radius: 3px; cursor: pointer; font-size: 12px; font-weight: bold; display: inline-flex; align-items: center; gap: 4px;">
+                        💾 Зберегти дані
+                    </button>
+                </div>
+
+                <!-- Пошук авто -->
+                <div class="search-box" style="margin: 0;">
                     <label>Пошук авто:</label>
                     <input type="text" id="car-search-input" list="cars-list" placeholder="Введіть номер або модель..." oninput="handleCarSearchInput(this.value, event)" onkeydown="if(event.key==='Enter') handleCarSearchInput(this.value, event)" autocomplete="off">
                     <datalist id="cars-list"></datalist>
@@ -343,94 +359,102 @@
         </section>
 
         <!-- РОЗДІЛ 6: КАРТКА ТАХА / ДЕТАЛІ -->
-        <section id="car-details-view" class="view-section">
-            <div class="card-header-panel">
-                <div class="car-title-box" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                    <button class="action-btn" onclick="switchView('base')" style="background-color: #34495e;">← Назад до бази</button>
-                    <input type="text" id="det-input-model" oninput="updateCarPropertyFromDetails('model', this.value)" placeholder="Модель автомобіля" style="font-size: 16px; font-weight: bold; padding: 6px 10px; border: 1px solid #bdc3c7; border-radius: 4px; background: white; color: #333; width: 260px;" title="Модель автомобіля">
-                    <input type="text" id="det-input-plate" oninput="updateCarPropertyFromDetails('plate', this.value)" placeholder="Номер" style="font-size: 16px; font-weight: bold; padding: 6px 10px; border: 1px solid #bdc3c7; border-radius: 4px; background: white; color: #333; width: 120px;" title="Номерний знак">
-                </div>
-                <div class="car-summary-badge-box">
-                    <span>Підрозділ: <strong id="detail-car-sub">—</strong></span> | 
-                    Підрозділ: <input type="text" id="det-input-subdivision" oninput="updateCarPropertyFromDetails('subdivision', this.value)" style="padding: 2px 5px; border-radius: 3px; border: 1px solid #bdc3c7; font-size: 13px; width: 110px;"> | Водій: <input type="text" id="det-input-driver" oninput="updateCarPropertyFromDetails('driver', this.value)" style="padding: 2px 5px; border-radius: 3px; border: 1px solid #bdc3c7; font-size: 13px; width: 140px;">
-                </div>
+<section id="car-details-view" class="view-section">
+    <div class="card-header-panel" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+        <div class="car-title-box" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <button class="action-btn" onclick="switchView('base')" style="background-color: #34495e;">← Назад до бази</button>
+            <input type="text" id="det-input-model" oninput="updateCarPropertyFromDetails('model', this.value)" placeholder="Модель автомобіля" style="font-size: 16px; font-weight: bold; padding: 6px 10px; border: 1px solid #bdc3c7; border-radius: 4px; background: white; color: #333; width: 260px;" title="Модель автомобіля">
+            <input type="text" id="det-input-plate" oninput="updateCarPropertyFromDetails('plate', this.value)" placeholder="Номер" style="font-size: 16px; font-weight: bold; padding: 6px 10px; border: 1px solid #bdc3c7; border-radius: 4px; background: white; color: #333; width: 120px;" title="Номерний знак">
+        </div>
+
+        <div>
+            <button class="action-btn" onclick="saveCarDetailsToBasePath()" style="background-color: #27ae60; font-weight: bold; padding: 8px 18px; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">💾 Зберегти зміни в базу</button>
+        </div>
+
+        <div class="car-summary-badge-box">
+            <span>Підрозділ: <strong id="detail-car-sub">—</strong></span> | 
+            Підрозділ: <input type="text" id="det-input-subdivision" oninput="updateCarPropertyFromDetails('subdivision', this.value)" style="padding: 2px 5px; border-radius: 3px; border: 1px solid #bdc3c7; font-size: 13px; width: 110px;"> | Водій: <input type="text" id="det-input-driver" oninput="updateCarPropertyFromDetails('driver', this.value)" style="padding: 2px 5px; border-radius: 3px; border: 1px solid #bdc3c7; font-size: 13px; width: 140px;">
+        </div>
+    </div>
+
+    <div class="details-workspace" style="display: flex; flex-direction: column; gap: 20px;">
+        <!-- Статистика -->
+        <div class="details-stats-row" style="display: flex; gap: 15px; flex-wrap: wrap;">
+            <div class="stat-card" style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px; flex: 1; min-width: 170px; text-align: center;">
+                <h4 style="color: #7f8c8d; margin-bottom: 5px;">Загальний пробіг</h4>
+                <strong id="det-total-mileage" style="font-size: 20px; color: #2c3e50;">0 км</strong>
+            </div>
+            <div class="stat-card" style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px; flex: 1; min-width: 170px; text-align: center;">
+                <h4 style="color: #7f8c8d; margin-bottom: 5px;">Отримано палива</h4>
+                <strong id="det-total-fuel" style="font-size: 20px; color: #27ae60;">0 л</strong>
+            </div>
+            <div class="stat-card" style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px; flex: 1; min-width: 170px; text-align: center;">
+                <h4 style="color: #7f8c8d; margin-bottom: 5px;">Витрачено палива</h4>
+                <strong id="det-total-spent-fuel" style="font-size: 20px; color: #c0392b;">0 л</strong>
+            </div>
+            <div class="stat-card" style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px; flex: 1; min-width: 170px; text-align: center;">
+                <h4 style="color: #7f8c8d; margin-bottom: 5px;">Отримано AdBlue</h4>
+                <strong id="det-total-adblue" style="font-size: 20px; color: #2980b9;">0 л</strong>
+            </div>
+            <div class="stat-card" style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px; flex: 1; min-width: 170px; text-align: center;">
+                <h4 style="color: #7f8c8d; margin-bottom: 5px;">Звітів у базі</h4>
+                <strong id="det-reports-count" style="font-size: 20px; color: #8e44ad;">0</strong>
+            </div>
+        </div>
+
+        <!-- Архів звітів -->
+        <div class="details-section" style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px;">
+            <h3 style="margin-bottom: 10px; color: #2c3e50;">Архів звітів по періодах (10 днів / місяці)</h3>
+            <div class="table-container" style="max-height: 250px;">
+                <table>
+                    <thead>
+                        <tr><th>Період</th><th>Початковий одометр</th><th>Кінцевий одометр</th><th>Пройдено</th><th>Заправка палива</th><th>Витрачено палива</th><th>Заправка AdBlue</th><th>Мастило</th><th>Омивач</th><th>Примітка</th></tr>
+                    </thead>
+                    <tbody id="det-periods-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Технічні характеристики -->
+        <div class="details-bottom-grid" style="display: flex; gap: 20px; flex-wrap: wrap;">
+            <div style="flex: 1; background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px; min-width: 320px;">
+                <h3 style="margin-bottom: 10px; color: #2c3e50;">Повна технічна характеристика</h3>
+                <table class="specs-table" style="width: 100%;">
+                    <tr>
+                        <td>Категорія</td>
+                        <td><select class="table-cell-input" id="det-input-category" onchange="updateCarCategoryFromDetails(this.value)"></select></td>
+                    </tr>
+                    <tr><td>Він код</td><td><input type="text" class="table-cell-input" id="det-input-vin" oninput="updateCarPropertyFromDetails('vin', this.value)"></td></tr>
+                    <tr><td>Рік випуску</td><td><input type="text" class="table-cell-input" id="det-input-year" oninput="updateCarPropertyFromDetails('year', this.value)"></td></tr>
+                    <tr><td>Тип коробки передач</td><td><input type="text" class="table-cell-input" id="det-input-transmission" oninput="updateCarPropertyFromDetails('transmission', this.value)"></td></tr>
+                    <tr><td>Ємність бензобаку</td><td><input type="text" class="table-cell-input" id="det-input-tank" oninput="updateCarPropertyFromDetails('tankCapacity', this.value)"></td></tr>
+                    <tr><td>Привід</td><td><input type="text" class="table-cell-input" id="det-input-drive" oninput="updateCarPropertyFromDetails('drive', this.value)"></td></tr>
+                    <tr><td>Маса без вантажу</td><td><input type="text" class="table-cell-input" id="det-input-emptyWeight" oninput="updateCarPropertyFromDetails('emptyWeight', this.value)"></td></tr>
+                    <tr><td>Повна маса</td><td><input type="text" class="table-cell-input" id="det-input-totalWeight" oninput="updateCarPropertyFromDetails('totalWeight', this.value)"></td></tr>
+                    <tr><td>Кількість передач</td><td><input type="text" class="table-cell-input" id="det-input-gears" oninput="updateCarPropertyFromDetails('gears', this.value)"></td></tr>
+                    <tr><td>Об'єм двигуна</td><td><input type="text" class="table-cell-input" id="det-input-engine" oninput="updateCarPropertyFromDetails('engineVolume', this.value)"></td></tr>
+                    <tr><td>Потужність (кВт)</td><td><input type="text" class="table-cell-input" id="det-input-kw" oninput="updateCarPropertyFromDetails('kw', this.value)"></td></tr>
+                    <tr><td>№ двигуна</td><td><input type="text" class="table-cell-input" id="det-input-engineNo" oninput="updateCarPropertyFromDetails('engineNo', this.value)"></td></tr>
+                    <tr><td>Норма витрати</td><td><input type="text" class="table-cell-input" id="det-input-consumption" oninput="updateCarPropertyFromDetails('consumption', this.value)"></td></tr>
+                </table>
             </div>
 
-            <div class="details-workspace" style="display: flex; flex-direction: column; gap: 20px;">
-                <div class="details-stats-row" style="display: flex; gap: 15px; flex-wrap: wrap;">
-                    <div class="stat-card" style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px; flex: 1; min-width: 170px; text-align: center;">
-                        <h4 style="color: #7f8c8d; margin-bottom: 5px;">Загальний пробіг</h4>
-                        <strong id="det-total-mileage" style="font-size: 20px; color: #2c3e50;">0 км</strong>
-                    </div>
-                    <div class="stat-card" style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px; flex: 1; min-width: 170px; text-align: center;">
-                        <h4 style="color: #7f8c8d; margin-bottom: 5px;">Отримано палива</h4>
-                        <strong id="det-total-fuel" style="font-size: 20px; color: #27ae60;">0 л</strong>
-                    </div>
-                    <div class="stat-card" style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px; flex: 1; min-width: 170px; text-align: center;">
-                        <h4 style="color: #7f8c8d; margin-bottom: 5px;">Витрачено палива</h4>
-                        <strong id="det-total-spent-fuel" style="font-size: 20px; color: #c0392b;">0 л</strong>
-                    </div>
-                    <div class="stat-card" style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px; flex: 1; min-width: 170px; text-align: center;">
-                        <h4 style="color: #7f8c8d; margin-bottom: 5px;">Отримано AdBlue</h4>
-                        <strong id="det-total-adblue" style="font-size: 20px; color: #2980b9;">0 л</strong>
-                    </div>
-                    <div class="stat-card" style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px; flex: 1; min-width: 170px; text-align: center;">
-                        <h4 style="color: #7f8c8d; margin-bottom: 5px;">Звітів у базі</h4>
-                        <strong id="det-reports-count" style="font-size: 20px; color: #8e44ad;">0</strong>
-                    </div>
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 20px; min-width: 320px;">
+                <div style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px;">
+                    <h3 style="margin-bottom: 10px; color: #2c3e50;">📁 Папка документів та сканів авто</h3>
+                    <input type="file" id="car-doc-file-input" multiple onchange="uploadCarDocument(this)" style="margin-bottom: 10px; font-size: 12px;">
+                    <div id="car-docs-list" style="border: 1px solid #bdc3c7; padding: 10px; min-height: 80px; border-radius: 4px; background: #f9f9f9; font-size: 13px;"></div>
                 </div>
 
-                <div class="details-section" style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px;">
-                    <h3 style="margin-bottom: 10px; color: #2c3e50;">Архів звітів по періодах (10 днів / місяці)</h3>
-                    <div class="table-container" style="max-height: 250px;">
-                        <table>
-                            <thead>
-                                <tr><th>Період</th><th>Початковий одометр</th><th>Кінцевий одометр</th><th>Пройдено</th><th>Заправка палива</th><th>Витрачено палива</th><th>Заправка AdBlue</th><th>Мастило</th><th>Омивач</th><th>Примітка</th></tr>
-                            </thead>
-                            <tbody id="det-periods-tbody"></tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div class="details-bottom-grid" style="display: flex; gap: 20px; flex-wrap: wrap;">
-                    <div style="flex: 1; background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px; min-width: 320px;">
-                        <h3 style="margin-bottom: 10px; color: #2c3e50;">Повна технічна характеристика</h3>
-                        <table class="specs-table" style="width: 100%;">
-                            <tr>
-                                <td>Категорія</td>
-                                <td><select class="table-cell-input" id="det-input-category" onchange="updateCarCategoryFromDetails(this.value)"></select></td>
-                            </tr>
-                            <tr><td>Він код</td><td><input type="text" class="table-cell-input" id="det-input-vin" oninput="updateCarPropertyFromDetails('vin', this.value)"></td></tr>
-                            <tr><td>Рік випуску</td><td><input type="text" class="table-cell-input" id="det-input-year" oninput="updateCarPropertyFromDetails('year', this.value)"></td></tr>
-                            <tr><td>Тип коробки передач</td><td><input type="text" class="table-cell-input" id="det-input-transmission" oninput="updateCarPropertyFromDetails('transmission', this.value)"></td></tr>
-                            <tr><td>Ємність бензобаку</td><td><input type="text" class="table-cell-input" id="det-input-tank" oninput="updateCarPropertyFromDetails('tank', this.value)"></td></tr>
-                            <tr><td>Привід</td><td><input type="text" class="table-cell-input" id="det-input-drive" oninput="updateCarPropertyFromDetails('drive', this.value)"></td></tr>
-                            <tr><td>Маса без вантажу</td><td><input type="text" class="table-cell-input" id="det-input-emptyWeight" oninput="updateCarPropertyFromDetails('emptyWeight', this.value)"></td></tr>
-                            <tr><td>Повна маса</td><td><input type="text" class="table-cell-input" id="det-input-totalWeight" oninput="updateCarPropertyFromDetails('totalWeight', this.value)"></td></tr>
-                            <tr><td>Кількість передач</td><td><input type="text" class="table-cell-input" id="det-input-gears" oninput="updateCarPropertyFromDetails('gears', this.value)"></td></tr>
-                            <tr><td>Об'єм двигуна</td><td><input type="text" class="table-cell-input" id="det-input-engine" oninput="updateCarPropertyFromDetails('engine', this.value)"></td></tr>
-                            <tr><td>Потужність (кВт)</td><td><input type="text" class="table-cell-input" id="det-input-kw" oninput="updateCarPropertyFromDetails('kw', this.value)"></td></tr>
-                            <tr><td>№ двигуна</td><td><input type="text" class="table-cell-input" id="det-input-engineNo" oninput="updateCarPropertyFromDetails('engineNo', this.value)"></td></tr>
-                            <tr><td>Норма витрати</td><td><input type="text" class="table-cell-input" id="det-input-consumption" oninput="updateCarPropertyFromDetails('consumption', this.value)"></td></tr>
-                        </table>
-                    </div>
-
-                    <div style="flex: 1; display: flex; flex-direction: column; gap: 20px; min-width: 320px;">
-                        <div style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px;">
-                            <h3 style="margin-bottom: 10px; color: #2c3e50;">📁 Папка документів та сканів авто</h3>
-                            <input type="file" id="car-doc-file-input" multiple onchange="uploadCarDocument(this)" style="margin-bottom: 10px; font-size: 12px;">
-                            <div id="car-docs-list" style="border: 1px solid #bdc3c7; padding: 10px; min-height: 80px; border-radius: 4px; background: #f9f9f9; font-size: 13px;"></div>
-                        </div>
-
-                        <div style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px;">
-                            <h3 style="margin-bottom: 10px; color: #2c3e50;">Обслуговування (ТО та Мастила)</h3>
-                            <textarea id="det-maintenance-note" placeholder="Введіть дані про останнє ТО..." style="width: 100%; height: 60px; padding: 8px; border: 1px solid #bdc3c7; border-radius: 4px; font-size: 13px; resize: vertical;"></textarea>
-                            <button class="action-btn" style="margin-top: 8px; padding: 6px 12px; font-size: 12px;" onclick="alert('Дані ТО збережено!')">Зберегти примітку ТО</button>
-                        </div>
-                    </div>
+                <div style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px;">
+                    <h3 style="margin-bottom: 10px; color: #2c3e50;">Обслуговування (ТО та Мастила)</h3>
+                    <textarea id="det-maintenance-note" placeholder="Введіть дані про останнє ТО..." style="width: 100%; height: 60px; padding: 8px; border: 1px solid #bdc3c7; border-radius: 4px; font-size: 13px; resize: vertical;"></textarea>
+                    <button class="action-btn" style="margin-top: 8px; padding: 6px 12px; font-size: 12px;" onclick="alert('Дані ТО збережено!')">Зберегти примітку ТО</button>
                 </div>
             </div>
-        </section>
+        </div>
+    </div>
+</section>
 
         <!-- РОЗДІЛ: РОЗРАХУНОК АГРЕГАТІВ -->
         <section id="aggregates-calc-view" class="view-section">
@@ -454,11 +478,82 @@
     <script src="heaters.js"></script>
     <script src="chainsaws.js"></script>
     <script src="utils.js"></script>
+    <script src="car_details_view.js"></script>
     <script src="admin.js"></script>
     <script src="equipment_report.js"></script>
     <script src="app.js"></script>
     <script src="app2.js"></script>
     <script src="aggregates_calc.js"></script>
     <script src="destroyed_equipment.js"></script>
+    
+    <!-- Додатковий скрипт для управління перенесеними періодами та кнопкою збереження -->
+    <script>
+        let activeCardPeriod = "01.10-10.10";
+
+        function initCardPeriodsSelect() {
+            const selectEl = document.getElementById('card-period-select');
+            if (!selectEl) return;
+
+            let periods = [];
+            try {
+                if (typeof getSavedPeriodsList === 'function') {
+                    periods = getSavedPeriodsList();
+                }
+            } catch(e) {}
+            if (!periods || periods.length === 0) {
+                periods = ["01.10-10.10"];
+            }
+
+            if (!periods.includes(activeCardPeriod)) {
+                activeCardPeriod = periods[0];
+            }
+
+            selectEl.innerHTML = periods.map(p => `<option value="${p}" ${p === activeCardPeriod ? 'selected' : ''}>${p}</option>`).join('');
+        }
+
+        function onCardPeriodChange(val) {
+            activeCardPeriod = val;
+            if (typeof currentCarId !== 'undefined' && currentCarId) {
+                if (typeof loadCarCard === 'function') loadCarCard(currentCarId);
+            }
+        }
+
+        function navigateCardPeriod(direction) {
+            let periods = [];
+            try { periods = getSavedPeriodsList(); } catch(e) {}
+            if (!periods || periods.length === 0) periods = ["01.10-10.10"];
+
+            let idx = periods.indexOf(activeCardPeriod);
+            if (idx !== -1) {
+                let newIdx = idx - direction;
+                if (newIdx >= 0 && newIdx < periods.length) {
+                    activeCardPeriod = periods[newIdx];
+                    const selectEl = document.getElementById('card-period-select');
+                    if (selectEl) selectEl.value = activeCardPeriod;
+                    if (typeof currentCarId !== 'undefined' && currentCarId) {
+                        if (typeof loadCarCard === 'function') loadCarCard(currentCarId);
+                    }
+                }
+            }
+        }
+
+        function saveActiveCardPeriodData() {
+            if (typeof currentCarId === 'undefined' || !currentCarId) {
+                alert("Автомобіль не обрано!");
+                return;
+            }
+            if (typeof saveCarHistoryModalData === 'function') {
+                activeHistoryCarId = currentCarId;
+                activeHistoryPeriod = activeCardPeriod;
+                saveCarHistoryModalData();
+            } else {
+                alert(`Дані для періоду ${activeCardPeriod} успішно збережено!`);
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initCardPeriodsSelect();
+        });
+    </script>
 </body>
 </html>

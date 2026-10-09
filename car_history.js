@@ -42,12 +42,9 @@ function renderCarHistoryModalHTML() {
     let oldModal = document.getElementById('car-history-modal');
     if (oldModal) oldModal.remove();
 
-    const periods = getCarHistoryPeriodsList();
     const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
     const car = sourceCars.find(c => Number(c.id) === Number(activeHistoryCarId));
     const carTitle = car ? `${car.plate} — ${car.model}` : 'Автомобіль';
-
-    let optionsHtml = periods.map(p => `<option value="${p}" ${p === activeHistoryPeriod ? 'selected' : ''}>${p}</option>`).join('');
 
     const modalDiv = document.createElement('div');
     modalDiv.id = 'car-history-modal';
@@ -66,16 +63,8 @@ function renderCarHistoryModalHTML() {
                 <button onclick="closeCarHistoryModal()" style="background: transparent; border: none; color: white; font-size: 22px; cursor: pointer; font-weight: bold;">&times;</button>
             </div>
 
-            <!-- Панель управління періодами -->
-            <div style="background: #ecf0f1; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #bdc3c7; flex-wrap: wrap; gap: 10px; flex-shrink: 0;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <button class="action-btn" onclick="navigateHistoryPeriod(-1)" style="background: #34495e; padding: 5px 12px; font-size: 12px;">◀ Попередній</button>
-                    <label style="font-weight: bold; font-size: 13px;">Період:</label>
-                    <select id="modal-period-select" onchange="onModalPeriodChange(this.value)" style="padding: 5px; font-size: 13px; border-radius: 4px; border: 1px solid #7f8c8d; cursor: pointer;">
-                        ${optionsHtml}
-                    </select>
-                    <button class="action-btn" onclick="navigateHistoryPeriod(1)" style="background: #34495e; padding: 5px 12px; font-size: 12px;">Наступний ▶</button>
-                </div>
+            <!-- Панель управління періодами (скоригована: без випадаючого списку та стрілок) -->
+            <div style="background: #ecf0f1; padding: 10px 20px; display: flex; justify-content: flex-end; align-items: center; border-bottom: 1px solid #bdc3c7; flex-wrap: wrap; gap: 10px; flex-shrink: 0;">
                 <div style="display: flex; gap: 10px;">
                     <button class="action-btn" onclick="saveCarHistoryModalData()" style="background: #27ae60; padding: 6px 16px; font-size: 13px; font-weight: bold;">💾 Зберегти та перерахувати каскад</button>
                     <button class="action-btn" onclick="closeCarHistoryModal()" style="background: #e74c3c; padding: 6px 14px; font-size: 13px;">Закрити</button>
@@ -113,8 +102,6 @@ function navigateHistoryPeriod(direction) {
         let newIdx = idx - direction; 
         if (newIdx >= 0 && newIdx < periods.length) {
             activeHistoryPeriod = periods[newIdx];
-            const selectEl = document.getElementById('modal-period-select');
-            if (selectEl) selectEl.value = activeHistoryPeriod;
             loadCarHistoryDataIntoModal();
         }
     }

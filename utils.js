@@ -245,3 +245,44 @@ if (typeof window.loadCarIntoCard === 'function') {
 document.addEventListener("DOMContentLoaded", () => {
     initCategorySelects();
 });
+function saveCarDetailsToBasePath() {
+    let sourceCars = typeof carsData !== 'undefined' ? carsData : [];
+    
+    // Шукаємо автомобіль суворо за унікальним ID
+    let car = sourceCars.find(c => Number(c.id) === Number(currentCarId));
+
+    if (!car) {
+        alert("Помилка: неможливо зберегти, оскільки ID поточного автомобіля не визначено!");
+        return;
+    }
+
+    // Оновлюємо поля конкретно цього знайденго об'єкта
+    car.model = document.getElementById('det-input-model')?.value || car.model;
+    car.plate = document.getElementById('det-input-plate')?.value || car.plate;
+    car.subdivision = document.getElementById('det-input-subdivision')?.value || car.subdivision;
+    car.driver = document.getElementById('det-input-driver')?.value || car.driver;
+    car.vin = document.getElementById('det-input-vin')?.value || car.vin;
+    car.year = parseInt(document.getElementById('det-input-year')?.value, 10) || car.year;
+    car.transmission = document.getElementById('det-input-transmission')?.value || car.transmission;
+    car.tankCapacity = parseFloat(document.getElementById('det-input-tank')?.value) || car.tankCapacity;
+    car.drive = document.getElementById('det-input-drive')?.value || car.drive;
+    car.emptyWeight = parseFloat(document.getElementById('det-input-emptyWeight')?.value) || car.emptyWeight;
+    car.totalWeight = parseFloat(document.getElementById('det-input-totalWeight')?.value) || car.totalWeight;
+    car.gears = parseInt(document.getElementById('det-input-gears')?.value, 10) || car.gears;
+    car.engineVolume = parseFloat(document.getElementById('det-input-engine')?.value) || car.engineVolume;
+    car.kw = parseFloat(document.getElementById('det-input-kw')?.value) || car.kw;
+    car.engineNo = document.getElementById('det-input-engineNo')?.value || car.engineNo;
+    car.consumption = parseFloat(document.getElementById('det-input-consumption')?.value) || car.consumption;
+
+    if (typeof saveCarsToStorage === 'function') {
+        saveCarsToStorage();
+    } else {
+        localStorage.setItem('cars_data_registry', JSON.stringify(sourceCars));
+    }
+
+    if (typeof renderCarsTable === 'function') {
+        renderCarsTable();
+    }
+
+    alert(`Зміни для автомобіля "${car.plate}" успішно збережено в базу!`);
+}

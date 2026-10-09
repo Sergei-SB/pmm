@@ -356,26 +356,200 @@ let carsData = [
     }
 ];
 
-// Функція постійного збереження бази в пам'ять браузера
+function isValidPlate(plate) {
+    if (!plate) return false;
+    const trimmed = String(plate).trim();
+    return trimmed !== '' && trimmed !== '—' && !/^\s*$/.test(trimmed);
+}
+
 function saveCarsToStorage() {
     try {
-        localStorage.setItem('user_cars_database_v2', JSON.stringify(carsData));
+        // Очищаємо масив від машин без номерів перед збереженням
+        const validCars = carsData.filter(c => isValidPlate(c.plate));
+        localStorage.setItem('user_cars_database_v2', JSON.stringify(validCars));
     } catch (e) {
         console.error("Помилка збереження даних:", e);
     }
 }
 
-// Автоматичне завантаження збереженої бази при запуску сторінки
 (function loadCarsFromStorage() {
     try {
         const saved = localStorage.getItem('user_cars_database_v2');
         if (saved) {
             const parsed = JSON.parse(saved);
             if (Array.isArray(parsed) && parsed.length > 0) {
-                carsData = parsed;
+                carsData = parsed.filter(c => isValidPlate(c.plate));
             }
         }
     } catch (e) {
         console.error("Помилка завантаження даних:", e);
     }
 })();
+
+function renderCarsTable(filterQuery = '') {
+    const tbody = document.getElementById('cars-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
+    if (safeCars.length === 0) return;
+
+    const subFilterEl = document.getElementById('base-subdivision-filter');
+    const currentSubVal = subFilterEl ? subFilterEl.value : 'all';
+
+    if (subFilterEl) {
+        const subs = new Set();
+        safeCars.forEach(c => { 
+            if (!isItemDestroyed(c.note) && isValidPlate(c.plate) && c.subdivision) {
+                subs.add(c.subdivision.trim()); 
+            }
+        });
+        let opts = '<option value="all">Усі</option>';
+        subs.forEach(sub => {
+            opts += `<option value="${sub}">${sub}</option>`;
+        });
+        subFilterEl.innerHTML = opts;
+        if (subs.has(currentSubVal) || currentSubVal === 'all') {
+            subFilterEl.value = currentSubVal;
+        }
+    }
+    const selectedSub = subFilterEl ? subFilterEl.value : 'all';
+
+    const searchInput = document.getElementById('base-search-input');
+    const query = filterQuery !== '' ? filterQuery : (searchInput ? searchInput.value : '');
+    const upperVal = query.toUpperCase().trim();
+    
+    // Сувора фільтрація: пропускаємо знищені та ті, у яких немає валідного номера
+    const filteredCars = safeCars.filter(car => {
+        if (isItemDestroyed(car.note)) return false;
+        if (!isValidPlate(car.plate)) return false;
+
+        if (selectedSub !== 'all' && (car.subdivision || '').trim() !== selectedSub) {
+            return false;
+        }
+
+        const carCatGroup = getCarGroup(car);
+
+        if (typeof currentCategoryFilter !== 'undefined' && currentCategoryFilter !== 'all' && carCatGroup !== currentCategoryFilter) {
+            return false;
+        }
+        if (!upperVal) return true;
+        return (
+            car.plate.toUpperCase().includes(upperVal) || 
+            car.model.toUpperCase().includes(upperVal) ||
+            (car.subdivision || '').toUpperCase().includes(upperVal) ||
+            car.fuelType.toUpperCase().includes(upperVal) ||
+            car.note.toUpperCase().includes(upperVal) ||
+            car.driver.toUpperCase().includes(upperVal)
+        );
+    });
+
+    filteredCars.forEach((car, index) => {
+        const tr = document.createElement('tr');
+        const group = getCarGroup(car);
+        
+        tr.innerHTML = `
+            <td>${index + 1}</td>
+            <td>
+                <select class="table-cell-input" onchange="updateCarVehicleType(${car.id}, this.value)" style="font-size: 11px; padding: 2px; cursor: pointer;">
+                    <option value="легковий" ${group === 'легковий' ? 'selected' : ''}>Легковий</option>
+                    <option value="вантажний" ${group === 'вантажний' ? 'selected' : ''}>Вантажний</option>
+                    <option value="мотоцикл" ${group === 'мотоцикл' ? 'selected' : ''}>Мотоцикл</option>
+                    <option value="квадроцикл" ${group === 'квадроцикл' ? 'selected' : ''}>Квадроцикл</option>
+                </select>
+            </td>
+            <td><span onclick="openCarCard(${car.id})" style="cursor: pointer; color: #000; font-weight: bold; text-decoration: none;" title="Відкрити картку авто">${car.plate || ''}</span></td>
+            <td>${car.model}</td>
+            <td>${car.subdivision || '—'}</td>
+            <td>${car.consumption} л</td>
+            <td>${car.fuelType}</td>
+            <td><input type="text" class="table-cell-input" value="${car.note}" oninput="updateCarProp(${car.id}, 'note', this.value)"></td>
+            <td>${car.vin}</td>
+            <td>${car.year}</td>
+            <td>${car.transmission}</td>
+            <td>${car.tankCapacity} л</td>
+            <td>${car.drive}</td>
+            <td>${car.emptyWeight} кг</td>
+            <td>${car.totalWeight} кг</td>
+            <td>${car.gears}</td>
+            <td>${car.engineVolume} см³</td>
+            <td>${car.kw}</td>
+            <td>${car.engineNo}</td>
+            <td><input type="text" class="table-cell-input" value="${car.driver}" oninput="updateCarProp(${car.id}, 'driver', this.value)"></td>
+            <td><button class="action-btn" style="padding: 3px 8px; font-size: 11px;" onclick="openCarDetails(${car.id})">Звіт</button></td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function updateCarField(carId, field, val) {
+    const car = carsData.find(c => Number(c.id) === Number(carId));
+    if (car) {
+        car[field] = val;
+        saveCarsToStorage();
+    }
+}
+
+if (typeof window.openCarCard !== 'function' || true) {
+    window.openCarCard = function(carId) {
+        const car = carsData.find(c => Number(c.id) === Number(carId));
+        if (!car) return;
+
+        window.currentCarId = car.id;
+        window.currentCar = car;
+
+        if (typeof loadCarCard === 'function') {
+            loadCarCard(car.id);
+        }
+
+        if (typeof switchView === 'function') {
+            switchView('card');
+        } else {
+            document.querySelectorAll('.view-section').forEach(sec => {
+                sec.classList.remove('active');
+                sec.style.display = 'none';
+            });
+            const cardView = document.getElementById('card-view');
+            if (cardView) {
+                cardView.classList.add('active');
+                cardView.style.display = 'block';
+            }
+        }
+    };
+}
+
+if (typeof window.openCarDetails !== 'function') {
+    window.openCarDetails = function(carId) {
+        const car = carsData.find(c => Number.c.id === Number(carId));
+        if (!car) return;
+
+        window.currentCarId = car.id;
+        window.currentCar = car;
+
+        if (typeof switchView === 'function') {
+            switchView('car-details');
+        } else {
+            document.querySelectorAll('.view-section').forEach(sec => {
+                sec.classList.remove('active');
+                sec.style.display = 'none';
+            });
+            const detailsView = document.getElementById('car-details-view');
+            if (detailsView) {
+                detailsView.classList.add('active');
+                detailsView.style.display = 'block';
+            }
+        }
+    };
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    renderCarsTable();
+});
+
+function openCarCardFromBase(carId) {
+    currentCarId = Number(carId);
+    if (typeof switchView === 'function') {
+        switchView('card');
+    }
+    loadCarCard(currentCarId);
+}

@@ -1521,7 +1521,16 @@ function importDataFromJson(input) {
 }
 
 function transferDataToReport() {
-    const periodStr = document.getElementById('report-custom-period').value.trim() || "01.10-10.10";
+    // Визначаємо активний ID автомобіля з усіх можливих глобальних змінних
+    let targetCarId = (typeof currentCarId !== 'undefined' && currentCarId) ? currentCarId : 
+                      ((typeof activeDetailCarId !== 'undefined' && activeDetailCarId) ? activeDetailCarId : null);
+
+    if (!targetCarId) {
+        alert("Помилка: не вибрано автомобіль для перенесення даних!");
+        return;
+    }
+
+    const periodStr = document.getElementById('report-custom-period')?.value.trim() || "01.10-10.10";
     
     let periods = getSavedPeriodsList();
     if (!periods.includes(periodStr)) {
@@ -1545,7 +1554,7 @@ function transferDataToReport() {
     const adblueLeft = document.getElementById('adblue-left')?.textContent || '';
     const finalOdo = document.getElementById('odo-2')?.value || '';
 
-    if (!savedReportData[currentCarId]) {
+    if (!savedReportData[targetCarId]) {
         let autoPrevFuel = '';
         let autoPrevAdBlue = '';
         let autoPrevOdo = '';
@@ -1555,18 +1564,18 @@ function transferDataToReport() {
                 const storedPrev = localStorage.getItem('report_data_' + prevPeriodKey);
                 if (storedPrev) {
                     const prevData = JSON.parse(storedPrev);
-                    if (prevData[currentCarId]) {
-                        autoPrevFuel = prevData[currentCarId].leftFuel || '';
-                        autoPrevAdBlue = prevData[currentCarId].leftAdBlue || '';
-                        autoPrevOdo = prevData[currentCarId].odo || '';
+                    if (prevData[targetCarId]) {
+                        autoPrevFuel = prevData[targetCarId].leftFuel || '';
+                        autoPrevAdBlue = prevData[targetCarId].leftAdBlue || '';
+                        autoPrevOdo = prevData[targetCarId].odo || '';
                     }
                 }
             } catch(e) {}
         }
 
         const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
-        const car = sourceCars.find(c => Number(c.id) === Number(currentCarId));
-        savedReportData[currentCarId] = {
+        const car = sourceCars.find(c => Number(c.id) === Number(targetCarId));
+        savedReportData[targetCarId] = {
             prevFuel: autoPrevFuel,
             prevAdBlue: autoPrevAdBlue,
             prevOdo: autoPrevOdo,
@@ -1582,24 +1591,24 @@ function transferDataToReport() {
         };
     }
 
-    savedReportData[currentCarId].refuelFuel = fuelReceived;
+    savedReportData[targetCarId].refuelFuel = fuelReceived;
     if (adblueReceived !== '') {
-        savedReportData[currentCarId].refuelAdBlue = adblueReceived;
+        savedReportData[targetCarId].refuelAdBlue = adblueReceived;
     }
     if (fuelLeft && fuelLeft !== '0.0') {
-        savedReportData[currentCarId].leftFuel = fuelLeft;
+        savedReportData[targetCarId].leftFuel = fuelLeft;
     }
     if (adblueLeft && adblueLeft !== '0.0') {
-        savedReportData[currentCarId].leftAdBlue = adblueLeft;
+        savedReportData[targetCarId].leftAdBlue = adblueLeft;
     }
     if (finalOdo) {
-        savedReportData[currentCarId].odo = finalOdo;
+        savedReportData[targetCarId].odo = finalOdo;
     }
 
     localStorage.setItem(storageKey, JSON.stringify(savedReportData));
 
     const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
-    const currentCar = sourceCars.find(c => Number(c.id) === Number(currentCarId));
+    const currentCar = sourceCars.find(c => Number(c.id) === Number(targetCarId));
     const carName = currentCar ? currentCar.plate + ' (' + currentCar.model + ')' : 'автомобіля';
     
     alert('Дані для ' + carName + ' успішно перенесено у звіт за період "' + periodStr + '"!');

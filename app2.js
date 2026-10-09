@@ -25,7 +25,6 @@ function getDefaultPeriodByCurrentDate() {
 
 document.addEventListener("DOMContentLoaded", () => {
     setTimeout(() => {
-        injectPeriodSelectorToCardHeader();
         hookIntoLoadCarCard();
         loadCarDataForActivePeriod();
     }, 500);
@@ -46,7 +45,6 @@ function parsePeriodDateVal(periodStr) {
 
 function getSortedPeriods() {
     let currentAuto = getDefaultPeriodByCurrentDate();
-    // Повністю відновлений список базових періодів з усіма попередніми місяцями/декадами
     let basePeriods = [
         "21.05-31.05", "01.06-10.06", "11.06-20.06", "21.06-30.06",
         "01.07-10.07", "11.07-20.07", "21.07-31.07", "01.08-10.08",
@@ -104,44 +102,6 @@ function getStrictActivePeriod() {
     return activeCarPeriod;
 }
 
-function injectPeriodSelectorToCardHeader() {
-    const topBar = document.querySelector('#card-view') || document.querySelector('.card-header-panel');
-    if (!topBar) return;
-
-    if (!document.getElementById('car-period-selector-box')) {
-        const box = document.createElement('div');
-        box.id = 'car-period-selector-box';
-        box.style.cssText = 'display: inline-flex; align-items: center; gap: 6px; margin-left: 15px; margin-right: 15px; background: #e2e8f0; padding: 4px 10px; border-radius: 4px; border: 1px solid #cbd5e1; vertical-align: middle;';
-        
-        const periods = getSortedPeriods();
-        if (!periods.includes(activeCarPeriod)) activeCarPeriod = getDefaultPeriodByCurrentDate();
-
-        box.innerHTML = `
-            <span style="font-weight: bold; font-size: 13px; color: #2c3e50;">Період:</span>
-            <button type="button" onclick="shiftCarPeriod(-1)" style="background: #34495e; color: white; border: none; padding: 2px 8px; border-radius: 3px; cursor: pointer; font-weight: bold;">◄</button>
-            <select id="car-period-select" onchange="onCarPeriodChange(this.value)" style="padding: 3px 6px; font-size: 13px; border-radius: 3px; border: 1px solid #7f8c8d; background: white; cursor: pointer;">
-                ${periods.map(p => `<option value="${p}" ${p === activeCarPeriod ? 'selected' : ''}>${p}</option>`).join('')}
-            </select>
-            <button type="button" onclick="shiftCarPeriod(1)" style="background: #34495e; color: white; border: none; padding: 2px 8px; border-radius: 3px; cursor: pointer; font-weight: bold;">►</button>
-            <button type="button" id="manual-save-period-btn" onclick="manualSaveCarRoutes()" style="margin-left: 8px; background: #27ae60; color: white; border: none; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px;">💾 Зберегти дані</button>
-        `;
-
-        let inserted = false;
-        const allElements = document.querySelectorAll('#card-view *');
-        for (let el of allElements) {
-            if (el.textContent && el.textContent.trim().match(/^[A-ZА-Я0-9\s]{3,8}$/) && el.children.length === 0) {
-                el.parentNode.insertBefore(box, el.nextSibling);
-                inserted = true;
-                break;
-            }
-        }
-
-        if (!inserted) {
-            topBar.prepend(box);
-        }
-    }
-}
-
 function shiftCarPeriod(direction) {
     manualSaveCarRoutes(); 
     const periods = getSortedPeriods();
@@ -181,7 +141,6 @@ function loadCarDataForActivePeriod() {
     if (typeof currentCarId === 'undefined' || !currentCarId) return;
     isRestoringState = true;
 
-    injectPeriodSelectorToCardHeader();
     const period = getStrictActivePeriod();
 
     const dataKey = getRoutesKey(currentCarId, period);
@@ -227,8 +186,6 @@ function loadCarDataForActivePeriod() {
             if (prevStored) prevData = JSON.parse(prevStored);
         } catch(e) {}
     }
-
-    // --- ПЕРЕНЕСЕННЯ ДАНИХ З ПРІОРИТЕТОМ ПОПЕРЕДНЬОГО ПЕРІОДУ ---
 
     // Початковий одометр
     const odo1El = document.getElementById('odo-1');
@@ -334,3 +291,52 @@ function manualSaveCarRoutes() {
         }, 1200);
     }
 }
+
+// ==========================================
+// ВИПРАВЛЕННЯ ТА АКТИВАЦІЯ ВЕРХНІХ КНОПОК НАВІГАЦІЇ
+// ==========================================
+
+window.switchView = function(viewName) {
+    const viewMapping = {
+        'base': 'base-view',
+        'card': 'card-view',
+        'report': 'report-view',
+        'subdivisions': 'subdivisions-view',
+        'generators': 'generators-view',
+        'aggregates-calc': 'aggregates-calc-view',
+        'destroyed': 'destroyed-view'
+    };
+
+    let targetSectionId = viewMapping[viewName] || (viewName + '-view');
+
+    document.querySelectorAll('.view-section').forEach(section => {
+        section.classList.remove('active');
+        section.style.display = 'none';
+    });
+
+    let targetSection = document.getElementById(targetSectionId);
+    if (targetSection) {
+        targetSection.classList.add('active');
+        targetSection.style.display = 'block';
+    }
+
+    document.querySelectorAll('.top-nav .nav-btn').forEach(btn => {
+        btn.classList.remove('active');
+        const onclickAttr = btn.getAttribute('onclick') || '';
+        if (onclickAttr.includes(`'${viewName}'`) || onclickAttr.includes(`"${viewName}"`)) {
+            btn.classList.add('active');
+        }
+    });
+
+    if (viewName === 'subdivisions' && typeof renderSubdivisionsView === 'function') {
+        renderSubdivisionsView();
+    } else if (viewName === 'generators' && typeof switchEquipmentTab === 'function') {
+        switchEquipmentTab('generators');
+    } else if (viewName === 'report' && typeof renderReportTable === 'function') {
+        renderReportTable();
+    } else if (viewName === 'aggregates-calc' && typeof renderAggregatesCalcView === 'function') {
+        renderAggregatesCalcView();
+    } else if (viewName === 'destroyed' && typeof renderDestroyedEquipmentView === 'function') {
+        renderDestroyedEquipmentView();
+    }
+};

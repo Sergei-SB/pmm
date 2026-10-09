@@ -3,7 +3,9 @@
 // ==========================================
 
 let lastActiveRow = null;
-let currentCarId = 1;
+if (typeof window.currentCarId === 'undefined') {
+    window.currentCarId = 1;
+}
 let currentCategoryFilter = 'all';
 let activeDetailCarId = null;
 
@@ -552,7 +554,7 @@ function renderCarsTable(filterQuery = '') {
     if (subFilterEl) {
         const subs = new Set();
         safeCars.forEach(c => { 
-            if (!isItemDestroyed(c.note) && c.subdivision) subs.add(c.subdivision.trim()); 
+            if (c.subdivision) subs.add(c.subdivision.trim()); 
         });
         let opts = '<option value="all">Усі</option>';
         subs.forEach(sub => {
@@ -570,61 +572,53 @@ function renderCarsTable(filterQuery = '') {
     const upperVal = query.toUpperCase().trim();
     
     const filteredCars = safeCars.filter(car => {
-        if (isItemDestroyed(car.note)) return false;
-
         if (selectedSub !== 'all' && (car.subdivision || '').trim() !== selectedSub) {
             return false;
         }
 
-        const carCatGroup = getCarGroup(car);
-
-        if (currentCategoryFilter !== 'all' && carCatGroup !== currentCategoryFilter) {
-            return false;
-        }
         if (!upperVal) return true;
         return (
-            car.plate.toUpperCase().includes(upperVal) || 
-            car.model.toUpperCase().includes(upperVal) ||
+            (car.plate || '').toUpperCase().includes(upperVal) || 
+            (car.model || '').toUpperCase().includes(upperVal) ||
             (car.subdivision || '').toUpperCase().includes(upperVal) ||
-            car.fuelType.toUpperCase().includes(upperVal) ||
-            car.note.toUpperCase().includes(upperVal) ||
-            car.driver.toUpperCase().includes(upperVal)
+            (car.fuelType || '').toUpperCase().includes(upperVal) ||
+            (car.note || '').toUpperCase().includes(upperVal) ||
+            (car.driver || '').toUpperCase().includes(upperVal)
         );
     });
 
     filteredCars.forEach((car, index) => {
         const tr = document.createElement('tr');
-        const group = getCarGroup(car);
         
         tr.innerHTML = `
             <td>${index + 1}</td>
             <td>
                 <select class="table-cell-input" onchange="updateCarVehicleType(${car.id}, this.value)" style="font-size: 11px; padding: 2px; cursor: pointer;">
-                    <option value="легковий" ${group === 'легковий' ? 'selected' : ''}>Легковий</option>
-                    <option value="вантажний" ${group === 'вантажний' ? 'selected' : ''}>Вантажний</option>
-                    <option value="мотоцикл" ${group === 'мотоцикл' ? 'selected' : ''}>Мотоцикл</option>
-                    <option value="квадроцикл" ${group === 'квадроцикл' ? 'selected' : ''}>Квадроцикл</option>
+                    <option value="легковий" ${car.vehicleType === 'легковий' ? 'selected' : ''}>Легковий</option>
+                    <option value="вантажний" ${car.vehicleType === 'вантажний' ? 'selected' : ''}>Вантажний</option>
+                    <option value="мотоцикл" ${car.vehicleType === 'мотоцикл' ? 'selected' : ''}>Мотоцикл</option>
+                    <option value="квадроцикл" ${car.vehicleType === 'квадроцикл' ? 'selected' : ''}>Квадроцикл</option>
                 </select>
             </td>
-            <td><span class="clickable-plate" onclick="openCarCard(${car.id})">${car.plate}</span></td>
-            <td>${car.model}</td>
-            <td><input type="text" class="table-cell-input" value="${car.subdivision || ''}" oninput="updateCarProp(${car.id}, 'subdivision', this.value)" style="text-align: center;"></td>
-            <td>${car.consumption} л</td>
-            <td>${car.fuelType}</td>
-            <td><input type="text" class="table-cell-input" value="${car.note}" oninput="updateCarProp(${car.id}, 'note', this.value)"></td>
-            <td>${car.vin}</td>
-            <td>${car.year}</td>
-            <td>${car.transmission}</td>
-            <td>${car.tankCapacity} л</td>
-            <td>${car.drive}</td>
-            <td>${car.emptyWeight} кг</td>
-            <td>${car.totalWeight} кг</td>
-            <td>${car.gears}</td>
-            <td>${car.engineVolume} см³</td>
-            <td>${car.kw}</td>
-            <td>${car.engineNo}</td>
-            <td><input type="text" class="table-cell-input" value="${car.driver}" oninput="updateCarProp(${car.id}, 'driver', this.value)"></td>
-            <td><button class="action-btn" style="padding: 3px 8px; font-size: 11px;" onclick="openCarDetails(${car.id})">Звіт</button></td>
+            <td><span onclick="openCarCardFromBase(${car.id})" title="Відкрити картку та маршрути" <td><span onclick="openCarCard(${car.id})" style="cursor: pointer; color: #000; font-weight: bold; text-decoration: none;" title="Відкрити картку авто">${car.plate || ''}</span></td>
+            <td>${car.model || ''}</td>
+            <td>${car.subdivision || '—'}</td>
+            <td>${car.consumption || 0} л</td>
+            <td>${car.fuelType || ''}</td>
+            <td><input type="text" class="table-cell-input" value="${car.note || ''}" oninput="updateCarProp(${car.id}, 'note', this.value)"></td>
+            <td>${car.vin || ''}</td>
+            <td>${car.year || ''}</td>
+            <td>${car.transmission || ''}</td>
+            <td>${car.tankCapacity || 0} л</td>
+            <td>${car.drive || ''}</td>
+            <td>${car.emptyWeight || 0} кг</td>
+            <td>${car.totalWeight || 0} кг</td>
+            <td>${car.gears || ''}</td>
+            <td>${car.engineVolume || 0} см³</td>
+            <td>${car.kw || 0}</td>
+            <td>${car.engineNo || ''}</td>
+            <td><input type="text" class="table-cell-input" value="${car.driver || ''}" oninput="updateCarProp(${car.id}, 'driver', this.value)"></td>
+            <td style="text-align: center;"><button class="action-btn" style="padding: 2px 8px; font-size: 11px;" onclick="openCarDetails(${car.id})">Звіт</button></td>
         `;
         tbody.appendChild(tr);
     });
@@ -704,104 +698,9 @@ function handleCarSearchInput(val, event) {
 }
 
 function openCarCard(carId) {
+    currentCarId = Number(carId); // Жорстко фіксуємо ID обраного автомобіля
     switchView('card');
-    loadCarCard(carId);
-}
-
-function openCarDetails(carId) {
-    activeDetailCarId = carId;
-    switchView('car-details');
-    const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
-    const car = safeCars.find(c => Number(c.id) === Number(carId));
-    if (!car) return;
-
-    document.getElementById('detail-car-title').textContent = `${car.model} (${car.plate})`;
-    document.getElementById('detail-car-sub').textContent = car.subdivision;
-    document.getElementById('detail-car-driver').textContent = car.driver;
-
-    document.getElementById('det-vin').textContent = car.vin;
-    document.getElementById('det-year').textContent = car.year;
-    document.getElementById('det-transmission').textContent = car.transmission;
-    document.getElementById('det-tank').textContent = car.tankCapacity + ' л';
-    document.getElementById('det-drive').textContent = car.drive;
-    document.getElementById('det-empty-weight').textContent = car.emptyWeight + ' кг';
-    document.getElementById('det-total-weight').textContent = car.totalWeight + ' кг';
-    document.getElementById('det-gears').textContent = car.gears;
-    document.getElementById('det-engine').textContent = car.engineVolume + ' см³';
-    document.getElementById('det-kw').textContent = car.kw;
-    document.getElementById('det-engine-no').textContent = car.engineNo;
-    document.getElementById('det-consumption').textContent = car.consumption + ' л/100км';
-
-    let totalFuelRefuel = 0;
-    let totalSpentFuel = 0;
-    let totalAdBlueRefuel = 0;
-    let totalMileage = 0;
-    let reportsCount = 0;
-    let periodsListHtml = '';
-
-    for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('report_data_')) {
-            const periodName = key.replace('report_data_', '');
-            try {
-                const data = JSON.parse(localStorage.getItem(key));
-                if (data && data[carId]) {
-                    const rec = data[carId];
-                    const refFuel = evaluateExpression(rec.refuelFuel);
-                    const refAdBlue = evaluateExpression(rec.refuelAdBlue);
-                    const oil = rec.refuelOil || '—';
-                    const washer = rec.refuelWasher || '—';
-                    
-                    const startOdo = evaluateExpression(rec.prevOdo);
-                    const endOdo = evaluateExpression(rec.odo);
-                    const mileage = (endOdo > startOdo) ? (endOdo - startOdo) : 0;
-
-                    const leftFuel = evaluateExpression(rec.leftFuel);
-                    let spentFuel = 0;
-                    if (refFuel > 0 || leftFuel > 0) {
-                        spentFuel = refFuel - leftFuel;
-                        if (spentFuel < 0) spentFuel = 0;
-                    }
-
-                    totalFuelRefuel += refFuel;
-                    totalSpentFuel += spentFuel;
-                    totalAdBlueRefuel += refAdBlue;
-                    totalMileage += mileage;
-                    reportsCount++;
-
-                    periodsListHtml += `
-                        <tr>
-                            <td><strong>${periodName}</strong></td>
-                            <td>${startOdo || '—'}</td>
-                            <td>${endOdo || '—'}</td>
-                            <td><strong>${mileage} км</strong></td>
-                            <td>${refFuel ? refFuel + ' л' : '—'}</td>
-                            <td style="color: #c0392b; font-weight: bold;">${spentFuel > 0 ? spentFuel.toFixed(1) + ' л' : '—'}</td>
-                            <td>${refAdBlue ? refAdBlue + ' л' : '—'}</td>
-                            <td>${oil}</td>
-                            <td>${washer}</td>
-                            <td>${rec.note || '—'}</td>
-                        </tr>
-                    `;
-                }
-            } catch(e) {
-                console.error(e);
-            }
-        }
-    }
-
-    document.getElementById('det-total-fuel').textContent = totalFuelRefuel.toFixed(1) + ' л';
-    document.getElementById('det-total-spent-fuel').textContent = totalSpentFuel.toFixed(1) + ' л';
-    document.getElementById('det-total-adblue').textContent = totalAdBlueRefuel.toFixed(1) + ' л';
-    document.getElementById('det-total-mileage').textContent = totalMileage + ' км';
-    document.getElementById('det-reports-count').textContent = reportsCount;
-
-    const tbody = document.getElementById('det-periods-tbody');
-    if (tbody) {
-        tbody.innerHTML = periodsListHtml || '<tr><td colspan="10" style="text-align:center; color:#7f8c8d; padding: 15px;">Немає збережених звітів для цього автомобіля.</td></tr>';
-    }
-
-    renderCarDocuments(car);
+    loadCarCard(currentCarId);
 }
 
 function uploadCarDocument(input) {
