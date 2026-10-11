@@ -1166,8 +1166,8 @@ function cleanCargoObjectFromAdBlue(obj) {
                 }
             } else {
                 delete obj[key];
+                changed = true;
             }
-            changed = true;
             continue;
         }
 
@@ -1329,7 +1329,19 @@ function syncCategorySelectsAndAdBlueDOM() {
     if (activeCardCategory) {
         const isExplicitAdBlueCategory = activeCardCategory === 'Автомобілі з AdBlue';
 
-        const allRowsAndBlocks = Array.from(document.querySelectorAll('tr, .formula-row, .calc-row, .field-row, .form-group, .param-row'));
+        // Відновлюємо всі випадково приховані рядки таблиць у звітах та підрозділах
+        document.querySelectorAll('tr[data-hidden-by-ad-blue-fix="true"], thead tr').forEach(tr => {
+            if (!tr.closest('#card-view')) {
+                tr.style.display = '';
+                delete tr.dataset.hiddenByAdBlueFix;
+            }
+        });
+
+        // Приховуємо AdBlue-рядки виключно всередині Картки авто (#card-view)
+        const cardScope = document.getElementById('card-view');
+        const allRowsAndBlocks = cardScope
+            ? Array.from(cardScope.querySelectorAll('.formula-row, .calc-row, .field-row, .form-group, .param-row'))
+            : [];
         allRowsAndBlocks.forEach(el => {
             if (el.closest('#documents-main-section')) return;
             if (el.querySelector('select')) return;
@@ -1352,6 +1364,110 @@ function syncCategorySelectsAndAdBlueDOM() {
             }
         });
     }
+
+    ensureSubdivisionsTableNarrowColumn();
+}
+
+function ensureSubdivisionsTableNarrowColumn() {
+    let st = document.getElementById('subdivisions-narrow-col-style');
+    if (!st) {
+        st = document.createElement('style');
+        st.id = 'subdivisions-narrow-col-style';
+        document.head.appendChild(st);
+    }
+    st.textContent = `
+        #subdivisions-view table th:first-child,
+        #subdivisions-view table td[rowspan] {
+            width: 220px !important;
+            min-width: 210px !important;
+            max-width: 240px !important;
+            white-space: nowrap !important;
+            text-align: center !important;
+            vertical-align: middle !important;
+            padding: 8px 10px !important;
+        }
+        #subdivisions-view table td[rowspan] select,
+        #subdivisions-view table td:first-child select {
+            width: auto !important;
+            min-width: 0 !important;
+            padding: 2px 6px !important;
+            font-size: 12px !important;
+        }
+    `;
+
+    const subView = document.getElementById('subdivisions-view');
+    if (!subView) return;
+
+    subView.querySelectorAll('table').forEach(tbl => {
+        const txt = (tbl.textContent || '');
+        if (txt.includes('Обраний період') || txt.includes('Всього за всі періоди') || txt.includes('30 днів')) {
+            const headFirst = tbl.querySelector('thead th:first-child');
+            if (headFirst) {
+                headFirst.style.setProperty('width', '220px', 'important');
+                headFirst.style.setProperty('min-width', '210px', 'important');
+                headFirst.style.setProperty('max-width', '240px', 'important');
+                headFirst.style.setProperty('white-space', 'nowrap', 'important');
+            }
+
+            tbl.querySelectorAll('tr').forEach(tr => {
+                if (tr.style.display === 'none') {
+                    tr.style.display = '';
+                }
+                const firstCell = tr.children[0];
+                if (!firstCell) return;
+
+                const cellTxt = (firstCell.textContent || '');
+                const isPeriodCell =
+                    firstCell.hasAttribute('rowspan') ||
+                    cellTxt.includes('Обраний період') ||
+                    cellTxt.includes('30 днів') ||
+                    cellTxt.includes('Всього за всі періоди');
+
+                if (isPeriodCell) {
+                    firstCell.style.setProperty('width', '220px', 'important');
+                    firstCell.style.setProperty('min-width', '210px', 'important');
+                    firstCell.style.setProperty('max-width', '240px', 'important');
+                    firstCell.style.setProperty('white-space', 'nowrap', 'important');
+                    firstCell.style.setProperty('text-align', 'center', 'important');
+                    firstCell.style.setProperty('vertical-align', 'middle', 'important');
+                    firstCell.style.setProperty('padding', '8px 10px', 'important');
+
+                    firstCell.querySelectorAll('div').forEach(div => {
+                        if (div.querySelector('div')) {
+                            div.style.setProperty('display', 'flex', 'important');
+                            div.style.setProperty('flex-direction', 'column', 'important');
+                            div.style.setProperty('align-items', 'center', 'important');
+                            div.style.setProperty('justify-content', 'center', 'important');
+                            div.style.setProperty('gap', '6px', 'important');
+                            div.style.setProperty('width', '100%', 'important');
+                        } else if (div.querySelector('select')) {
+                            div.style.setProperty('display', 'flex', 'important');
+                            div.style.setProperty('flex-direction', 'row', 'important');
+                            div.style.setProperty('align-items', 'center', 'important');
+                            div.style.setProperty('justify-content', 'center', 'important');
+                            div.style.setProperty('gap', '6px', 'important');
+                            div.style.setProperty('width', 'fit-content', 'important');
+                            div.style.setProperty('margin', '6px auto 0 auto', 'important');
+                            div.style.setProperty('white-space', 'nowrap', 'important');
+                        } else {
+                            div.style.setProperty('display', 'block', 'important');
+                            div.style.setProperty('text-align', 'center', 'important');
+                        }
+                    });
+
+                    const innerSelect = firstCell.querySelector('select');
+                    if (innerSelect) {
+                        innerSelect.style.setProperty('width', 'auto', 'important');
+                        innerSelect.style.setProperty('min-width', '0', 'important');
+                        innerSelect.style.setProperty('padding', '2px 6px', 'important');
+                    }
+                } else {
+                    firstCell.style.removeProperty('width');
+                    firstCell.style.removeProperty('max-width');
+                }
+            });
+        }
+    });
 }
 
 // ==========================================
