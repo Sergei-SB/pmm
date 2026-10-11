@@ -1,13 +1,12 @@
 // ==========================================
 // МОДУЛЬ: УПРАВЛІННЯ ДОКУМЕНТАМИ ТА КОНСТРУКТОР А4 (documents.js)
-// + Доступ до вкладки "📄 Документи та Шаблони" ТІЛЬКИ для Розробника та Адміна
-// + Шаблони по кожному з 5 виділених фрагментів:
+// + ШАБЛОНИ ПО КОЖНОМУ З 5 ВИДІЛЕНИХ ФРАГМЕНТІВ ДОКУМЕНТА:
 //   1) Верхня ліва шапка (leftHeader)
 //   2) Верхня права шапка (rightHeader)
 //   3) Заголовок документа (docTitle)
 //   4) Основний текст документа (bodyText)
 //   5) Хто підписав документ / Підписанти (signers)
-// + Виділення фрагмента у файлі -> Видалення з файла -> Додавання як шаблону + Вставка у блок А4
+// + Виділення фрагмента в завантаженому файлі -> Видалення (вирізання) з файла -> Збереження як шаблон + Вставка у блок А4
 // ==========================================
 
 const DOCS_STORAGE_KEY = 'saved_documents_v2';
@@ -411,6 +410,7 @@ function showDocToast(message, bgColor = '#16a34a') {
     }, 3200);
 }
 
+// Розбір виділеного тексту у підписанти (Посада/звання зліва + Ім'я ПРІЗВИЩЕ справа)
 function parseTextIntoSignerRows(rawText) {
     const lines = String(rawText || '')
         .split(/\r?\n/)
@@ -424,6 +424,7 @@ function parseTextIntoSignerRows(rawText) {
     const rows = [];
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
+        // Якщо в рядку є табуляція або 2+ пробіли або тире між посадою та ПІБ
         const tabOrMultiSpace = line.split(/\t+|\s{2,}/).map(s => s.trim()).filter(Boolean);
         if (tabOrMultiSpace.length >= 2) {
             const namePart = tabOrMultiSpace.pop();
@@ -437,6 +438,7 @@ function parseTextIntoSignerRows(rawText) {
             continue;
         }
 
+        // Якщо 2 рядки підряд (перший — посада, другий — звання/ПІБ, і в них немає табуляції)
         if (lines.length === 2 && i === 0 && !lines[1].match(/\t+|\s{2,}/)) {
             rows.push({
                 role: lines[0],
@@ -447,6 +449,7 @@ function parseTextIntoSignerRows(rawText) {
             break;
         }
 
+        // Спробуємо відокремити останні 2 слова (Ім'я ПРІЗВИЩЕ), якщо рядок довгий
         const words = line.split(/\s+/);
         if (words.length >= 4) {
             const namePart = words.slice(-2).join(' ');
@@ -482,6 +485,7 @@ window.toggleCutFromFileMode = function (checked) {
     if (chk2) chk2.checked = cutFromFileOnExtract;
 };
 
+// Отримує виділений користувачем фрагмент на аркуші А4 (або у відкритому файлі) і за потреби видаляє його з файла
 function extractSelectedFragmentFromSheet(shouldDeleteFromFile) {
     let range = null;
     const sel = window.getSelection();
@@ -517,6 +521,7 @@ function extractSelectedFragmentFromSheet(shouldDeleteFromFile) {
 
         range.deleteContents();
 
+        // Очищуємо порожні обгортки або зайві переноси рядків, що залишилися після видалення
         if (editableParent) {
             editableParent.querySelectorAll('div, p, span').forEach(node => {
                 const rawTxt = (node.textContent || '').replace(/\u00A0/g, '').trim();
@@ -524,6 +529,7 @@ function extractSelectedFragmentFromSheet(shouldDeleteFromFile) {
                     node.remove();
                 }
             });
+            // Прибираємо початкові порожні <br>
             while (editableParent.firstChild && editableParent.firstChild.nodeName === 'BR') {
                 editableParent.firstChild.remove();
             }
@@ -533,12 +539,14 @@ function extractSelectedFragmentFromSheet(shouldDeleteFromFile) {
         savedSelectionRange = null;
         hideFloatingSelectionToolbar();
 
+        // Оновлюємо стан після вирізання з файла
         syncAllRichBlocksToState();
     }
 
     return { text, html };
 }
 
+// Головна функція: бере виділений у файлі фрагмент -> видаляє з файла -> додає як шаблон -> вставляє у відповідний блок документа
 window.extractSelectionToFragmentTemplate = function (fragmentKey, forceCut = null) {
     const doCut = forceCut !== null ? forceCut : cutFromFileOnExtract;
     const extracted = extractSelectedFragmentFromSheet(doCut);
@@ -570,6 +578,7 @@ window.extractSelectionToFragmentTemplate = function (fragmentKey, forceCut = nu
         store.signers.unshift(newTpl);
         saveFragmentTemplatesStore(store);
 
+        // Вставляємо у блок підписантів на аркуші
         docLayoutState.signers.rows = parsedRows.map(r => ({ ...r }));
         renderSignerRowsSidebarAndSheet();
     } else if (fragmentKey === 'bodyText') {
@@ -586,10 +595,12 @@ window.extractSelectionToFragmentTemplate = function (fragmentKey, forceCut = nu
 
         const bodyEl = document.getElementById('doc-ed-body-text');
         const bodyInp = document.getElementById('inp-body-text');
+        // Якщо ми вирізали весь текст або частину — оновлюємо поле бічної панелі
         if (bodyEl && bodyInp) {
             bodyInp.value = bodyEl.innerText;
         }
     } else {
+        // leftHeader, rightHeader, docTitle
         const newTpl = {
             id: newTplId,
             name: customName,
@@ -601,6 +612,7 @@ window.extractSelectionToFragmentTemplate = function (fragmentKey, forceCut = nu
         store[fragmentKey].unshift(newTpl);
         saveFragmentTemplatesStore(store);
 
+        // Вставляємо у відповідний блок А4
         docLayoutState[fragmentKey].text = extracted.text;
         docLayoutState[fragmentKey].html = extracted.html;
 
@@ -618,6 +630,7 @@ window.extractSelectionToFragmentTemplate = function (fragmentKey, forceCut = nu
         }
     }
 
+    // Оновлюємо також поле основного тексту в сайдбарі після вирізання з файла
     const bodyElAfter = document.getElementById('doc-ed-body-text');
     const bodyInpAfter = document.getElementById('inp-body-text');
     if (bodyElAfter && bodyInpAfter) {
@@ -633,6 +646,7 @@ window.extractSelectionToFragmentTemplate = function (fragmentKey, forceCut = nu
     );
 };
 
+// Збереження поточного вмісту фрагмента (блоку) як нового шаблону
 window.saveCurrentBlockAsTemplate = function (fragmentKey) {
     const meta = FRAGMENT_META[fragmentKey];
     const store = getFragmentTemplatesStore();
@@ -724,6 +738,7 @@ window.saveCurrentBlockAsTemplate = function (fragmentKey) {
     showDocToast(`💾 Шаблон збережено у розділ «${meta.title}»!`, meta.color);
 };
 
+// Застосування збереженого шаблону до фрагмента на аркуші А4
 window.applyFragmentTemplateById = function (fragmentKey, tplId, appendMode = false) {
     if (!tplId) return;
     const store = getFragmentTemplatesStore();
@@ -785,6 +800,7 @@ window.applyFragmentTemplateById = function (fragmentKey, tplId, appendMode = fa
     showDocToast(`✅ Застосовано шаблон «${escapeHtml(tpl.name)}» (${meta.shortTitle})`, meta.color);
 };
 
+// Видалення шаблону зі списку фрагмента
 window.deleteFragmentTemplateById = function (fragmentKey, tplId) {
     const store = getFragmentTemplatesStore();
     if (!Array.isArray(store[fragmentKey])) return;
@@ -796,6 +812,7 @@ window.deleteFragmentTemplateById = function (fragmentKey, tplId) {
     showDocToast('🗑️ Шаблон видалено зі списку', '#dc2626');
 };
 
+// Перейменування шаблону
 window.renameFragmentTemplateById = function (fragmentKey, tplId, newName) {
     const store = getFragmentTemplatesStore();
     const list = store[fragmentKey] || [];
@@ -811,6 +828,7 @@ window.toggleTemplateDrawer = function (fragmentKey) {
     refreshFragmentTemplateWidget(fragmentKey);
 };
 
+// Генерація HTML-блоку управління шаблонами для конкретного фрагмента в лівій панелі
 function buildFragmentTemplateBoxHtml(fragmentKey) {
     const meta = FRAGMENT_META[fragmentKey];
     const store = getFragmentTemplatesStore();
@@ -833,7 +851,7 @@ function buildFragmentTemplateBoxHtml(fragmentKey) {
 
     const drawerItemsHtml = list.length === 0
         ? `<div style="font-size:11px; color:#64748b; text-align:center; padding:6px;">У цій категорії ще немає шаблонів. Виділіть текст у файлі та натисніть «✂️ З файла в шаблон».</div>`
-        : list.map((t) => {
+        : list.map((t, idx) => {
             const previewText = fragmentKey === 'signers'
                 ? (t.rows || []).map(r => `${r.role} — ${r.name}`).join('; ')
                 : (t.text || '');
@@ -1115,7 +1133,7 @@ function updateFloatingSelectionToolbarPosition() {
 }
 
 // ==========================================
-// ОЧИЩЕННЯ КАТЕГОРІЙ ТА ВІДОКРЕМЛЕННЯ ФОРМУЛ ADBLUE
+// ОЧИЩЕННЯ КАТЕГОРІЙ ("ШТАБНІ АВТОМОБІЛІ") ТА ВІДОКРЕМЛЕННЯ ФОРМУЛ ADBLUE
 // ==========================================
 
 function isAdBlueTerm(str) {
@@ -1148,8 +1166,8 @@ function cleanCargoObjectFromAdBlue(obj) {
                 }
             } else {
                 delete obj[key];
-                changed = true;
             }
+            changed = true;
             continue;
         }
 
@@ -1245,6 +1263,37 @@ function sanitizeCategoriesAndFormulasInStorage() {
 }
 
 function syncCategorySelectsAndAdBlueDOM() {
+    // Синхронізація списку номерів авто (#base-plate-filter) відповідно до обраного підрозділу (#base-subdivision-filter)
+    const subFilterEl = document.getElementById('base-subdivision-filter');
+    const plateFilterEl = document.getElementById('base-plate-filter');
+    if (subFilterEl && plateFilterEl && typeof carsData !== 'undefined' && Array.isArray(carsData)) {
+        const selectedSub = subFilterEl.value || 'all';
+        const currentPlate = plateFilterEl.value || 'all';
+        const activeCat = (typeof currentCategoryFilter !== 'undefined') ? currentCategoryFilter : 'all';
+
+        const validPlates = [];
+        carsData.forEach(car => {
+            if (typeof isItemDestroyed === 'function' && isItemDestroyed(car.note)) return;
+            const p = (car.plate || '').trim();
+            if (!p || p === '—') return;
+            if (selectedSub !== 'all' && (car.subdivision || '').trim() !== selectedSub) return;
+            if (activeCat !== 'all' && typeof getCarGroup === 'function' && getCarGroup(car) !== activeCat) return;
+            if (!validPlates.includes(p)) validPlates.push(p);
+        });
+
+        const existingOpts = Array.from(plateFilterEl.options).slice(1).map(o => o.value);
+        if (existingOpts.join('|') !== validPlates.join('|')) {
+            plateFilterEl.innerHTML = '<option value="all">Усі</option>' +
+                validPlates.map(p => `<option value="${p}">${p}</option>`).join('');
+            if (currentPlate !== 'all' && validPlates.includes(currentPlate)) {
+                plateFilterEl.value = currentPlate;
+            } else if (currentPlate !== 'all') {
+                plateFilterEl.value = 'all';
+                if (typeof renderCarsTable === 'function') renderCarsTable();
+            }
+        }
+    }
+
     const selects = Array.from(document.querySelectorAll('select'));
     let activeCardCategory = null;
 
@@ -1306,7 +1355,7 @@ function syncCategorySelectsAndAdBlueDOM() {
 }
 
 // ==========================================
-// ВИЗНАЧЕННЯ АКТИВНОЇ РОЛІ ТА ДОСТУП ТІЛЬКИ ДЛЯ РОЗРОБНИКА І АДМІНА
+// ВИЗНАЧЕННЯ АКТИВНОЇ РОЛІ ТА ВІДНОВЛЕННЯ КНОПКИ "+ ДОДАТИ АВТОМОБІЛЬ"
 // ==========================================
 
 function detectActiveUserRole() {
@@ -1411,9 +1460,314 @@ function triggerAddCarAction() {
     }
 }
 
+function ensureTransferDataButtonAndDevImportButton() {
+    const role = detectActiveUserRole();
+    const isDevOrAdmin = (role === 'dev' || role === 'admin');
+
+    // 1. Відновлення та відображення кнопки "Перенесення даних" у Картці авто (тільки для Розробника та Адміна)
+    const topStatsRow = document.querySelector('#card-view .top-stats-row') || document.querySelector('.top-stats-row');
+    if (topStatsRow) {
+        let transferContainer = topStatsRow.querySelector('.transfer-btn-container');
+        if (!transferContainer) {
+            transferContainer = document.createElement('div');
+            transferContainer.className = 'transfer-btn-container';
+            const odoPanel = topStatsRow.querySelector('.odometer-panel');
+            if (odoPanel) {
+                topStatsRow.insertBefore(transferContainer, odoPanel);
+            } else {
+                topStatsRow.appendChild(transferContainer);
+            }
+        }
+        transferContainer.style.cssText = 'display: flex; align-items: center; justify-content: center; flex: 1; min-width: 180px;';
+
+        let transferBtn = document.getElementById('transfer-data-btn');
+        if (!transferBtn) {
+            transferBtn = document.createElement('button');
+            transferBtn.id = 'transfer-data-btn';
+            transferBtn.type = 'button';
+            transferBtn.className = 'action-btn transfer-btn';
+            transferContainer.appendChild(transferBtn);
+        }
+
+        if (!transferBtn.dataset.transferHooked) {
+            transferBtn.dataset.transferHooked = 'true';
+            if (!transferBtn.textContent.trim() || transferBtn.textContent.trim() === 'Перенос даних') {
+                transferBtn.innerHTML = '📤 Перенесення даних у Звіт (10 днів)';
+            }
+            transferBtn.style.backgroundColor = '#2980b9';
+            transferBtn.style.color = '#ffffff';
+            transferBtn.style.padding = '10px 18px';
+            transferBtn.style.borderRadius = '6px';
+            transferBtn.style.fontSize = '13px';
+            transferBtn.style.fontWeight = 'bold';
+            transferBtn.style.cursor = 'pointer';
+            transferBtn.style.boxShadow = '0 3px 8px rgba(41, 128, 185, 0.3)';
+            transferBtn.style.whiteSpace = 'nowrap';
+            transferBtn.onclick = function (e) {
+                e.preventDefault();
+                executeTransferCarDataToReport();
+            };
+        }
+
+        if (isDevOrAdmin) {
+            transferBtn.style.setProperty('display', 'inline-flex', 'important');
+            transferBtn.style.alignItems = 'center';
+            transferBtn.style.justifyContent = 'center';
+            transferBtn.style.gap = '6px';
+        } else {
+            transferBtn.style.setProperty('display', 'none', 'important');
+        }
+    }
+
+    // 2. Додавання кнопки "📤 Імпортувати Бекап (JSON)" у Панелі розробника поруч із "📥 Скачати Бекап Бази" (суворо 1 кнопка без дублікатів)
+    const devHeaders = Array.from(document.querySelectorAll('#dev-panel-view .card-header-panel, #developer-panel-view .card-header-panel, .card-header-panel'));
+    devHeaders.forEach(hdr => {
+        if (hdr.closest('#documents-main-section')) return;
+        const buttonsInHdr = Array.from(hdr.querySelectorAll('button'));
+        const backupDownloadBtn = buttonsInHdr.find(b => {
+            const t = (b.textContent || '').trim();
+            return t.includes('Скачати Бекап') || t.includes('Бекап Бази');
+        });
+
+        if (backupDownloadBtn && backupDownloadBtn.parentElement) {
+            const btnParent = backupDownloadBtn.parentElement;
+            btnParent.style.display = 'flex';
+            btnParent.style.alignItems = 'center';
+            btnParent.style.gap = '8px';
+            btnParent.style.flexWrap = 'wrap';
+
+            const existingImportBtns = Array.from(btnParent.querySelectorAll('button')).filter(b => {
+                const t = (b.textContent || '').trim();
+                return t.includes('Імпортувати Бекап') || b.id === 'btn-dev-import-backup' || b.classList.contains('dev-json-import-btn');
+            });
+
+            // Якщо раптом є дублікат — видаляємо зайві, залишаючи рівно одну кнопку
+            if (existingImportBtns.length > 1) {
+                for (let i = 1; i < existingImportBtns.length; i++) {
+                    existingImportBtns[i].remove();
+                }
+            }
+
+            if (existingImportBtns.length === 0) {
+                const importBtn = document.createElement('button');
+                importBtn.type = 'button';
+                importBtn.id = 'btn-dev-import-backup';
+                importBtn.className = backupDownloadBtn.className || 'action-btn';
+                importBtn.classList.add('dev-json-import-btn');
+                importBtn.innerHTML = '📤 Імпортувати Бекап (JSON)';
+                importBtn.style.cssText = 'background-color: #e67e22; color: #ffffff; border: none; padding: 8px 14px; border-radius: 5px; font-size: 13px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; box-shadow: 0 2px 5px rgba(0,0,0,0.15);';
+                importBtn.title = 'Імпортувати збережені файли .json у базу даних';
+                importBtn.onclick = function (e) {
+                    e.preventDefault();
+                    openUniversalJsonImportPicker();
+                };
+
+                if (backupDownloadBtn.nextSibling) {
+                    btnParent.insertBefore(importBtn, backupDownloadBtn.nextSibling);
+                } else {
+                    btnParent.appendChild(importBtn);
+                }
+            } else {
+                const singleBtn = existingImportBtns[0];
+                singleBtn.classList.add('dev-json-import-btn');
+                if (!singleBtn.onclick && !singleBtn.getAttribute('onclick')) {
+                    singleBtn.onclick = function (e) {
+                        e.preventDefault();
+                        openUniversalJsonImportPicker();
+                    };
+                }
+            }
+        }
+    });
+}
+
+window.executeTransferCarDataToReport = function () {
+    if (typeof updateRouteTotals === 'function') {
+        updateRouteTotals();
+    }
+
+    const period = (typeof getStrictActivePeriod === 'function')
+        ? getStrictActivePeriod()
+        : (document.getElementById('card-period-select')?.value || document.getElementById('car-period-select')?.value || '01.10-10.10');
+
+    if (typeof saveCarRoutesForPeriod === 'function') {
+        saveCarRoutesForPeriod(period);
+    }
+
+    const carId = (typeof currentCarId !== 'undefined' && currentCarId) ? currentCarId : 1;
+    const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
+    const car = safeCars.find(c => Number(c.id) === Number(carId));
+
+    const fuelStartVal = document.getElementById('fuel-start')?.value?.trim() || '';
+    const fuelRecVal = document.getElementById('fuel-received')?.value?.trim() || '';
+    const fuelLeftVal = document.getElementById('fuel-left')?.textContent?.trim() || '0';
+
+    const adblueStartVal = document.getElementById('adblue-start')?.value?.trim() || '';
+    const adblueRecVal = document.getElementById('adblue-received')?.value?.trim() || '';
+    const adblueLeftVal = (car && car.hasAdBlue) ? (document.getElementById('adblue-left')?.textContent?.trim() || '') : '';
+
+    const odoStartVal = document.getElementById('odo-1')?.value?.trim() || '';
+    let odoEndVal = document.getElementById('odo-2')?.value?.trim() || '';
+    if (!odoEndVal && odoStartVal) {
+        odoEndVal = odoStartVal;
+    }
+
+    let reportStore = {};
+    try {
+        const raw = localStorage.getItem('report_data_' + period);
+        if (raw) reportStore = JSON.parse(raw) || {};
+    } catch (e) {
+        reportStore = {};
+    }
+
+    if (!reportStore[carId]) reportStore[carId] = {};
+    reportStore[carId].prevFuel = fuelStartVal;
+    reportStore[carId].refuelFuel = fuelRecVal;
+    reportStore[carId].leftFuel = fuelLeftVal;
+
+    if (car && car.hasAdBlue) {
+        reportStore[carId].prevAdBlue = adblueStartVal;
+        reportStore[carId].refuelAdBlue = adblueRecVal;
+        reportStore[carId].leftAdBlue = adblueLeftVal;
+    }
+
+    reportStore[carId].prevOdo = odoStartVal;
+    reportStore[carId].odo = odoEndVal;
+    if (reportStore[carId].note === undefined && car) {
+        reportStore[carId].note = car.note || '';
+    }
+
+    localStorage.setItem('report_data_' + period, JSON.stringify(reportStore));
+
+    if (typeof activeReportPeriod !== 'undefined') {
+        activeReportPeriod = period;
+    }
+    if (typeof populatePeriodDropdown === 'function') {
+        populatePeriodDropdown(period);
+    }
+    if (typeof renderReportTable === 'function') {
+        renderReportTable();
+    }
+
+    // Також оновлюємо інпути в таблиці Звіт (10 днів), якщо вони вже відмальовані в DOM
+    const reportRowInputs = document.querySelectorAll(`#report-tbody input[data-car="${carId}"]`);
+    reportRowInputs.forEach(inp => {
+        const f = inp.getAttribute('data-field');
+        if (f && reportStore[carId][f] !== undefined) {
+            inp.value = reportStore[carId][f];
+        }
+    });
+
+    const plateStr = car ? `${car.plate} (${car.model})` : `Авто #${carId}`;
+    showDocToast(
+        `✅ Перенесено у «Звіт (10 днів)» [${period}]:<br>${escapeHtml(plateStr)} — Залишок: <b>${escapeHtml(fuelLeftVal)} л</b>, Одометр: <b>${escapeHtml(odoEndVal || '0')}</b>`,
+        '#16a34a'
+    );
+};
+
+window.transferDataToReport = window.executeTransferCarDataToReport;
+
+window.openUniversalJsonImportPicker = function () {
+    let fileInp = document.getElementById('universal-json-backup-input');
+    if (!fileInp) {
+        fileInp = document.createElement('input');
+        fileInp.type = 'file';
+        fileInp.id = 'universal-json-backup-input';
+        fileInp.accept = '.json,application/json';
+        fileInp.multiple = true;
+        fileInp.style.display = 'none';
+        fileInp.onchange = async function (ev) {
+            const files = Array.from(ev.target.files || []);
+            if (!files.length) return;
+
+            let restoredKeysCount = 0;
+            let loadedNames = [];
+
+            for (const file of files) {
+                try {
+                    const text = await readFileAsTextAsync(file);
+                    const parsed = JSON.parse(text);
+                    if (parsed && typeof parsed === 'object') {
+                        const map = parsed.localStorageData || parsed.localStorage || parsed.storage ||
+                            (parsed.data && typeof parsed.data === 'object' && !Array.isArray(parsed.data) ? parsed.data : null);
+
+                        if (map && typeof map === 'object' && !Array.isArray(map)) {
+                            Object.keys(map).forEach(k => {
+                                const v = map[k];
+                                if (v !== undefined && v !== null) {
+                                    localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
+                                    restoredKeysCount++;
+                                }
+                            });
+                            loadedNames.push(file.name);
+                        } else if (Array.isArray(parsed)) {
+                            if (parsed.length > 0 && parsed[0] && (parsed[0].layout || String(parsed[0].id || '').startsWith('doc_'))) {
+                                localStorage.setItem(DOCS_STORAGE_KEY, JSON.stringify(parsed));
+                                restoredKeysCount++;
+                                loadedNames.push(file.name);
+                            } else if (parsed.length > 0 && parsed[0] && (parsed[0].plate || parsed[0].fuelType)) {
+                                if (typeof carsData !== 'undefined' && Array.isArray(carsData)) {
+                                    carsData.length = 0;
+                                    parsed.forEach(c => carsData.push(c));
+                                    if (typeof saveCarsModificationsToStorage === 'function') saveCarsModificationsToStorage();
+                                }
+                                restoredKeysCount++;
+                                loadedNames.push(file.name);
+                            }
+                        } else if (parsed.leftHeader && parsed.rightHeader && parsed.docTitle) {
+                            localStorage.setItem(DOCS_TEMPLATES_STORAGE_KEY, JSON.stringify(parsed));
+                            restoredKeysCount++;
+                            loadedNames.push(file.name);
+                        } else {
+                            const skip = new Set(['app', 'version', 'exportDate', 'exportDateLocale']);
+                            Object.keys(parsed).forEach(k => {
+                                if (skip.has(k)) return;
+                                const v = parsed[k];
+                                if (v !== undefined && v !== null) {
+                                    localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
+                                    restoredKeysCount++;
+                                }
+                            });
+                            loadedNames.push(file.name);
+                        }
+                    }
+                } catch (err) {
+                    console.error('Помилка читання JSON:', err);
+                }
+            }
+
+            fileInp.value = '';
+
+            if (loadedNames.length > 0) {
+                if (typeof loadCarsModifications === 'function') loadCarsModifications();
+                if (typeof initCardPeriodsSelect === 'function') initCardPeriodsSelect();
+                if (typeof loadCarDataForActivePeriod === 'function') loadCarDataForActivePeriod();
+                if (typeof renderCarsTable === 'function') renderCarsTable();
+                if (typeof renderReportTable === 'function') renderReportTable();
+                if (typeof renderDeveloperPanel === 'function') renderDeveloperPanel();
+                if (typeof renderDevPanelView === 'function') renderDevPanelView();
+                renderDocumentsMainView();
+                refreshAllFragmentTemplateWidgets();
+
+                showDocToast(
+                    `✅ Імпортовано JSON (${escapeHtml(loadedNames.join(', '))})! Відновлено розділів: ${restoredKeysCount}.`,
+                    '#16a34a'
+                );
+            } else {
+                showDocToast('⚠️ Не вдалося розпізнати структуру вибраного файлу .json!', '#dc2626');
+            }
+        };
+        document.body.appendChild(fileInp);
+    }
+    fileInp.value = '';
+    fileInp.click();
+};
+
 function syncAddCarButtonVisibility() {
     const role = detectActiveUserRole();
     const canSeeAddCar = (role === 'dev' || role === 'admin');
+
+    ensureTransferDataButtonAndDevImportButton();
 
     let addCarBtn = findExistingAddCarButton();
     const registryTable = findRegistryTableElement();
@@ -1585,7 +1939,7 @@ function getInitialSampleDocuments() {
 }
 
 // ==========================================
-// РОЗПАКОВКА ТА КОНВЕРТАЦІЯ ФАЙЛІВ WORD (.DOCX)
+// РОЗПАКОВКА ТА КОНВЕРТАЦІЯ ФАЙЛІВ WORD (.DOCX) У ЧИСТИЙ ФОРМАТОВАНИЙ HTML
 // ==========================================
 
 function normalizeWordFontName(rawFont) {
@@ -1812,7 +2166,7 @@ async function extractDocxRichHtmlAndText(arrayBuffer) {
 }
 
 // ==========================================
-// ІНТЕГРАЦІЯ КНОПКИ "ДОКУМЕНТИ ТА ШАБЛОНИ" (ТІЛЬКИ ДЛЯ РОЗРОБНИКА ТА АДМІНА)
+// ІНТЕГРАЦІЯ КНОПКИ "ДОКУМЕНТИ" У ВЕРХНЄ МЕНЮ
 // ==========================================
 
 function syncDocumentsButtonVisibility() {
