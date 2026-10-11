@@ -975,3 +975,7 @@ input[type=number] {
         grid-template-columns: repeat(7, 1fr) !important;
     }
 }
+/* Вирівнювання назв автомобілів (стовпчик "Модель") по центру */
+#cars-tbody tr td:nth-child(4) {
+    text-align: center !important;
+}

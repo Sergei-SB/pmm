@@ -1,265 +1,380 @@
-// ==========================================
-// МОДУЛЬ УПРАВЛІННЯ РОЛЯМИ ТА ПРАВАМИ (admin.js)
-// ==========================================
-
-let currentRole = "user"; // за замовчуванням при вході — юзер
-const ADMIN_PASSWORD = "4343";
+let currentRole = "user";
 let isDeveloperLoggedIn = false;
 
-// Функція вибору ролі користувачем при кліку на панель
-function selectRole(role) {
-    if (role === currentRole) return;
-
-    // Якщо Розробник вже авторизований у цій сесії — пускаємо в будь-який кабінет без пароля!
-    if (isDeveloperLoggedIn) {
-        const roleNames = {
-            developer: "Режим Розробника активовано!",
-            admin: "Режим Адміна активовано (вхід від Розробника без пароля)!",
-            moderator: "Режим Модератора активовано (вхід від Розробника без пароля)!",
-            user: "Увімкнено режим Юзера (сесія Розробника збережена)."
+// --- ДОПОМІЖНІ ФУНКЦІЇ ЗВ'ЯЗКУ З ПАНЕЛЛЮ РОЗРОБНИКА ---
+function getSystemPasswords() {
+    const defaultPasswords = {
+        moderator: "2121",
+        admin: "4343",
+        developer: "02031985"
+    };
+    try {
+        const saved = JSON.parse(localStorage.getItem('dev_system_passwords') || '{}');
+        return {
+            moderator: saved.moderator || defaultPasswords.moderator,
+            admin: saved.admin || defaultPasswords.admin,
+            developer: saved.developer || defaultPasswords.developer
         };
-        applyRoleChange(role, roleNames[role]);
-        return;
-    }
-
-    if (role === "developer") {
-        if (typeof checkDeveloperPassword === 'function') {
-            checkDeveloperPassword((success) => {
-                if (success) {
-                    isDeveloperLoggedIn = true;
-                    applyRoleChange("developer", "Режим Розробника активовано! Тепер усі кабінети доступні без пароля.");
-                }
-            });
-        }
-    } else if (role === "admin") {
-        showCustomPasswordModal((pass) => {
-            if (pass === ADMIN_PASSWORD) {
-                applyRoleChange("admin", "Режим Адміна активовано!");
-            } else if (pass !== null) {
-                alert("Неправильний пароль Адміна!");
-            }
-        }, "•");
-    } else if (role === "moderator") {
-        if (typeof checkModeratorPassword === 'function') {
-            checkModeratorPassword((success) => {
-                if (success) {
-                    applyRoleChange("moderator", "Режим Модератора активовано!");
-                }
-            });
-        }
-    } else if (role === "user") {
-        applyRoleChange("user", "Увімкнено режим Юзера.");
+    } catch (e) {
+        return defaultPasswords;
     }
 }
 
-function applyRoleChange(role, message) {
-    currentRole = role;
-    if (message) alert(message);
+function getRoleSecurityConfig() {
+    const defaultCfg = {
+        lockUser: false,
+        lockModerator: false,
+        lockAdmin: false,
+        moderatorCanEditReport: false
+    };
+    try {
+        const saved = JSON.parse(localStorage.getItem('dev_role_security_config') || '{}');
+        return Object.assign({}, defaultCfg, saved);
+    } catch (e) {
+        return defaultCfg;
+    }
+}
+
+function addSecurityLog(type, title, details) {
+    try {
+        const logs = JSON.parse(localStorage.getItem('dev_security_logs') || '[]');
+        logs.unshift({
+            id: Date.now() + Math.random(),
+            time: new Date().toLocaleString('uk-UA'),
+            type: type, // 'info' | 'warning' | 'danger' | 'success'
+            title: title,
+            details: details || ''
+        });
+        if (logs.length > 150) logs.length = 150;
+        localStorage.setItem('dev_security_logs', JSON.stringify(logs));
+    } catch (e) {}
+}
+
+// Таймер обліку реального часу в ролях
+setInterval(() => {
+    try {
+        const stats = JSON.parse(localStorage.getItem('dev_role_time_stats') || '{"user":0,"moderator":0,"admin":0,"developer":0}');
+        stats[currentRole] = (Number(stats[currentRole]) || 0) + 1;
+        localStorage.setItem('dev_role_time_stats', JSON.stringify(stats));
+    } catch (e) {}
+}, 1000);
+
+// --- ПЕРЕМИКАННЯ РОЛЕЙ ---
+function selectRole(role) {
+    if (role === currentRole) return;
+
+    const secCfg = getRoleSecurityConfig();
+    const passwords = getSystemPasswords();
+
+    // Якщо Розробник вже авторизований у цій сесії — пускаємо у будь-який кабінет без пароля
+    if (isDeveloperLoggedIn) {
+        currentRole = role;
+        addSecurityLog('info', `Швидкий перехід Розробника`, `Перехід у кабінет: ${getRoleDisplayName(role)}`);
+        updateRoleUI();
+        return;
+    }
+
+    // Перевірка, чи не заблокована роль Розробником
+    if (role === "user" && secCfg.lockUser) {
+        alert("⛔ Доступ до режиму «Юзер» тимчасово призупинено Розробником.");
+        return;
+    }
+    if (role === "moderator" && secCfg.lockModerator) {
+        alert("⛔ Доступ до кабінету «Модератор» тимчасово заблоковано Розробником!");
+        addSecurityLog('warning', 'Спроба входу в заблоковану роль', 'Кабінет Модератора заблокований');
+        return;
+    }
+    if (role === "admin" && secCfg.lockAdmin) {
+        alert("⛔ Доступ до кабінету «Адмін» тимчасово заблоковано Розробником!");
+        addSecurityLog('warning', 'Спроба входу в заблоковану роль', 'Кабінет Адміна заблокований');
+        return;
+    }
+
+    if (role === "user") {
+        currentRole = "user";
+        updateRoleUI();
+        return;
+    }
+
+    if (role === "moderator") {
+        showCustomPasswordModal("Введіть пароль Модератора:", (pwd) => {
+            if (pwd === null) return;
+            // Перевіряємо або загальний пароль Модератора, або індивідуальний пароль користувача з роллю moderator
+            if (pwd === passwords.moderator || checkCustomUserPassword('moderator', pwd)) {
+                currentRole = "moderator";
+                addSecurityLog('success', 'Успішний вхід: Модератор', 'Авторизація пройдена');
+                updateRoleUI();
+            } else {
+                addSecurityLog('danger', 'Невірний пароль Модератора', `Введено: "${pwd}"`);
+                alert("❌ Невірний пароль Модератора!");
+            }
+        });
+    } else if (role === "admin") {
+        showCustomPasswordModal("Введіть пароль Адміна:", (pwd) => {
+            if (pwd === null) return;
+            if (pwd === passwords.admin || checkCustomUserPassword('admin', pwd)) {
+                currentRole = "admin";
+                addSecurityLog('success', 'Успішний вхід: Адмін', 'Авторизація пройдена');
+                updateRoleUI();
+            } else {
+                addSecurityLog('danger', 'Невірний пароль Адміна', `Введено: "${pwd}"`);
+                alert("❌ Невірний пароль Адміна!");
+            }
+        });
+    } else if (role === "developer") {
+        showCustomPasswordModal("Введіть пароль Розробника:", (pwd) => {
+            if (pwd === null) return;
+            if (pwd === passwords.developer) {
+                currentRole = "developer";
+                isDeveloperLoggedIn = true;
+                addSecurityLog('success', 'Успішний вхід: Розробник (Супер-доступ)', 'Активовано вільний перехід між кабінетами');
+                updateRoleUI();
+            } else {
+                addSecurityLog('danger', 'Спроба злому кабінету Розробника!', `Введено невірний пароль: "${pwd}"`);
+                alert("❌ Невірний пароль Розробника!");
+            }
+        });
+    }
+}
+
+function checkCustomUserPassword(targetRole, inputPwd) {
+    if (!inputPwd) return false;
+    try {
+        const users = JSON.parse(localStorage.getItem('dev_managed_users') || '[]');
+        const matched = users.find(u => u.role === targetRole && u.pin && String(u.pin) === String(inputPwd));
+        if (matched) {
+            if (matched.status === 'banned') {
+                alert(`🚫 Ваш обліковий запис (${matched.name}) ЗАБЛОКОВАНО!\nПричина: ${matched.banReason || 'Порушення правил'}`);
+                addSecurityLog('danger', `Спроба входу забаненого користувача`, `Користувач: ${matched.name} (${targetRole})`);
+                return false;
+            }
+            addSecurityLog('success', `Персональний вхід: ${matched.name}`, `Роль: ${targetRole}, Підрозділ: ${matched.subdivision || '-'}`);
+            return true;
+        }
+    } catch (e) {}
+    return false;
+}
+
+function getRoleDisplayName(role) {
+    if (role === 'developer') return 'Розробник';
+    if (role === 'admin') return 'Адмін';
+    if (role === 'moderator') return 'Модератор';
+    return 'Юзер';
+}
+
+function logoutDeveloperSession() {
+    isDeveloperLoggedIn = false;
+    currentRole = "user";
+    addSecurityLog('info', 'Вихід із режиму Розробника', 'Сесію супер-доступу завершено');
     updateRoleUI();
 }
 
 function updateRoleUI() {
-    const roles = ["developer", "admin", "moderator", "user"];
+    const isModOrHigher = (currentRole === "moderator" || currentRole === "admin" || currentRole === "developer");
+    const isAdminOrHigher = (currentRole === "admin" || currentRole === "developer");
+    const isDev = (currentRole === "developer");
+    const secCfg = getRoleSecurityConfig();
+
+    const roles = ["user", "moderator", "admin", "developer"];
+    const activeColors = {
+        user: "#3498db",
+        moderator: "#16a085",
+        admin: "#e74c3c",
+        developer: "#8e44ad"
+    };
+
     roles.forEach(r => {
         const btn = document.getElementById(`role-btn-${r}`);
         if (btn) {
             if (r === currentRole) {
-                btn.style.backgroundColor = "#c0392b";
-                btn.style.borderColor = "#e74c3c";
+                btn.style.background = activeColors[r];
+                btn.style.color = "white";
+                btn.style.boxShadow = "0 0 8px " + activeColors[r];
             } else {
-                btn.style.backgroundColor = "#34495e";
-                btn.style.borderColor = "transparent";
+                btn.style.background = "transparent";
+                btn.style.color = "#bdc3c7";
+                btn.style.boxShadow = "none";
             }
         }
     });
 
-    const isDev = (currentRole === "developer");
-    const isAdmin = (currentRole === "admin");
-    const isDevOrAdmin = (isDev || isAdmin);
-    const isMod = (currentRole === "moderator");
-
-    const btnReport = document.getElementById('nav-btn-report');
-    const btnSubdivisions = document.getElementById('nav-btn-subdivisions');
-    const btnEquipment = document.getElementById('nav-btn-equipment');
-    const btnDestroyed = document.getElementById('nav-btn-destroyed');
-    const addCarBtn = document.getElementById('add-car-btn');
-    const transferBtn = document.getElementById('transfer-data-btn');
-
-    // Кнопки збереження та імпорту JSON у шапці (тільки для Розробника)
-    const saveBtn = document.getElementById('header-direct-save-btn');
-    const importBtn = document.getElementById('header-direct-import-btn');
-    if (saveBtn) saveBtn.style.display = isDev ? 'inline-flex' : 'none';
-    if (importBtn) importBtn.style.display = isDev ? 'inline-flex' : 'none';
-
-    // Кнопка збереження на картці авто (для Розробника та Адміна)
-    const cardSaveBtn = document.getElementById('card-save-btn');
-    if (cardSaveBtn) cardSaveBtn.style.display = isDevOrAdmin ? 'inline-flex' : 'none';
-
-    // Кнопка "Зберегти звіт" у 10-денному звіті (доступна для Розробника та Адміна, прихована для Модератора)
-    const reportSaveBtn = document.querySelector('#report-view button[onclick*="saveReportData"]');
-    if (reportSaveBtn) {
-        reportSaveBtn.style.display = isDevOrAdmin ? 'inline-flex' : 'none';
+    // Кнопка швидкого виходу з режиму Розробника
+    let devBadge = document.getElementById('dev-super-badge');
+    const roleSwitchContainer = document.getElementById('role-btn-developer')?.parentElement;
+    if (isDeveloperLoggedIn && roleSwitchContainer) {
+        if (!devBadge) {
+            devBadge = document.createElement('button');
+            devBadge.id = 'dev-super-badge';
+            devBadge.title = 'Ви увійшли як Розробник (перехід без паролів). Натисніть, щоб вийти з режиму Розробника.';
+            devBadge.style.cssText = 'background:#2c3e50; color:#f1c40f; border:1px solid #f1c40f; border-radius:4px; padding:4px 8px; font-size:11px; font-weight:bold; cursor:pointer; margin-left:4px;';
+            devBadge.innerHTML = '🔓 DEV (Вийти)';
+            devBadge.onclick = logoutDeveloperSession;
+            roleSwitchContainer.appendChild(devBadge);
+        }
+        devBadge.style.display = 'inline-block';
+    } else if (devBadge) {
+        devBadge.style.display = 'none';
     }
 
-    if (isDev) {
-        if (btnReport) btnReport.style.display = 'inline-block';
-        if (btnSubdivisions) btnSubdivisions.style.display = 'inline-block';
-        if (btnEquipment) btnEquipment.style.display = 'inline-block';
-        if (btnDestroyed) btnDestroyed.style.display = 'inline-block';
-        if (addCarBtn) addCarBtn.style.display = 'inline-block';
-        if (transferBtn) transferBtn.style.display = 'inline-block';
-    } else if (isAdmin) {
-        if (btnReport) btnReport.style.display = 'inline-block';
-        if (btnSubdivisions) btnSubdivisions.style.display = 'inline-block';
-        if (btnEquipment) btnEquipment.style.display = 'inline-block';
-        if (btnDestroyed) btnDestroyed.style.display = 'inline-block';
-        if (addCarBtn) addCarBtn.style.display = 'none';
-        if (transferBtn) transferBtn.style.display = 'inline-block';
-    } else if (isMod) {
-        if (btnReport) btnReport.style.display = 'inline-block';
-        if (btnSubdivisions) btnSubdivisions.style.display = 'none';
-        if (btnEquipment) btnEquipment.style.display = 'none';
-        if (btnDestroyed) btnDestroyed.style.display = 'none';
-        if (addCarBtn) addCarBtn.style.display = 'none';
-        if (transferBtn) transferBtn.style.display = 'none';
-    } else {
-        if (btnReport) btnReport.style.display = 'none';
-        if (btnSubdivisions) btnSubdivisions.style.display = 'none';
-        if (btnEquipment) btnEquipment.style.display = 'none';
-        if (btnDestroyed) btnDestroyed.style.display = 'none';
-        if (addCarBtn) addCarBtn.style.display = 'none';
-        if (transferBtn) transferBtn.style.display = 'none';
-
-        const activeView = document.querySelector('.view-section.active');
-        if (activeView && activeView.id !== 'base-view' && activeView.id !== 'card-view' && activeView.id !== 'aggregates-calc-view') {
-            if (typeof switchView === 'function') switchView('base');
-        }
+    // 1. Вкладка "Звіт (10 днів)"
+    const reportNavBtn = document.getElementById("nav-btn-report");
+    if (reportNavBtn) {
+        reportNavBtn.style.display = isModOrHigher ? "inline-block" : "none";
     }
 
-    // Управління редагуванням у "Звіт (10 днів)":
-    // Розробник та Адмін — ПОВНЕ РЕДАГУВАННЯ, Модератор — ТІЛЬКИ ПЕРЕГЛЯД
-    setTimeout(() => {
-        const reportInputs = document.querySelectorAll('#report-table input, #report-table select');
-        reportInputs.forEach(input => {
-            // Фільтр за підрозділом завжди відкритий для всіх
-            if (input.id === 'report-subdivision-filter') {
-                input.removeAttribute('disabled');
-                input.style.backgroundColor = 'white';
-                input.style.cursor = 'pointer';
-                return;
-            }
-
-            if (isDevOrAdmin) {
-                // Розблоковуємо всі клітинки для Розробника та Адміна (крім AdBlue у машин, де його немає)
-                if (!input.hasAttribute('data-no-adblue')) {
-                    input.removeAttribute('disabled');
-                    input.style.backgroundColor = 'white';
-                    input.style.cursor = 'text';
-                }
-            } else {
-                // Для Модератора (та інших) — блокуємо редагування (тільки перегляд)
-                input.setAttribute('disabled', 'true');
-                if (!input.hasAttribute('data-no-adblue')) {
-                    input.style.backgroundColor = '#f1f2f6';
-                }
-                input.style.cursor = 'default';
-            }
-        });
-    }, 100);
-
-    const carsTable = document.getElementById('cars-table');
-    if (carsTable) {
-        const headers = carsTable.querySelectorAll('thead th');
-        const rows = carsTable.querySelectorAll('tbody tr');
-
-        if (headers.length > 0) {
-            const lastHeader = headers[headers.length - 1];
-            if (lastHeader.textContent.trim().toLowerCase() === 'звіт') {
-                lastHeader.style.display = isDevOrAdmin ? '' : 'none';
-            }
-        }
-
-        rows.forEach(row => {
-            const cells = row.querySelectorAll('td');
-            if (cells.length > 0) {
-                const lastCell = cells[cells.length - 1];
-                if (lastCell.querySelector('button, a') || lastCell.textContent.trim().toLowerCase() === 'звіт') {
-                    lastCell.style.display = isDevOrAdmin ? '' : 'none';
-                }
-            }
-        });
+    // 2. Вкладка "Панель розробника"
+    const devPanelBtn = document.getElementById("nav-btn-dev-panel");
+    if (devPanelBtn) {
+        devPanelBtn.style.display = isDev ? "inline-block" : "none";
     }
 
-    // Керування показом окремої сторінки Панелі розробника в шапці
-    const devPanelNavBtn = document.getElementById('nav-btn-dev-panel');
-    if (devPanelNavBtn) {
-        devPanelNavBtn.style.display = isDev ? 'inline-block' : 'none';
-        if (!isDev) {
-            const activeView = document.querySelector('.view-section.active');
-            if (activeView && activeView.id === 'dev-panel-view') {
-                if (typeof switchView === 'function') switchView('base');
-            }
+    const reportView = document.getElementById("report-view");
+    if (reportView && reportView.style.display !== "none" && !isModOrHigher) {
+        if (typeof switchTab === "function") switchTab("cars");
+    }
+
+    const devPanelView = document.getElementById("developer-panel-view");
+    if (devPanelView && devPanelView.style.display !== "none" && !isDev) {
+        if (typeof switchTab === "function") switchTab("cars");
+    }
+
+    // 3. Кнопки на сторінці "База (Реєстр)"
+    const addCarBtn = document.querySelector('#cars-view .action-bar .btn-green');
+    if (addCarBtn) {
+        addCarBtn.style.display = isAdminOrHigher ? "inline-block" : "none";
+    }
+
+    const deleteActionHeader = document.getElementById("delete-action-header");
+    if (deleteActionHeader) {
+        deleteActionHeader.style.display = isAdminOrHigher ? "" : "none";
+    }
+
+    const deleteCells = document.querySelectorAll('#cars-tbody .delete-cell');
+    deleteCells.forEach(cell => {
+        cell.style.display = isAdminOrHigher ? "" : "none";
+    });
+
+    // 4. Кнопки у "Картка авто та Маршрути"
+    const saveCardBtn = document.querySelector('#car-card-view .card-panel .btn-blue');
+    if (saveCardBtn) {
+        saveCardBtn.style.display = isAdminOrHigher ? "block" : "none";
+    }
+
+    const clearRoutesBtn = document.querySelector('#car-card-view .routes-panel .btn-red');
+    if (clearRoutesBtn) {
+        clearRoutesBtn.style.display = isAdminOrHigher ? "inline-block" : "none";
+    }
+
+    const addPeriodBtn = document.getElementById("btn-add-period");
+    if (addPeriodBtn) {
+        addPeriodBtn.style.display = isDev ? "inline-block" : "none";
+    }
+    const delPeriodBtn = document.getElementById("btn-del-period");
+    if (delPeriodBtn) {
+        delPeriodBtn.style.display = isDev ? "inline-block" : "none";
+    }
+
+    const cardInputs = document.querySelectorAll('#car-card-view .card-panel input, #car-card-view .card-panel select');
+    cardInputs.forEach(input => {
+        if (input.id === "card-period-select") {
+            input.disabled = false;
+            return;
         }
+        input.disabled = !isAdminOrHigher;
+        input.style.backgroundColor = isAdminOrHigher ? "" : "#f5f5f5";
+        input.style.cursor = isAdminOrHigher ? "" : "not-allowed";
+    });
+
+    // 5. Розділ "Звіт (10 днів)":
+    // Розробник та Адмін (або Модератор, якщо Розробник увімкнув йому дозвіл у Панелі) — можуть редагувати
+    const canEditReport = isAdminOrHigher || (currentRole === "moderator" && secCfg.moderatorCanEditReport);
+
+    const reportInputs = document.querySelectorAll('#report-tbody input.report-cell-input');
+    reportInputs.forEach(input => {
+        input.disabled = !canEditReport;
+        input.readOnly = !canEditReport;
+        input.style.backgroundColor = canEditReport ? "" : "#f0f3f4";
+        input.style.cursor = canEditReport ? "text" : "not-allowed";
+    });
+
+    const reportPeriodInput = document.getElementById('report-custom-period');
+    if (reportPeriodInput) {
+        reportPeriodInput.disabled = !canEditReport;
+        reportPeriodInput.readOnly = !canEditReport;
+    }
+
+    const reportActionButtons = document.querySelectorAll('#report-view .report-header button');
+    reportActionButtons.forEach(btn => {
+        const text = (btn.innerText || "").trim();
+        if (text.includes("Друк") || text === "◄" || text === "►") {
+            btn.style.display = "inline-block";
+            btn.disabled = false;
+        } else {
+            btn.style.display = canEditReport ? "inline-block" : "none";
+        }
+    });
+
+    // Оновлюємо Панель розробника, якщо вона відкрита
+    if (isDev && typeof renderDeveloperPanel === "function") {
+        renderDeveloperPanel();
     }
 }
 
-function showCustomPasswordModal(callback, maskChar = "🖕") {
-    const oldModal = document.getElementById('custom-admin-modal');
+function showCustomPasswordModal(titleText, callback) {
+    const oldModal = document.getElementById("custom-admin-modal");
     if (oldModal) oldModal.remove();
 
-    const overlay = document.createElement('div');
-    overlay.id = 'custom-admin-modal';
-    overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 9999;';
+    const overlay = document.createElement("div");
+    overlay.id = "custom-admin-modal";
+    overlay.style.cssText = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:99999;";
 
-    const box = document.createElement('div');
-    box.style.cssText = 'background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); width: 320px; text-align: center; font-family: Arial, sans-serif;';
+    const box = document.createElement("div");
+    box.style.cssText = "background:white; padding:25px; border-radius:10px; width:340px; max-width:92%; box-shadow:0 10px 30px rgba(0,0,0,0.35); text-align:center; font-family:sans-serif;";
 
-    box.innerHTML = `
-        <h3 style="margin-top: 0; margin-bottom: 15px; color: #2c3e50; font-size: 16px;">Введіть пароль доступу:</h3>
-        <div style="position: relative; margin-bottom: 15px;">
-            <input type="password" id="admin-pass-field" style="width: 100%; padding: 8px; font-size: 16px; border: 1px solid #ccc; border-radius: 4px; text-align: center; box-sizing: border-box;" autocomplete="current-password">
-            <div id="admin-masked-display" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: white; border: 1px solid #ccc; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 18px; letter-spacing: 3px; pointer-events: none; box-sizing: border-box; overflow: hidden; white-space: nowrap; padding: 0 10px;"></div>
-        </div>
-        <div style="display: flex; gap: 10px;">
-            <button id="admin-modal-ok" style="flex: 1; background: #27ae60; color: white; border: none; padding: 8px; border-radius: 4px; font-weight: bold; cursor: pointer;">OK</button>
-            <button id="admin-modal-cancel" style="flex: 1; background: #7f8c8d; color: white; border: none; padding: 8px; border-radius: 4px; font-weight: bold; cursor: pointer;">Скасувати</button>
-        </div>
-    `;
+    const title = document.createElement("h3");
+    title.innerText = titleText;
+    title.style.cssText = "margin:0 0 15px 0; color:#2c3e50; font-size:18px;";
 
+    const input = document.createElement("input");
+    input.type = "password";
+    input.placeholder = "Введіть пароль...";
+    input.style.cssText = "width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box; font-size:16px; text-align:center;";
+
+    const btnContainer = document.createElement("div");
+    btnContainer.style.cssText = "display:flex; gap:10px; justify-content:center;";
+
+    const okBtn = document.createElement("button");
+    okBtn.innerText = "Увійти";
+    okBtn.style.cssText = "background:#27ae60; color:white; border:none; padding:10px 20px; border-radius:6px; cursor:pointer; font-weight:bold; flex:1;";
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.innerText = "Скасувати";
+    cancelBtn.style.cssText = "background:#e74c3c; color:white; border:none; padding:10px 20px; border-radius:6px; cursor:pointer; font-weight:bold; flex:1;";
+
+    btnContainer.appendChild(okBtn);
+    btnContainer.appendChild(cancelBtn);
+    box.appendChild(title);
+    box.appendChild(input);
+    box.appendChild(btnContainer);
     overlay.appendChild(box);
     document.body.appendChild(overlay);
 
-    const inputField = document.getElementById('admin-pass-field');
-    const maskedDisplay = document.getElementById('admin-masked-display');
-    const okBtn = document.getElementById('admin-modal-ok');
-    const cancelBtn = document.getElementById('admin-modal-cancel');
-
-    inputField.focus();
-
-    let realValue = "";
-    inputField.addEventListener('input', () => {
-        const val = inputField.value;
-        if (val.length > realValue.length) {
-            realValue += val.slice(realValue.length);
-        } else {
-            realValue = realValue.slice(0, val.length);
-        }
-        maskedDisplay.textContent = maskChar.repeat(realValue.length);
-        inputField.value = "•".repeat(realValue.length);
-    });
+    input.focus();
 
     const submit = () => {
-        const pwd = realValue;
+        const val = input.value;
         overlay.remove();
-        callback(pwd);
+        callback(val);
     };
 
     okBtn.onclick = submit;
-    inputField.onkeydown = (e) => {
-        if (e.key === 'Enter') submit();
-        if (e.key === 'Escape') overlay.remove();
+    input.onkeydown = (e) => {
+        if (e.key === "Enter") submit();
+        if (e.key === "Escape") {
+            overlay.remove();
+            callback(null);
+        }
     };
-
     cancelBtn.onclick = () => {
         overlay.remove();
         callback(null);
