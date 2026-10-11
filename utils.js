@@ -16,14 +16,14 @@ document.addEventListener("mouseover", function(e) {
 // ==========================================
 
 function tryAddCarRow() {
-    if (typeof isAdminLoggedIn !== 'undefined' && isAdminLoggedIn) {
+    if (typeof currentRole !== 'undefined' && (currentRole === 'developer' || currentRole === 'admin')) {
+        promptAndAddCar();
+    } else if (typeof isAdminLoggedIn !== 'undefined' && isAdminLoggedIn) {
         promptAndAddCar();
     } else {
         if (typeof showCustomPasswordModal === 'function') {
             showCustomPasswordModal((pass) => {
-                if (pass === "02031985") {
-                    isAdminLoggedIn = true;
-                    if (typeof updateAdminUI === 'function') updateAdminUI();
+                if (pass === "02031985" || pass === "4343") {
                     promptAndAddCar();
                 } else if (pass !== null) {
                     alert("Неправильний пароль!");
@@ -61,10 +61,14 @@ function promptAndAddCar() {
     let selectedCategoryName = VEHICLE_CATEGORIES[selectedKey];
 
     let vehicleTypeUA = "легковий";
-    const lowerName = selectedCategoryName.toLowerCase();
-    if (lowerName.includes("вантаж") || lowerName.includes("adblue")) vehicleTypeUA = "вантажний";
-    else if (lowerName.includes("мотоцикл")) vehicleTypeUA = "мотоцикл";
-    else if (lowerName.includes("квадроцикл")) vehicleTypeUA = "квадроцикл";
+    const upperKey = selectedKey.toUpperCase();
+    if (upperKey === "TRUCK" || upperKey === "MINIBUS" || upperKey === "SPECIAL" || upperKey === "ADBLUE") {
+        vehicleTypeUA = "вантажний";
+    } else if (upperKey === "MOTORCYCLE") {
+        vehicleTypeUA = "мотоцикл";
+    } else if (upperKey === "QUAD") {
+        vehicleTypeUA = "квадроцикл";
+    }
 
     executeAddCarWithCategory(selectedKey, vehicleTypeUA, selectedCategoryName);
 }
@@ -77,48 +81,52 @@ function executeAddCarWithCategory(categoryKey, vehicleTypeStr, categoryDisplayN
     const newId = carsData.length > 0 ? Math.max(...carsData.map(i => Number(i.id) || 0)) + 1 : 1;
     const upperKey = categoryKey.toUpperCase();
 
-    // Автоматичний підбір формул (AdBlue та вантажівки отримують розкладку MAN)
     let assignedFormulas = [1, 2, 3, 4];
-    if (upperKey === 'TRUCK' || upperKey === 'SPECIAL' || upperKey === 'ADBLUE') {
+    if (upperKey === 'TRUCK' || upperKey === 'SPECIAL' || upperKey === 'ADBLUE' || upperKey === 'MINIBUS') {
         assignedFormulas = [5, 1, 2, 3, 6, 7]; 
-    } else if (upperKey === 'MOTORCYCLE' || upperKey === 'QUAD') {
+    } else if (upperKey === 'MOTORCYCLE') {
         assignedFormulas = [8, 9];
+    } else if (upperKey === 'QUAD') {
+        assignedFormulas = [8];
     }
+
+    const hasAdBlueFlag = (upperKey === 'ADBLUE' || upperKey === 'TRUCK' || upperKey === 'SPECIAL');
 
     const newCar = {
         id: newId,
         plate: "NEW 0000",
         model: `Новий авто (${categoryDisplayName})`,
         subdivision: "РМТЗ",
-        consumption: (upperKey === 'MOTORCYCLE' || upperKey === 'QUAD') ? 4.0 : 25.0,
+        consumption: (upperKey === 'MOTORCYCLE' || upperKey === 'QUAD') ? 4.0 : (vehicleTypeStr === 'вантажний' ? 25.0 : 10.0),
         fuelType: "ДП",
         note: "",
         vin: "",
         year: 2024,
         transmission: "автомат",
-        tankCapacity: 200,
+        tankCapacity: vehicleTypeStr === 'вантажний' ? 200 : 60,
         drive: "повний",
-        emptyWeight: 7500,
-        totalWeight: 14000,
+        emptyWeight: vehicleTypeStr === 'вантажний' ? 7500 : 1800,
+        totalWeight: vehicleTypeStr === 'вантажний' ? 14000 : 2500,
         gears: 6,
-        engineVolume: 7698,
-        kw: 210,
+        engineVolume: 2000,
+        kw: 110,
         engineNo: "",
         driver: "Водій",
         category: categoryKey.toLowerCase(),
         vehicleType: vehicleTypeStr,     
-        hasAdBlue: true,
+        hasAdBlue: hasAdBlueFlag,
         isMiles: upperKey === 'MILES',
         formulas: assignedFormulas
     };
 
     carsData.push(newCar);
 
-    // Надійне збереження у пам'ять браузера
     if (typeof saveCarsToStorage === 'function') {
         saveCarsToStorage();
     }
-
+    if (typeof saveCarsModificationsToStorage === 'function') {
+        saveCarsModificationsToStorage();
+    }
     if (typeof renderCarsTable === 'function') {
         renderCarsTable();
     }
@@ -131,6 +139,11 @@ function executeAddCarWithCategory(categoryKey, vehicleTypeStr, categoryDisplayN
 // ==========================================
 
 function initCategorySelects() {
+    if (typeof ensureCategoryDropdownsPopulated === 'function') {
+        ensureCategoryDropdownsPopulated();
+        return;
+    }
+
     const selectDet = document.getElementById('det-input-category');
     if (selectDet && typeof VEHICLE_CATEGORIES !== 'undefined' && selectDet.options.length === 0) {
         for (let key in VEHICLE_CATEGORIES) {
@@ -152,137 +165,73 @@ function initCategorySelects() {
     }
 }
 
-function updateCarCategoryFromDetails(newCategoryKey) {
-    if (typeof currentCarId === 'undefined' || !currentCarId) return;
-    
-    let sourceCars = typeof carsData !== 'undefined' ? carsData : [];
-    const car = sourceCars.find(c => Number(c.id) === Number(currentCarId));
-    
-    if (car) {
-        applyCategoryChangesToCar(car, newCategoryKey);
-        alert("Категорію та формули успішно змінено й збережено!");
-    }
-}
-
 function updateCardCarCategory(newCategoryKey) {
-    if (typeof currentCar === 'undefined' || !currentCar) return;
+    const targetId = (typeof currentCarId !== 'undefined' && currentCarId) ? currentCarId : null;
+    if (!targetId) return;
 
-    applyCategoryChangesToCar(currentCar, newCategoryKey);
+    const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
+    const car = sourceCars.find(c => Number(c.id) === Number(targetId));
+    if (!car) return;
 
-    if (typeof renderFormulas === 'function') {
-        renderFormulas(currentCar.formulas);
+    applyCategoryChangesToCar(car, newCategoryKey);
+
+    if (typeof loadCarCard === 'function') {
+        loadCarCard(car.id);
     }
-    if (typeof calculateFuel === 'function') {
-        calculateFuel();
-    }
-
-    alert("Категорію та формули успішно оновлено й збережено!");
 }
 
 function applyCategoryChangesToCar(car, newCategoryKey) {
+    if (!car || !newCategoryKey) return;
     car.category = newCategoryKey.toLowerCase();
     const upperKey = newCategoryKey.toUpperCase();
 
     let assignedFormulas = [1, 2, 3, 4];
     let vehicleTypeUA = "легковий";
 
-    if (upperKey === 'TRUCK' || upperKey === 'SPECIAL' || upperKey === 'ADBLUE') {
-        assignedFormulas = [5, 1, 2, 3, 6, 7]; // Вантажна розкладка MAN
+    if (upperKey === 'TRUCK' || upperKey === 'SPECIAL' || upperKey === 'ADBLUE' || upperKey === 'MINIBUS') {
+        assignedFormulas = [5, 1, 2, 3, 6, 7];
         vehicleTypeUA = "вантажний";
-    } else if (upperKey === 'MOTORCYCLE' || upperKey === 'QUAD') {
+    } else if (upperKey === 'MOTORCYCLE') {
         assignedFormulas = [8, 9];
-        vehicleTypeUA = upperKey === 'MOTORCYCLE' ? "мотоцикл" : "квадроцикл";
+        vehicleTypeUA = "мотоцикл";
+    } else if (upperKey === 'QUAD') {
+        assignedFormulas = [8];
+        vehicleTypeUA = "квадроцикл";
     }
 
     car.formulas = assignedFormulas;
     car.vehicleType = vehicleTypeUA;
-    car.hasAdBlue = true;
+    car.hasAdBlue = (upperKey === 'ADBLUE' || upperKey === 'TRUCK' || upperKey === 'SPECIAL');
     car.isMiles = (upperKey === 'MILES');
 
-    // Зберігаємо зміни у сховище браузера
     if (typeof saveCarsToStorage === 'function') {
         saveCarsToStorage();
     }
-
+    if (typeof saveCarsModificationsToStorage === 'function') {
+        saveCarsModificationsToStorage();
+    }
     if (typeof renderCarsTable === 'function') {
         renderCarsTable();
     }
-}
-
-if (typeof window.openCarDetails === 'function') {
-    const originalOpenDetails = window.openCarDetails;
-    window.openCarDetails = function(carId) {
-        originalOpenDetails(carId);
-        initCategorySelects();
-        
-        const car = carsData.find(c => Number(c.id) === Number(carId));
-        if (car) {
-            const modelInput = document.getElementById('det-input-model');
-            const plateInput = document.getElementById('det-input-plate');
-            if (modelInput) modelInput.value = car.model || '';
-            if (plateInput) plateInput.value = car.plate || '';
-
-            const catSelect = document.getElementById('det-input-category');
-            if (catSelect && car.category) {
-                catSelect.value = car.category.toLowerCase();
-            }
-        }
-    };
-}
-
-if (typeof window.loadCarIntoCard === 'function') {
-    const origLoadCar = window.loadCarIntoCard;
-    window.loadCarIntoCard = function(car) {
-        origLoadCar(car);
-        initCategorySelects();
-        const catSelect = document.getElementById('card-input-category');
-        if (catSelect && car && car.category) {
-            catSelect.value = car.category.toLowerCase();
-        }
-    };
 }
 
 document.addEventListener("DOMContentLoaded", () => {
     initCategorySelects();
+
+    // Автоматично синхронізуємо випадаючий список категорії у Картці авто при її відкритті
+    if (typeof window.loadCarCard === 'function' && !window._categoryCardSyncHooked) {
+        window._categoryCardSyncHooked = true;
+        const origLoadCard = window.loadCarCard;
+        window.loadCarCard = function(carId) {
+            initCategorySelects();
+            origLoadCard.apply(this, arguments);
+            const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
+            const car = sourceCars.find(c => Number(c.id) === Number(carId));
+            const cardCatSelect = document.getElementById('card-input-category');
+            if (car && cardCatSelect) {
+                const resolved = (typeof resolveCarCategoryKey === 'function') ? resolveCarCategoryKey(car) : (car.category || 'passenger');
+                cardCatSelect.value = resolved;
+            }
+        };
+    }
 });
-function saveCarDetailsToBasePath() {
-    let sourceCars = typeof carsData !== 'undefined' ? carsData : [];
-    
-    // Шукаємо автомобіль суворо за унікальним ID
-    let car = sourceCars.find(c => Number(c.id) === Number(currentCarId));
-
-    if (!car) {
-        alert("Помилка: неможливо зберегти, оскільки ID поточного автомобіля не визначено!");
-        return;
-    }
-
-    // Оновлюємо поля конкретно цього знайденго об'єкта
-    car.model = document.getElementById('det-input-model')?.value || car.model;
-    car.plate = document.getElementById('det-input-plate')?.value || car.plate;
-    car.subdivision = document.getElementById('det-input-subdivision')?.value || car.subdivision;
-    car.driver = document.getElementById('det-input-driver')?.value || car.driver;
-    car.vin = document.getElementById('det-input-vin')?.value || car.vin;
-    car.year = parseInt(document.getElementById('det-input-year')?.value, 10) || car.year;
-    car.transmission = document.getElementById('det-input-transmission')?.value || car.transmission;
-    car.tankCapacity = parseFloat(document.getElementById('det-input-tank')?.value) || car.tankCapacity;
-    car.drive = document.getElementById('det-input-drive')?.value || car.drive;
-    car.emptyWeight = parseFloat(document.getElementById('det-input-emptyWeight')?.value) || car.emptyWeight;
-    car.totalWeight = parseFloat(document.getElementById('det-input-totalWeight')?.value) || car.totalWeight;
-    car.gears = parseInt(document.getElementById('det-input-gears')?.value, 10) || car.gears;
-    car.engineVolume = parseFloat(document.getElementById('det-input-engine')?.value) || car.engineVolume;
-    car.kw = parseFloat(document.getElementById('det-input-kw')?.value) || car.kw;
-    car.engineNo = document.getElementById('det-input-engineNo')?.value || car.engineNo;
-    car.consumption = parseFloat(document.getElementById('det-input-consumption')?.value) || car.consumption;
-
-    if (typeof saveCarsToStorage === 'function') {
-        saveCarsToStorage();
-    } else {
-        localStorage.setItem('cars_data_registry', JSON.stringify(sourceCars));
-    }
-
-    if (typeof renderCarsTable === 'function') {
-        renderCarsTable();
-    }
-
-    alert(`Зміни для автомобіля "${car.plate}" успішно збережено в базу!`);
-}

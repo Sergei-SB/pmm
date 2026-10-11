@@ -4,9 +4,59 @@
 
 window.activeReportCarId = null; 
 
+// Допоміжна функція для визначення ключа категорії автомобіля
+function resolveCarCategoryKey(car) {
+    if (!car) return 'passenger';
+    const cat = String(car.category || '').toLowerCase().trim();
+    const validKeys = ['passenger', 'truck', 'suv', 'minibus', 'adblue', 'miles', 'hq', 'special', 'motorcycle', 'quad'];
+    if (validKeys.includes(cat)) {
+        return cat;
+    }
+
+    // Якщо car.category порожнє або українською — визначаємо за властивостями авто
+    if (car.isMiles) return 'miles';
+    if (car.hasAdBlue && (!car.vehicleType || !String(car.vehicleType).toLowerCase().includes('вантаж'))) return 'adblue';
+
+    const vType = String(car.vehicleType || '').toLowerCase().trim();
+    if (vType.includes('вантаж')) return 'truck';
+    if (vType.includes('мото')) return 'motorcycle';
+    if (vType.includes('квадро')) return 'quad';
+    return 'passenger';
+}
+
+// Заповнення списків категорій (якщо ще не заповнені)
+function ensureCategoryDropdownsPopulated() {
+    const categoriesMap = (typeof VEHICLE_CATEGORIES !== 'undefined') ? VEHICLE_CATEGORIES : {
+        PASSENGER: "Легкові автомобілі",
+        TRUCK: "Вантажні автомобілі",
+        SUV: "Позашляховики",
+        MINIBUS: "Мікроавтобуси",
+        ADBLUE: "Автомобілі з AdBlue",
+        MILES: "Автомобілі з милями",
+        HQ: "Штабні автомобілі",
+        SPECIAL: "Спецтехніка",
+        MOTORCYCLE: "Мотоцикли",
+        QUAD: "Квадроцикли"
+    };
+
+    ['det-input-category', 'card-input-category'].forEach(selectId => {
+        const selectEl = document.getElementById(selectId);
+        if (selectEl && selectEl.options.length === 0) {
+            for (let key in categoriesMap) {
+                let opt = document.createElement('option');
+                opt.value = key.toLowerCase();
+                opt.textContent = categoriesMap[key];
+                selectEl.appendChild(opt);
+            }
+        }
+    });
+}
+
 // Точне відкриття звіту за унікальним ID автомобіля
 window.openCarDetails = function(carId) {
     window.activeReportCarId = Number(carId);
+    window.currentCarId = Number(carId);
+    activeDetailCarId = Number(carId);
     
     let sourceCars = typeof carsData !== 'undefined' ? carsData : [];
     const car = sourceCars.find(c => Number(c.id) === window.activeReportCarId);
@@ -15,6 +65,8 @@ window.openCarDetails = function(carId) {
         alert("Помилка: автомобіль з таким ID не знайдено в базі!");
         return;
     }
+
+    ensureCategoryDropdownsPopulated();
 
     document.querySelectorAll('.view-section').forEach(sec => {
         sec.classList.remove('active');
@@ -27,10 +79,13 @@ window.openCarDetails = function(carId) {
         detSec.style.display = 'block';
     }
 
+    const topSearchBox = document.getElementById('top-search-box');
+    if (topSearchBox) topSearchBox.style.display = 'none';
+
     document.querySelectorAll('.top-nav .nav-btn, .nav-btn').forEach(btn => btn.classList.remove('active'));
 
     renderCarDetailsData();
-}
+};
 
 function getActiveReportCar() {
     if (typeof carsData === 'undefined' || !Array.isArray(carsData)) return null;
@@ -40,6 +95,8 @@ function getActiveReportCar() {
 function renderCarDetailsData() {
     const car = getActiveReportCar();
     if (!car) return;
+
+    ensureCategoryDropdownsPopulated();
 
     const modelInput = document.getElementById('det-input-model');
     const plateInput = document.getElementById('det-input-plate');
@@ -58,12 +115,12 @@ function renderCarDetailsData() {
         'vin': car.vin,
         'year': car.year,
         'transmission': car.transmission,
-        'tank': car.tankCapacity || car.tank,
+        'tank': car.tankCapacity !== undefined ? car.tankCapacity : car.tank,
         'drive': car.drive,
         'emptyWeight': car.emptyWeight,
         'totalWeight': car.totalWeight,
         'gears': car.gears,
-        'engine': car.engineVolume || car.engine,
+        'engine': car.engineVolume !== undefined ? car.engineVolume : car.engine,
         'kw': car.kw,
         'engineNo': car.engineNo,
         'consumption': car.consumption
@@ -76,16 +133,16 @@ function renderCarDetailsData() {
         }
     }
 
+    // Встановлюємо поточну категорію у випадаючий список
     const catSelect = document.getElementById('det-input-category');
-    if (catSelect && car.category) {
-        catSelect.value = car.category.toLowerCase();
+    if (catSelect) {
+        const resolvedCat = resolveCarCategoryKey(car);
+        car.category = resolvedCat;
+        catSelect.value = resolvedCat;
     }
 
     renderCarPeriodsAndStats(car);
-    
-    if (typeof renderCarDocuments === 'function') {
-        renderCarDocuments(car);
-    }
+    renderCarDocuments(car);
 }
 
 // Пряме оновлення характеристик активного авто та миттєве збереження
@@ -117,19 +174,29 @@ window.updateCarPropertyFromDetails = function(prop, val) {
     if (typeof saveCarsToStorage === 'function') saveCarsToStorage();
     if (typeof saveCarsModificationsToStorage === 'function') saveCarsModificationsToStorage();
     if (typeof renderCarsTable === 'function') renderCarsTable();
-}
+};
 
+// Оновлення категорії прямо зі звіту автомобіля
 window.updateCarCategoryFromDetails = function(newCategoryKey) {
     let car = getActiveReportCar();
-    if (!car) return;
+    if (!car || !newCategoryKey) return;
+
     if (typeof applyCategoryChangesToCar === 'function') {
         applyCategoryChangesToCar(car, newCategoryKey);
     } else {
         car.category = newCategoryKey.toLowerCase();
     }
+
     if (typeof saveCarsToStorage === 'function') saveCarsToStorage();
+    if (typeof saveCarsModificationsToStorage === 'function') saveCarsModificationsToStorage();
     if (typeof renderCarsTable === 'function') renderCarsTable();
-}
+
+    // Також оновлюємо картку авто, якщо воно зараз вибране
+    if (typeof currentCarId !== 'undefined' && Number(currentCarId) === Number(car.id)) {
+        const cardCatSelect = document.getElementById('card-input-category');
+        if (cardCatSelect) cardCatSelect.value = car.category;
+    }
+};
 
 window.saveCarDetailsToBasePath = function() {
     let car = getActiveReportCar();
@@ -138,13 +205,22 @@ window.saveCarDetailsToBasePath = function() {
         return;
     }
 
+    const catSelect = document.getElementById('det-input-category');
+    if (catSelect && catSelect.value) {
+        if (typeof applyCategoryChangesToCar === 'function') {
+            applyCategoryChangesToCar(car, catSelect.value);
+        } else {
+            car.category = catSelect.value;
+        }
+    }
+
     if (typeof saveCarsToStorage === 'function') saveCarsToStorage();
     if (typeof saveCarsModificationsToStorage === 'function') saveCarsModificationsToStorage();
     if (typeof renderCarsTable === 'function') renderCarsTable();
 
     alert(`Зміни для автомобіля "${car.plate}" успішно збережено в базу!`);
     if (typeof switchView === 'function') switchView('base');
-}
+};
 
 function renderCarPeriodsAndStats(car) {
     const periodsTbody = document.getElementById('det-periods-tbody');
@@ -193,6 +269,11 @@ function renderCarPeriodsAndStats(car) {
                 const refFuel = parseFloat(rowData.refuelFuel) || 0;
                 totalReceivedFuel += refFuel;
 
+                const prevF = parseFloat(rowData.prevFuel) || 0;
+                const leftF = parseFloat(rowData.leftFuel) || 0;
+                const spentF = (prevF + refFuel - leftF) > 0 ? (prevF + refFuel - leftF) : 0;
+                totalSpentFuel += spentF;
+
                 const refAdBlue = parseFloat(rowData.refuelAdBlue) || 0;
                 totalReceivedAdBlue += refAdBlue;
 
@@ -203,7 +284,7 @@ function renderCarPeriodsAndStats(car) {
                         <td>${currOdo || '—'}</td>
                         <td><strong>${driven > 0 ? driven + ' км' : '0 км'}</strong></td>
                         <td style="color: #27ae60;">${refFuel ? refFuel + ' л' : '0'}</td>
-                        <td style="color: #c0392b;">${rowData.leftFuel || '—'}</td>
+                        <td style="color: #c0392b;">${spentF > 0 ? spentF.toFixed(1) + ' л' : (rowData.leftFuel || '—')}</td>
                         <td>${refAdBlue ? refAdBlue + ' л' : '0'}</td>
                         <td>${rowData.refuelOil || '—'}</td>
                         <td>${rowData.refuelWasher || '—'}</td>
@@ -238,8 +319,9 @@ function uploadCarDocument(input) {
     let car = getActiveReportCar();
     if (!files || files.length === 0 || !car) return;
     
+    const folderName = `Doc/${car.plate.replace(/[^a-zA-Z0-9А-Яа-яІіЇїЄє]/g, '_')}`;
     const storageKey = `car_folder_${car.id}`;
-    let folderData = { path: `Doc/car_${car.id}`, files: [] };
+    let folderData = { path: folderName, files: [] };
     
     try {
         const stored = localStorage.getItem(storageKey);
@@ -273,23 +355,29 @@ function renderCarDocuments(car) {
     const docsList = document.getElementById('car-docs-list');
     if (!docsList) return;
 
+    const folderName = `Doc/${car.plate.replace(/[^a-zA-Z0-9А-Яа-яІіЇїЄє]/g, '_')}`;
     const storageKey = `car_folder_${car.id}`;
-    let folderData = { path: `Doc/${car.plate}`, files: [] };
+    let folderData = { path: folderName, files: [] };
     try {
         const stored = localStorage.getItem(storageKey);
         if (stored) folderData = JSON.parse(stored);
     } catch(e) {}
 
-    if (folderData.files.length === 0) {
-        docsList.innerHTML = '<span style="color: #7f8c8d; font-style: italic;">Папка порожня. Документи не завантажено.</span>';
+    let headerHtml = `<div style="margin-bottom: 8px; font-weight: bold; color: #2980b9; font-size: 12px;">📁 Шлях папки: ${folderData.path}</div>`;
+
+    if (!folderData.files || folderData.files.length === 0) {
+        docsList.innerHTML = headerHtml + '<span style="color: #7f8c8d; font-style: italic;">Папка порожня. Документи не завантажено.</span>';
         return;
     }
 
-    let html = `<div style="margin-bottom: 6px; font-weight: bold; color: #2980b9;">Шлях: ${folderData.path}</div><ul style="padding-left: 15px; margin: 0;">`;
+    let html = headerHtml + '<ul style="list-style-type: none; padding: 0; margin: 0;">';
     folderData.files.forEach((doc, idx) => {
-        html += `<li style="padding: 3px 0; display: flex; justify-content: space-between; align-items: center;">
-            <span>📄 ${doc.name} (${doc.size})</span>
-            <button class="action-btn" style="padding: 2px 6px; font-size: 11px;" onclick="viewCarDoc(${car.id}, ${idx})">Переглянути</button>
+        html += `<li style="padding: 6px 0; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; color: #2980b9;" onclick="viewCarDoc(${car.id}, ${idx})">📄 <strong>${doc.name}</strong> <small style="color: #7f8c8d;">(${doc.size})</small></span>
+            <div style="display: flex; gap: 5px; flex-shrink: 0;">
+                <button class="action-btn" style="padding: 2px 6px; font-size: 11px; background-color: #2980b9;" onclick="viewCarDoc(${car.id}, ${idx})">Переглянути</button>
+                <button class="delete-row-btn" onclick="deleteCarDoc(${car.id}, ${idx})">Видалити</button>
+            </div>
         </li>`;
     });
     html += '</ul>';
@@ -304,7 +392,15 @@ function viewCarDoc(carId, index) {
             const doc = folderData.files[index];
             if (doc && doc.dataUrl) {
                 const win = window.open();
-                win.document.write(`<iframe src="${doc.dataUrl}" style="width:100%; height:100%; border:none;"></iframe>`);
+                const isImage = doc.dataUrl.startsWith('data:image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.name);
+                win.document.write(`
+                    <html>
+                        <head><title>Перегляд: ${doc.name}</title></head>
+                        <body style="margin:0; background:#222; display:flex; justify-content:center; align-items:center; height:100vh;">
+                            ${isImage ? `<img src="${doc.dataUrl}" style="max-width:100%; max-height:100%; object-fit:contain;" />` : `<iframe src="${doc.dataUrl}" style="width:100%; height:100%; border:none;"></iframe>`}
+                        </body>
+                    </html>
+                `);
             }
         }
     } catch(e) {

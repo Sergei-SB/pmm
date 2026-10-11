@@ -1,18 +1,41 @@
 // ==========================================
 // ЛОГІКА ДЕСЯТИДЕННОГО ЗВІТУ ТА ЗВІТУ ПО ПІДРОЗДІЛАХ (report.js)
+// (ПЕРЕМИКАЧІ ПЕРІОДУ ТА МІСЯЦЯ ПРЯМО В ТАБЛИЦІ ПІДРОЗДІЛІВ)
 // ==========================================
 
+let activeReportPeriod = "";
+let activeSubdivisionPeriod = "";
+let activeSubdivisionMonth = "10.2026";
+
+const UKRAINIAN_MONTH_NAMES = {
+    1: "Січень",
+    2: "Лютий",
+    3: "Березень",
+    4: "Квітень",
+    5: "Травень",
+    6: "Червень",
+    7: "Липень",
+    8: "Серпень",
+    9: "Вересень",
+    10: "Жовтень",
+    11: "Листопад",
+    12: "Грудень"
+};
+
 document.addEventListener("DOMContentLoaded", () => {
-    initPeriodDropdown();
-    restoreDirectoryHandle();
-    injectSaveButtonToHeader();
-    
-    if (typeof renderReportTable === 'function') {
-        renderReportTable();
-    }
-    if (typeof renderSubdivisionsView === 'function') {
-        renderSubdivisionsView();
-    }
+    setTimeout(() => {
+        upgradeReportControlsUI();
+        initPeriodDropdown();
+        restoreDirectoryHandle();
+        injectSaveButtonToHeader();
+        
+        if (typeof renderReportTable === 'function') {
+            renderReportTable();
+        }
+        if (typeof renderSubdivisionsView === 'function') {
+            renderSubdivisionsView();
+        }
+    }, 100);
 });
 
 let projectDirectoryHandle = null;
@@ -21,7 +44,216 @@ function isItemDestroyed(note) {
     return /знищ/ui.test(note || '');
 }
 
-// Перевірка, чи потрібно приховувати об'єкт у звіті за конкретний період
+// ==========================================
+// ЛОГІКА МІСЯЦІВ ДЛЯ РЯДКА "30 ДНІВ" У ЗВІТІ ПО ПІДРОЗДІЛАХ
+// ==========================================
+
+function getAvailableMonthsList() {
+    let months = ["10.2026"];
+
+    const now = new Date();
+    const curY = now.getFullYear();
+    const curM = now.getMonth() + 1;
+    if (curY > 2026 || (curY === 2026 && curM >= 10)) {
+        let y = 2026, m = 10;
+        let safety = 0;
+        while ((y < curY || (y === curY && m <= curM)) && safety < 24) {
+            const key = `${String(m).padStart(2, '0')}.${y}`;
+            if (!months.includes(key)) months.push(key);
+            m++;
+            if (m > 12) { m = 1; y++; }
+            safety++;
+        }
+    }
+
+    const periods = getSavedPeriodsList();
+    periods.forEach(p => {
+        if (!p || !p.includes('-')) return;
+        const startPart = p.split('-')[0].trim();
+        const parts = startPart.split('.');
+        if (parts.length >= 2) {
+            const m = parseInt(parts[1], 10);
+            if (!isNaN(m)) {
+                const y = parts[2] ? parseInt(parts[2], 10) : (m >= 10 ? 2026 : 2027);
+                const key = `${String(m).padStart(2, '0')}.${y}`;
+                if (!months.includes(key)) months.push(key);
+            }
+        }
+    });
+
+    try {
+        const stored = localStorage.getItem('app_saved_months_list');
+        if (stored) {
+            const arr = JSON.parse(stored);
+            if (Array.isArray(arr)) {
+                arr.forEach(k => {
+                    if (k && !months.includes(k)) months.push(k);
+                });
+            }
+        }
+    } catch (e) {}
+
+    months.sort((a, b) => {
+        const [mA, yA] = a.split('.').map(Number);
+        const [mB, yB] = b.split('.').map(Number);
+        return (yA * 100 + mA) - (yB * 100 + mB);
+    });
+
+    localStorage.setItem('app_saved_months_list', JSON.stringify(months));
+    return months;
+}
+
+function getNextMonthKey(monthKey) {
+    const parts = (monthKey || "10.2026").split('.');
+    let m = parseInt(parts[0], 10) || 10;
+    let y = parseInt(parts[1], 10) || 2026;
+    m++;
+    if (m > 12) {
+        m = 1;
+        y++;
+    }
+    return `${String(m).padStart(2, '0')}.${y}`;
+}
+
+function formatMonthLabel(monthKey) {
+    const parts = (monthKey || "10.2026").split('.');
+    const m = parseInt(parts[0], 10) || 10;
+    const y = parseInt(parts[1], 10) || 2026;
+    const name = UKRAINIAN_MONTH_NAMES[m] || m;
+    const mm = String(m).padStart(2, '0');
+    return y === 2026 ? `${name} (${mm})` : `${name} (${mm}.${y})`;
+}
+
+function getThreePeriodsForMonth(monthKey) {
+    const parts = (monthKey || "10.2026").split('.');
+    const m = parseInt(parts[0], 10) || 10;
+    const y = parseInt(parts[1], 10) || 2026;
+    const mm = String(m).padStart(2, '0');
+    const lastDay = new Date(y, m, 0).getDate();
+
+    const standardThree = [
+        `01.${mm}-10.${mm}`,
+        `11.${mm}-20.${mm}`,
+        `21.${mm}-${lastDay}.${mm}`
+    ];
+
+    const allPeriods = getSavedPeriodsList();
+    allPeriods.forEach(p => {
+        if (p && p.includes(`.${mm}`) && !standardThree.includes(p)) {
+            standardThree.push(p);
+        }
+    });
+
+    return standardThree;
+}
+
+window.changeSubdivisionMonth = function(val) {
+    if (!val) return;
+    activeSubdivisionMonth = val;
+    refreshActiveSubdivisionView();
+};
+
+window.navigateSubdivisionMonth = function(direction) {
+    let months = getAvailableMonthsList();
+    let idx = months.indexOf(activeSubdivisionMonth);
+    if (idx === -1) idx = 0;
+
+    let newIdx = idx + direction;
+
+    if (direction > 0 && newIdx >= months.length) {
+        const nextM = getNextMonthKey(months[months.length - 1]);
+        if (!months.includes(nextM)) {
+            months.push(nextM);
+            localStorage.setItem('app_saved_months_list', JSON.stringify(months));
+        }
+        newIdx = months.indexOf(nextM);
+    }
+
+    if (newIdx >= 0 && newIdx < months.length) {
+        activeSubdivisionMonth = months[newIdx];
+        refreshActiveSubdivisionView();
+    }
+};
+
+// Блок перемикання ПЕРІОДУ всередині клітинки "Обраний період" у таблиці підрозділів
+function buildPeriodSelectorWidgetHtml(periodsOptionsHtml, currentCustomPeriod) {
+    return `
+        <div class="card-period-box" style="display: inline-flex; align-items: center; gap: 6px; background: #ecf0f1; padding: 4px 8px; border-radius: 4px; border: 1px solid #bdc3c7; margin-top: 6px;">
+            <label style="font-weight: bold; font-size: 12px; color: #2c3e50;">Період:</label>
+            <button type="button" class="action-btn no-print" onclick="navigateSubdivisionPeriod(-1)" style="background: #34495e; padding: 3px 7px; font-size: 10px; color: white; border: none; border-radius: 3px; cursor: pointer;">◄</button>
+            <select id="sub-custom-period-select" onchange="changeSubCustomPeriod(this.value)" style="padding: 3px 6px; font-size: 12px; border-radius: 3px; border: 1px solid #7f8c8d; background: white; cursor: pointer; font-weight: bold; color: #2c3e50;">
+                ${periodsOptionsHtml}
+            </select>
+            <button type="button" class="action-btn no-print" onclick="navigateSubdivisionPeriod(1)" style="background: #34495e; padding: 3px 7px; font-size: 10px; color: white; border: none; border-radius: 3px; cursor: pointer;">►</button>
+            <input type="hidden" id="sub-custom-period-input" value="${currentCustomPeriod}">
+        </div>
+    `;
+}
+
+// Блок перемикання МІСЯЦЯ всередині клітинки "30 днів (за місяць)" у таблиці підрозділів
+function buildMonthSelectorWidgetHtml() {
+    const months = getAvailableMonthsList();
+    if (!activeSubdivisionMonth || !months.includes(activeSubdivisionMonth)) {
+        activeSubdivisionMonth = months[0] || "10.2026";
+    }
+
+    const optionsHtml = months.map(mKey => 
+        `<option value="${mKey}" ${mKey === activeSubdivisionMonth ? 'selected' : ''}>${formatMonthLabel(mKey)}</option>`
+    ).join('');
+
+    return `
+        <div class="card-period-box" style="display: inline-flex; align-items: center; gap: 6px; background: #ecf0f1; padding: 4px 8px; border-radius: 4px; border: 1px solid #bdc3c7; margin-top: 6px;">
+            <label style="font-weight: bold; font-size: 12px; color: #2c3e50;">Місяць:</label>
+            <button type="button" class="action-btn no-print" onclick="navigateSubdivisionMonth(-1)" style="background: #34495e; padding: 3px 7px; font-size: 10px; color: white; border: none; border-radius: 3px; cursor: pointer;">◄</button>
+            <select id="sub-month-select" onchange="changeSubdivisionMonth(this.value)" style="padding: 3px 6px; font-size: 12px; border-radius: 3px; border: 1px solid #7f8c8d; background: white; cursor: pointer; font-weight: bold; color: #2c3e50;">
+                ${optionsHtml}
+            </select>
+            <button type="button" class="action-btn no-print" onclick="navigateSubdivisionMonth(1)" style="background: #34495e; padding: 3px 7px; font-size: 10px; color: white; border: none; border-radius: 3px; cursor: pointer;">►</button>
+        </div>
+    `;
+}
+
+// Зверху праворуч у Звіті по підрозділах тепер залишається тільки кнопка "Друк звіту"
+function buildSubdivisionTopPrintButtonHtml() {
+    return `
+        <div class="no-print" style="position: absolute; top: 15px; right: 20px; display: flex; align-items: center; gap: 10px;">
+            <button class="action-btn print-btn" onclick="printSubdivisionReport()" style="background-color: #337ab7; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; white-space: nowrap;">
+                <span style="font-size: 14px; margin-right: 6px; vertical-align: middle;">🖨️</span> Друк звіту
+            </button>
+        </div>
+    `;
+}
+
+function upgradeReportControlsUI() {
+    const controls = document.querySelector('#report-view .report-controls');
+    if (!controls || document.getElementById('rep-nav-prev-btn')) return;
+
+    const currentPeriods = getSavedPeriodsList();
+    if (!activeReportPeriod) {
+        activeReportPeriod = (typeof activeCarPeriod !== 'undefined' && activeCarPeriod)
+            ? activeCarPeriod
+            : (currentPeriods[currentPeriods.length - 1] || "01.10-10.10");
+    }
+
+    controls.style.display = 'flex';
+    controls.style.alignItems = 'center';
+    controls.style.gap = '12px';
+
+    controls.innerHTML = `
+        <div class="card-period-box" style="display: flex; align-items: center; gap: 10px; background: #ecf0f1; padding: 6px 12px; border-radius: 4px; border: 1px solid #bdc3c7;">
+            <label style="font-weight: bold; font-size: 13px; color: #2c3e50;">Період:</label>
+            <button id="rep-nav-prev-btn" type="button" class="action-btn" onclick="navigateReportPeriod(-1)" style="background: #34495e; padding: 4px 8px; font-size: 11px; color: white; border: none; border-radius: 3px; cursor: pointer;">◄</button>
+            <select id="report-period-select" onchange="changeReportPeriod(this.value)" style="padding: 4px 8px; font-size: 13px; border-radius: 3px; border: 1px solid #7f8c8d; background: white; cursor: pointer; font-weight: bold;"></select>
+            <button id="rep-nav-next-btn" type="button" class="action-btn" onclick="navigateReportPeriod(1)" style="background: #34495e; padding: 4px 8px; font-size: 11px; color: white; border: none; border-radius: 3px; cursor: pointer;">►</button>
+        </div>
+        <input type="hidden" id="report-custom-period" value="${activeReportPeriod}">
+        <button class="action-btn" onclick="saveReportData()" style="background-color: #27ae60; font-weight: bold;">💾 Зберегти звіт</button>
+        <button id="print-ten-days-report-btn" class="action-btn print-btn" onclick="printTenDaysReport()" style="background-color: #337ab7; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; white-space: nowrap;">
+            <span style="font-size: 14px; margin-right: 6px; vertical-align: middle;">🖨️</span> Друк звіту
+        </button>
+    `;
+}
+
 function shouldHideItemInReport(itemType, itemId, itemNote, reportPeriodStr) {
     if (!isItemDestroyed(itemNote)) return false;
 
@@ -42,7 +274,6 @@ function shouldHideItemInReport(itemType, itemId, itemNote, reportPeriodStr) {
         }
     }
 
-    // Якщо дата знищення ще не введена, вважаємо поточним місяцем (жовтень 2026)
     if (!destMonth || isNaN(destMonth)) {
         destMonth = 10; 
         destYear = 2026;
@@ -63,11 +294,10 @@ function shouldHideItemInReport(itemType, itemId, itemNote, reportPeriodStr) {
         repMonth = 10;
     }
 
-    // Якщо рік звіту пізніший за рік знищення або місяць звіту пізніший за місяць знищення — приховуємо
     if (repYear > destYear) return true;
     if (repYear === destYear && repMonth > destMonth) return true;
 
-    return false; // До кінця місяця знищення залишаємо у звітах
+    return false;
 }
 
 async function restoreDirectoryHandle() {
@@ -214,90 +444,84 @@ function mergeFluidMaps(targetMap, sourceMap) {
     return targetMap;
 }
 
+// ==========================================
+// ЄДИНА СИСТЕМА ПЕРІОДІВ (ЯК У КАРТЦІ АВТО)
+// ==========================================
+
 function getStandardPeriods() {
-    return [
-        "01.10-10.10"
-    ];
+    if (typeof getSortedPeriods === 'function') {
+        return getSortedPeriods();
+    }
+    return ["01.10-10.10"];
 }
 
 function getSavedPeriodsList() {
-    let periods = getStandardPeriods();
+    if (typeof getSortedPeriods === 'function') {
+        return getSortedPeriods();
+    }
+    let periods = ["01.10-10.10"];
     try {
         const stored = localStorage.getItem('app_saved_periods_list');
         if (stored) {
             const customList = JSON.parse(stored);
-            customList.forEach(p => {
-                if (!periods.includes(p)) periods.push(p);
-            });
+            if (Array.isArray(customList)) {
+                customList.forEach(p => {
+                    if (p && p.includes('-') && parseInt(p.split('-')[0].split('.')[1], 10) >= 10 && !periods.includes(p)) {
+                        periods.push(p);
+                    }
+                });
+            }
         }
     } catch(e) {}
-    
-    for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('report_data_')) {
-            const p = key.replace('report_data_', '');
-            if (!periods.includes(p)) {
-                periods.push(p);
-            }
-        }
-    }
-
-    periods.sort((a, b) => {
-        const parseDateVal = (str) => {
-            if (!str) return 0;
-            const cleanStr = str.split('-')[0].trim();
-            const parts = cleanStr.split('.');
-            if (parts.length >= 2) {
-                const day = parseInt(parts[0]) || 0;
-                const month = parseInt(parts[1]) || 0;
-                const year = parts[2] ? parseInt(parts[2]) : 2026;
-                return year * 10000 + month * 100 + day;
-            }
-            return 0;
-        };
-        return parseDateVal(b) - parseDateVal(a);
-    });
-
     return periods;
 }
 
 function populatePeriodDropdown(selectedVal) {
+    const periods = getSavedPeriodsList();
+    const targetVal = selectedVal || activeReportPeriod || periods[periods.length - 1] || "01.10-10.10";
+
     const select = document.getElementById('report-period-select');
     if (select) {
-        const periods = getSavedPeriodsList();
-        let html = '';
-        periods.forEach(p => {
-            html += '<option value="' + p + '">' + p + '</option>';
-        });
-        html += '<option value="custom">Власний період...</option>';
-        select.innerHTML = html;
-        if (periods.includes(selectedVal)) {
-            select.value = selectedVal;
-        } else {
-            select.value = 'custom';
+        select.innerHTML = periods.map(p => `<option value="${p}" ${p === targetVal ? 'selected' : ''}>${p}</option>`).join('');
+        if (periods.includes(targetVal)) {
+            select.value = targetVal;
         }
     }
 
+    const customInput = document.getElementById('report-custom-period');
+    if (customInput && periods.includes(targetVal)) {
+        customInput.value = targetVal;
+    }
+
+    const subTargetVal = activeSubdivisionPeriod || targetVal;
     const subSelect = document.getElementById('sub-custom-period-select');
     if (subSelect) {
-        const periods = getSavedPeriodsList();
-        let html = '';
-        periods.forEach(p => {
-            html += '<option value="' + p + '">' + p + '</option>';
-        });
-        html += '<option value="custom">Власний...</option>';
-        subSelect.innerHTML = html;
-        if (periods.includes(selectedVal)) {
-            subSelect.value = selectedVal;
-        } else {
-            subSelect.value = 'custom';
+        subSelect.innerHTML = periods.map(p => `<option value="${p}" ${p === subTargetVal ? 'selected' : ''}>${p}</option>`).join('');
+        if (periods.includes(subTargetVal)) {
+            subSelect.value = subTargetVal;
         }
+    }
+
+    const subCustomInput = document.getElementById('sub-custom-period-input');
+    if (subCustomInput && periods.includes(subTargetVal)) {
+        subCustomInput.value = subTargetVal;
+    }
+
+    if (typeof initCardPeriodsSelect === 'function') {
+        initCardPeriodsSelect();
     }
 }
 
 function initPeriodDropdown() {
+    upgradeReportControlsUI();
     const periods = getSavedPeriodsList();
-    const defaultPeriod = periods.length > 0 ? periods[0] : "01.10-10.10";
+    const defaultPeriod = (typeof activeCarPeriod !== 'undefined' && periods.includes(activeCarPeriod))
+        ? activeCarPeriod
+        : (periods[periods.length - 1] || "01.10-10.10");
+
+    activeReportPeriod = defaultPeriod;
+    activeSubdivisionPeriod = defaultPeriod;
+
     populatePeriodDropdown(defaultPeriod);
     const customInput = document.getElementById('report-custom-period');
     if (customInput) customInput.value = defaultPeriod;
@@ -305,55 +529,141 @@ function initPeriodDropdown() {
     if (subCustomInput) subCustomInput.value = defaultPeriod;
 }
 
+function saveCurrentReportSilently() {
+    const periodInput = document.getElementById('report-custom-period');
+    const periodStr = periodInput ? periodInput.value.trim() : activeReportPeriod;
+    if (!periodStr) return;
+
+    const rows = document.querySelectorAll('#report-tbody tr');
+    if (rows.length === 0) return;
+
+    const storageKey = 'report_data_' + periodStr;
+    let reportData = {};
+    try {
+        const existing = localStorage.getItem(storageKey);
+        if (existing) reportData = JSON.parse(existing);
+    } catch (e) {}
+
+    rows.forEach(row => {
+        const carIdInput = row.querySelector('.report-cell-input');
+        if (carIdInput) {
+            const carId = carIdInput.getAttribute('data-car');
+            reportData[carId] = {
+                prevFuel: row.querySelector('.report-cell-input[data-field="prevFuel"]')?.value || '',
+                prevAdBlue: row.querySelector('.report-cell-input[data-field="prevAdBlue"]')?.value || '',
+                prevOdo: row.querySelector('.report-cell-input[data-field="prevOdo"]')?.value || '',
+                refuelFuel: row.querySelector('.report-cell-input[data-field="refuelFuel"]')?.value || '',
+                refuelAdBlue: row.querySelector('.report-cell-input[data-field="refuelAdBlue"]')?.value || '',
+                refuelOil: row.querySelector('.report-cell-input[data-field="refuelOil"]')?.value || '',
+                refuelWasher: row.querySelector('.report-cell-input[data-field="refuelWasher"]')?.value || '',
+                note: row.querySelector('.report-cell-input[data-field="note"]')?.value || '',
+                docNo: row.querySelector('.report-cell-input[data-field="docNo"]')?.value || '',
+                leftFuel: row.querySelector('.report-cell-input[data-field="leftFuel"]')?.value || '',
+                leftAdBlue: row.querySelector('.report-cell-input[data-field="leftAdBlue"]')?.value || '',
+                odo: row.querySelector('.report-cell-input[data-field="odo"]')?.value || ''
+            };
+        }
+    });
+
+    localStorage.setItem(storageKey, JSON.stringify(reportData));
+}
+
 function changeReportPeriod(val) {
+    if (!val) return;
+    saveCurrentReportSilently();
+    activeReportPeriod = val;
     const customInput = document.getElementById('report-custom-period');
-    if (val === 'custom') {
-        customInput.value = '';
-        customInput.focus();
-    } else {
-        customInput.value = val;
+    if (customInput) customInput.value = val;
+    updateReportHeaders();
+    renderReportTable();
+}
+
+window.navigateReportPeriod = function(direction) {
+    saveCurrentReportSilently();
+
+    let periods = getSavedPeriodsList();
+    const selectEl = document.getElementById('report-period-select');
+    let current = (selectEl && selectEl.value) ? selectEl.value : activeReportPeriod;
+    let idx = periods.indexOf(current);
+    if (idx === -1) idx = periods.length - 1;
+
+    let newIdx = idx + direction;
+
+    if (direction > 0 && newIdx >= periods.length && typeof getNextTenDayPeriod === 'function') {
+        const nextPeriod = getNextTenDayPeriod(periods[periods.length - 1]);
+        if (!periods.includes(nextPeriod)) {
+            periods.push(nextPeriod);
+            localStorage.setItem('app_saved_periods_list', JSON.stringify(periods));
+        }
+        newIdx = periods.indexOf(nextPeriod);
+    }
+
+    if (newIdx >= 0 && newIdx < periods.length) {
+        activeReportPeriod = periods[newIdx];
+        const customInput = document.getElementById('report-custom-period');
+        if (customInput) customInput.value = activeReportPeriod;
+        populatePeriodDropdown(activeReportPeriod);
         updateReportHeaders();
         renderReportTable();
     }
-}
+};
 
 function changeSubCustomPeriod(val) {
+    if (!val) return;
+    activeSubdivisionPeriod = val;
     const customInput = document.getElementById('sub-custom-period-input');
-    if (!customInput) return;
-    if (val === 'custom') {
-        customInput.value = '';
-        customInput.focus();
-    } else {
-        customInput.value = val;
-        const activeSubEl = document.querySelector('#subdivisions-buttons-container .action-btn.active-sub');
-        if (activeSubEl) {
-            const activeSubName = activeSubEl.getAttribute('data-subname');
-            if (activeSubName === 'ПОЛК') {
-                showPolkDetails();
-            } else if (activeSubName === 'НЕ ЗАДІЯНА ТЕХНІКА') {
-                showNoSubdivisionDetails();
-            } else {
-                showSubdivisionDetails(activeSubName);
-            }
-        }
-    }
+    if (customInput) customInput.value = val;
+    refreshActiveSubdivisionView();
 }
 
 function changePolkCustomPeriod(val) {
-    const customInput = document.getElementById('sub-custom-period-input');
-    if (!customInput) return;
-    if (val === 'custom') {
-        customInput.value = '';
-        customInput.focus();
-    } else {
-        customInput.value = val;
-        showPolkDetails();
+    changeSubCustomPeriod(val);
+}
+
+window.navigateSubdivisionPeriod = function(direction) {
+    let periods = getSavedPeriodsList();
+    const selectEl = document.getElementById('sub-custom-period-select');
+    let current = (selectEl && selectEl.value) ? selectEl.value : activeSubdivisionPeriod;
+    let idx = periods.indexOf(current);
+    if (idx === -1) idx = periods.length - 1;
+
+    let newIdx = idx + direction;
+
+    if (direction > 0 && newIdx >= periods.length && typeof getNextTenDayPeriod === 'function') {
+        const nextPeriod = getNextTenDayPeriod(periods[periods.length - 1]);
+        if (!periods.includes(nextPeriod)) {
+            periods.push(nextPeriod);
+            localStorage.setItem('app_saved_periods_list', JSON.stringify(periods));
+        }
+        newIdx = periods.indexOf(nextPeriod);
+    }
+
+    if (newIdx >= 0 && newIdx < periods.length) {
+        activeSubdivisionPeriod = periods[newIdx];
+        const customInput = document.getElementById('sub-custom-period-input');
+        if (customInput) customInput.value = activeSubdivisionPeriod;
+        populatePeriodDropdown(activeReportPeriod);
+        refreshActiveSubdivisionView();
+    }
+};
+
+function refreshActiveSubdivisionView() {
+    const activeSubEl = document.querySelector('#subdivisions-buttons-container .action-btn.active-sub');
+    if (activeSubEl) {
+        const activeSubName = activeSubEl.getAttribute('data-subname');
+        if (activeSubName === 'ПОЛК') {
+            showPolkDetails();
+        } else if (activeSubName === 'НЕ ЗАДІЯНА ТЕХНІКА') {
+            showNoSubdivisionDetails();
+        } else {
+            showSubdivisionDetails(activeSubName);
+        }
     }
 }
 
 function updateReportHeaders() {
     const periodInput = document.getElementById('report-custom-period');
-    const periodStr = periodInput ? periodInput.value.trim() : "01.10-10.10";
+    const periodStr = periodInput ? periodInput.value.trim() : (activeReportPeriod || "01.10-10.10");
     
     let parts = periodStr.split('-');
     let startDate = parts[0] ? parts[0].trim() : "01.10";
@@ -366,10 +676,10 @@ function updateReportHeaders() {
 
 function getPreviousPeriodKey(currentPeriod) {
     const periods = getSavedPeriodsList();
-    const cleanCurrent = currentPeriod.trim();
+    const cleanCurrent = (currentPeriod || "").trim();
     const idx = periods.indexOf(cleanCurrent);
-    if (idx !== -1 && idx < periods.length - 1) {
-        return periods[idx + 1];
+    if (idx > 0) {
+        return periods[idx - 1];
     }
     return null;
 }
@@ -418,19 +728,16 @@ function printTenDaysReport() {
 }
 
 function renderReportTable() {
+    upgradeReportControlsUI();
+    const periods = getSavedPeriodsList();
+    if (!activeReportPeriod || !periods.includes(activeReportPeriod)) {
+        activeReportPeriod = periods[periods.length - 1] || "01.10-10.10";
+    }
+    populatePeriodDropdown(activeReportPeriod);
     updateReportHeaders();
+
     const table = document.getElementById('report-table');
     if (!table) return;
-
-    const saveBtn = document.querySelector('button[onclick*="saveReportData"]') || document.querySelector('.btn-success');
-    if (saveBtn && !document.getElementById('print-ten-days-report-btn')) {
-        const printBtn = document.createElement('button');
-        printBtn.id = 'print-ten-days-report-btn';
-        printBtn.innerHTML = '<span style="font-size: 14px; margin-right: 6px; vertical-align: middle;">🖨️️</span> Друк звіту';
-        printBtn.style.cssText = 'background-color: #337ab7; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; white-space: nowrap; margin-right: 5px;';
-        printBtn.onclick = printTenDaysReport;
-        saveBtn.parentNode.insertBefore(printBtn, saveBtn.nextSibling);
-    }
     
     let tbody = document.getElementById('report-tbody');
     if (!tbody) {
@@ -441,7 +748,7 @@ function renderReportTable() {
     tbody.innerHTML = '';
 
     const periodInput = document.getElementById('report-custom-period');
-    const periodStr = periodInput ? periodInput.value.trim() : "01.10-10.10";
+    const periodStr = periodInput ? periodInput.value.trim() : activeReportPeriod;
     const storageKey = 'report_data_' + periodStr;
     
     let savedReportData = {};
@@ -482,6 +789,7 @@ function renderReportTable() {
     const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
     const filteredCars = sourceCars.filter(car => {
         if (shouldHideItemInReport('car', car.id, car.note, periodStr)) return false;
+        if (!car.plate || String(car.plate).trim() === '' || String(car.plate).trim() === '—') return false;
         if (selectedSub !== 'all' && (car.subdivision || '').trim() && normalizeSubdivision(car.subdivision) !== normalizeSubdivision(selectedSub)) {
             return false;
         }
@@ -493,42 +801,73 @@ function renderReportTable() {
         tr.setAttribute('data-fuel-type', (car.fuelType || '').toUpperCase());
         let carData = savedReportData[car.id];
 
-        if (!carData) {
-            let autoPrevFuel = '';
-            let autoPrevAdBlue = '';
-            let autoPrevOdo = '';
+        let autoPrevFuel = '';
+        let autoPrevAdBlue = '';
+        let autoPrevOdo = '';
+
+        if (prevPeriodKey) {
+            try {
+                const prevCardRaw = localStorage.getItem(`isolated_car_routes_${prevPeriodKey}_${car.id}`);
+                if (prevCardRaw) {
+                    const prevCard = JSON.parse(prevCardRaw);
+                    if (prevCard && prevCard.topFields) {
+                        if (prevCard.topFields.savedFuelLeft !== undefined && prevCard.topFields.savedFuelLeft !== '') {
+                            autoPrevFuel = prevCard.topFields.savedFuelLeft;
+                        }
+                        if (prevCard.topFields.savedAdblueLeft !== undefined && prevCard.topFields.savedAdblueLeft !== '') {
+                            autoPrevAdBlue = prevCard.topFields.savedAdblueLeft;
+                        }
+                        if (prevCard.topFields.odo2 !== undefined && prevCard.topFields.odo2 !== '') {
+                            autoPrevOdo = prevCard.topFields.odo2;
+                        }
+                    }
+                }
+            } catch (e) {}
 
             if (prevPeriodSavedData[car.id]) {
-                autoPrevFuel = prevPeriodSavedData[car.id].leftFuel || '';
-                autoPrevAdBlue = prevPeriodSavedData[car.id].leftAdBlue || '';
-                autoPrevOdo = prevPeriodSavedData[car.id].odo || '';
+                if (prevPeriodSavedData[car.id].leftFuel) autoPrevFuel = prevPeriodSavedData[car.id].leftFuel;
+                if (prevPeriodSavedData[car.id].leftAdBlue) autoPrevAdBlue = prevPeriodSavedData[car.id].leftAdBlue;
+                if (prevPeriodSavedData[car.id].odo) autoPrevOdo = prevPeriodSavedData[car.id].odo;
             }
+        }
 
+        let currCardTop = null;
+        try {
+            const currCardRaw = localStorage.getItem(`isolated_car_routes_${periodStr}_${car.id}`);
+            if (currCardRaw) {
+                const currCard = JSON.parse(currCardRaw);
+                if (currCard && currCard.topFields) currCardTop = currCard.topFields;
+            }
+        } catch (e) {}
+
+        if (!carData) {
             carData = {
-                prevFuel: autoPrevFuel,
-                prevAdBlue: autoPrevAdBlue,
-                prevOdo: autoPrevOdo,
-                refuelFuel: '',
-                refuelAdBlue: '',
+                prevFuel: autoPrevFuel !== '' ? autoPrevFuel : (currCardTop?.fuelStart || ''),
+                prevAdBlue: autoPrevAdBlue !== '' ? autoPrevAdBlue : (currCardTop?.adblueStart || ''),
+                prevOdo: autoPrevOdo !== '' ? autoPrevOdo : (currCardTop?.odo1 || ''),
+                refuelFuel: currCardTop?.fuelReceived || '',
+                refuelAdBlue: currCardTop?.adblueReceived || '',
                 refuelOil: '',
                 refuelWasher: '',
                 note: car.note || '',
                 docNo: '',
-                leftFuel: '',
-                leftAdBlue: '',
-                odo: ''
+                leftFuel: currCardTop?.savedFuelLeft || '',
+                leftAdBlue: currCardTop?.savedAdblueLeft || '',
+                odo: currCardTop?.odo2 || ''
             };
         } else {
-            if ((carData.prevFuel === '' || carData.prevFuel == null) && prevPeriodSavedData[car.id]) {
-                carData.prevFuel = prevPeriodSavedData[car.id].leftFuel || '';
+            if ((carData.prevFuel === '' || carData.prevFuel == null) && autoPrevFuel !== '') {
+                carData.prevFuel = autoPrevFuel;
             }
-            if ((carData.prevAdBlue === '' || carData.prevAdBlue == null) && prevPeriodSavedData[car.id]) {
-                carData.prevAdBlue = prevPeriodSavedData[car.id].leftAdBlue || '';
+            if ((carData.prevAdBlue === '' || carData.prevAdBlue == null) && autoPrevAdBlue !== '') {
+                carData.prevAdBlue = autoPrevAdBlue;
             }
-            if ((carData.prevOdo === '' || carData.prevOdo == null) && prevPeriodSavedData[car.id]) {
-                carData.prevOdo = prevPeriodSavedData[car.id].odo || '';
+            if ((carData.prevOdo === '' || carData.prevOdo == null) && autoPrevOdo !== '') {
+                carData.prevOdo = autoPrevOdo;
             }
         }
+
+        const noAdblueAttr = car.hasAdBlue ? '' : 'disabled data-no-adblue="true" style="background:#e0e0e0;"';
 
         tr.innerHTML = `
             <td>${index + 1}</td>
@@ -537,22 +876,25 @@ function renderReportTable() {
             <td class="rep-row-fuel-type">${car.fuelType}</td>
             <td style="text-align: left; padding-left: 10px;">${car.model}</td>
             <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="prevFuel" value="${carData.prevFuel}"></td>
-            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="prevAdBlue" value="${carData.prevAdBlue}" ${car.hasAdBlue ? '' : 'disabled style="background:#e0e0e0;"'}></td>
+            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="prevAdBlue" value="${carData.prevAdBlue}" ${noAdblueAttr}></td>
             <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="prevOdo" value="${carData.prevOdo}"></td>
             <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="refuelFuel" value="${carData.refuelFuel}"></td>
-            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="refuelAdBlue" value="${carData.refuelAdBlue}" ${car.hasAdBlue ? '' : 'disabled style="background:#e0e0e0;"'}></td>
+            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="refuelAdBlue" value="${carData.refuelAdBlue}" ${noAdblueAttr}></td>
             <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="refuelOil" value="${carData.refuelOil}"></td>
             <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="refuelWasher" value="${carData.refuelWasher}"></td>
             <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="note" value="${carData.note}"></td>
             <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="docNo" value="${carData.docNo}"></td>
             <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="leftFuel" value="${carData.leftFuel}"></td>
-            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="leftAdBlue" value="${carData.leftAdBlue}" ${car.hasAdBlue ? '' : 'disabled style="background:#e0e0e0;"'}></td>
+            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="leftAdBlue" value="${carData.leftAdBlue}" ${noAdblueAttr}></td>
             <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="odo" value="${carData.odo}"></td>
         `;
         tbody.appendChild(tr);
     });
 
     updateReportTotals();
+    if (typeof updateRoleUI === 'function') {
+        updateRoleUI();
+    }
 }
 
 function updateReportTotals() {
@@ -628,15 +970,12 @@ function updateReportTotals() {
             <td></td>
         </tr>
         <tr style="background-color: #d5f5e3; font-weight: bold; border-top: 2px solid #27ae60; border-bottom: 2px solid #27ae60;">
-            <td colspan="8" style="text-align: right; padding-right: 10px; color: #145a32;">ВСЬОГО ЗА ПЕРІУД:</td>
+            <td colspan="8" style="text-align: right; padding-right: 10px; color: #145a32;">ВСЬОГО ЗА ПЕРІОД:</td>
             <td colspan="9" style="text-align: left; padding-left: 20px; color: #2c3e50;">Пальне: <strong style="color: #27ae60;">ДП: ${dpRefF.toFixed(1)} л</strong>, <strong style="color: #2980b9;">АБ: ${abRefF.toFixed(1)} л</strong> &nbsp;|&nbsp; AdBlue: <strong>${sumRefAd.toFixed(1)} л</strong> &nbsp;|&nbsp; Мастило: <strong style="color: #8e44ad;">${formatFluidBreakdown(totalOilMap)}</strong> &nbsp;|&nbsp; Омивач: <strong>${formatFluidBreakdown(totalWasherMap)}</strong></td>
         </tr>
     `;
 }
 
-// ==========================================
-// НОРМАЛІЗАЦІЯ ПІДРОЗДІЛІВ (Об'єднання РМТЗ / PMT3)
-// ==========================================
 function normalizeSubdivision(sub) {
     if (!sub || !sub.trim()) return '';
     let trimmed = sub.trim();
@@ -654,6 +993,11 @@ function normalizeSubdivision(sub) {
 function renderSubdivisionsView() {
     const container = document.getElementById('subdivisions-buttons-container');
     if (!container) return;
+
+    const periods = getSavedPeriodsList();
+    if (!activeSubdivisionPeriod || !periods.includes(activeSubdivisionPeriod)) {
+        activeSubdivisionPeriod = periods[periods.length - 1] || "01.10-10.10";
+    }
 
     const subs = getUniqueSubdivisions();
     let html = '';
@@ -711,14 +1055,10 @@ function showSubdivisionDetails(subName) {
     if (!container) return;
 
     const periods = getSavedPeriodsList();
-    const customPeriodInput = document.getElementById('sub-custom-period-input');
-    const customPeriodSelect = document.getElementById('sub-custom-period-select');
-    
-    let currentCustomPeriod = customPeriodInput ? customPeriodInput.value.trim() : "";
-    if (!currentCustomPeriod) {
-        currentCustomPeriod = customPeriodSelect ? customPeriodSelect.value : (periods[0] || "01.10-10.10");
-        if (customPeriodInput) customPeriodInput.value = currentCustomPeriod;
+    if (!activeSubdivisionPeriod || !periods.includes(activeSubdivisionPeriod)) {
+        activeSubdivisionPeriod = periods[periods.length - 1] || "01.10-10.10";
     }
+    let currentCustomPeriod = activeSubdivisionPeriod;
 
     const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
     const subCars = sourceCars.filter(c => !shouldHideItemInReport('car', c.id, c.note, currentCustomPeriod) && c.subdivision && normalizeSubdivision(c.subdivision) === normalizeSubdivision(subName));
@@ -731,8 +1071,8 @@ function showSubdivisionDetails(subName) {
     } catch(e) {}
 
     let statsCustom = calculateSubStatsDetailed(subName, [currentCustomPeriod]);
-    let last3Periods = periods.slice(0, 3);
-    let stats30 = calculateSubStatsDetailed(subName, last3Periods);
+    let monthPeriods = getThreePeriodsForMonth(activeSubdivisionMonth);
+    let stats30 = calculateSubStatsDetailed(subName, monthPeriods);
     let statsAll = calculateSubStatsDetailed(subName, periods);
 
     let carsListHtml = subCars.length > 0 ? subCars.map(c => '<li style="margin-bottom: 4px;"><strong>' + c.plate + '</strong> — ' + c.model + ' (<span style="color: #555;">паливо: ' + c.fuelType + '</span>)</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає автомобілів</li>';
@@ -742,15 +1082,7 @@ function showSubdivisionDetails(subName) {
     let html = `
         <div id="subdivision-print-area" style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); position: relative;">
             
-            <div class="no-print" style="position: absolute; top: 20px; right: 20px; display: flex; align-items: center; gap: 8px; background: #f8f9fa; padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1;">
-                <label style="font-weight: bold; font-size: 13px; color: #2c3e50;">Період:</label>
-                <select id="sub-custom-period-select" onchange="changeSubCustomPeriod(this.value)" style="padding: 4px; font-size: 13px; border-radius: 4px; border: 1px solid #ccc; cursor: pointer;">
-                    ${periodsOptionsHtml}
-                    <option value="custom" ${!periods.includes(currentCustomPeriod) ? 'selected' : ''}>Власний...</option>
-                </select>
-                <input type="text" id="sub-custom-period-input" value="${currentCustomPeriod}" placeholder="01.10-10.10" oninput="showSubdivisionDetails('${subName}')" style="width: 100px; text-align: center; padding: 4px; font-size: 13px; border-radius: 4px; border: 1px solid #ccc;">
-                <button class="action-btn print-btn" onclick="printSubdivisionReport()" style="background-color: #337ab7; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; white-space: nowrap;"><span style="font-size: 14px; margin-right: 6px; vertical-align: middle;">🖨️</span> Друк звіту</button>
-            </div>
+            ${buildSubdivisionTopPrintButtonHtml()}
 
             <h3 style="color: #2c3e50; margin-top: 0; margin-bottom: 15px;">Підрозділ: <span style="color: #2980b9;">${subName}</span></h3>
             
@@ -772,7 +1104,7 @@ function showSubdivisionDetails(subName) {
             <table class="data-table" style="width: 100%;">
                 <thead>
                     <tr>
-                        <th style="text-align: left; width: 220px;">Період звіту / Категорія</th>
+                        <th style="text-align: left; width: 250px;">Період звіту / Категорія</th>
                         <th style="text-align: center;">Паливо ДП</th>
                         <th style="text-align: center;">Паливо АБ</th>
                         <th style="text-align: center;">AdBlue</th>
@@ -782,8 +1114,9 @@ function showSubdivisionDetails(subName) {
                 </thead>
                 <tbody>
                     <tr style="background: #eef9ff;">
-                        <td rowspan="3" style="vertical-align: middle; border-bottom: 2px solid #2980b9;">
-                            <strong style="color: #2980b9;">Обраний період</strong> <small style="color: #7f8c8d;">(${currentCustomPeriod})</small>
+                        <td rowspan="3" style="vertical-align: middle; border-bottom: 2px solid #2980b9; text-align: center;">
+                            <div><strong style="color: #2980b9;">Обраний період</strong> <small style="color: #7f8c8d;">(${currentCustomPeriod})</small></div>
+                            ${buildPeriodSelectorWidgetHtml(periodsOptionsHtml, currentCustomPeriod)}
                         </td>
                         <td style="text-align: center; color: #555; font-size: 12px;">🚗 ${statsCustom.cars.dpFuel.toFixed(1)} л</td>
                         <td style="text-align: center; color: #555; font-size: 12px;">🚗 ${statsCustom.cars.abFuel.toFixed(1)} л</td>
@@ -807,8 +1140,9 @@ function showSubdivisionDetails(subName) {
                     </tr>
 
                     <tr style="background: #fafafa;">
-                        <td rowspan="3" style="vertical-align: middle; border-bottom: 2px solid #ccc;">
-                            <strong>30 днів</strong> <small style="color: #7f8c8d;">(останні 3 періоди)</small>
+                        <td rowspan="3" style="vertical-align: middle; border-bottom: 2px solid #ccc; text-align: center;">
+                            <div><strong>30 днів</strong> <small style="color: #7f8c8d;">(за місяць)</small></div>
+                            ${buildMonthSelectorWidgetHtml()}
                         </td>
                         <td style="text-align: center; color: #555; font-size: 12px;">🚗 ${stats30.cars.dpFuel.toFixed(1)} л</td>
                         <td style="text-align: center; color: #555; font-size: 12px;">🚗 ${stats30.cars.abFuel.toFixed(1)} л</td>
@@ -880,14 +1214,10 @@ function showNoSubdivisionDetails() {
     if (!container) return;
 
     const periods = getSavedPeriodsList();
-    const customPeriodInput = document.getElementById('sub-custom-period-input');
-    const customPeriodSelect = document.getElementById('sub-custom-period-select');
-    
-    let currentCustomPeriod = customPeriodInput ? customPeriodInput.value.trim() : "";
-    if (!currentCustomPeriod) {
-        currentCustomPeriod = customPeriodSelect ? customPeriodSelect.value : (periods[0] || "01.10-10.10");
-        if (customPeriodInput) customPeriodInput.value = currentCustomPeriod;
+    if (!activeSubdivisionPeriod || !periods.includes(activeSubdivisionPeriod)) {
+        activeSubdivisionPeriod = periods[periods.length - 1] || "01.10-10.10";
     }
+    let currentCustomPeriod = activeSubdivisionPeriod;
 
     const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
     const subCars = sourceCars.filter(c => !shouldHideItemInReport('car', c.id, c.note, currentCustomPeriod) && (!c.subdivision || c.subdivision.trim() === ''));
@@ -900,8 +1230,8 @@ function showNoSubdivisionDetails() {
     } catch(e) {}
 
     let statsCustom = calculateNoSubStatsDetailed([currentCustomPeriod]);
-    let last3Periods = periods.slice(0, 3);
-    let stats30 = calculateNoSubStatsDetailed(last3Periods);
+    let monthPeriods = getThreePeriodsForMonth(activeSubdivisionMonth);
+    let stats30 = calculateNoSubStatsDetailed(monthPeriods);
     let statsAll = calculateNoSubStatsDetailed(periods);
 
     let carsListHtml = subCars.length > 0 ? subCars.map(c => '<li style="margin-bottom: 4px;"><strong>' + c.plate + '</strong> — ' + c.model + ' (<span style="color: #555;">паливо: ' + c.fuelType + '</span>)</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає не задіяних автомобілів</li>';
@@ -911,15 +1241,7 @@ function showNoSubdivisionDetails() {
     let html = `
         <div id="subdivision-print-area" style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); position: relative;">
             
-            <div class="no-print" style="position: absolute; top: 20px; right: 20px; display: flex; align-items: center; gap: 8px; background: #f8f9fa; padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1;">
-                <label style="font-weight: bold; font-size: 13px; color: #2c3e50;">Період:</label>
-                <select id="sub-custom-period-select" onchange="changeSubCustomPeriod(this.value)" style="padding: 4px; font-size: 13px; border-radius: 4px; border: 1px solid #ccc; cursor: pointer;">
-                    ${periodsOptionsHtml}
-                    <option value="custom" ${!periods.includes(currentCustomPeriod) ? 'selected' : ''}>Власний...</option>
-                </select>
-                <input type="text" id="sub-custom-period-input" value="${currentCustomPeriod}" placeholder="01.10-10.10" oninput="showNoSubdivisionDetails()" style="width: 100px; text-align: center; padding: 4px; font-size: 13px; border-radius: 4px; border: 1px solid #ccc;">
-                <button class="action-btn print-btn" onclick="printSubdivisionReport()" style="background-color: #337ab7; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; white-space: nowrap;"><span style="font-size: 14px; margin-right: 6px; vertical-align: middle;">🖨️</span> Друк звіту</button>
-            </div>
+            ${buildSubdivisionTopPrintButtonHtml()}
 
             <h3 style="color: #2c3e50; margin-top: 0; margin-bottom: 15px;">Категорія: <span style="color: #7f8c8d;">Не задіяна техніка</span></h3>
             
@@ -941,7 +1263,7 @@ function showNoSubdivisionDetails() {
             <table class="data-table" style="width: 100%;">
                 <thead>
                     <tr>
-                        <th style="text-align: left; width: 220px;">Період звіту / Категорія</th>
+                        <th style="text-align: left; width: 250px;">Період звіту / Категорія</th>
                         <th style="text-align: center;">Паливо ДП</th>
                         <th style="text-align: center;">Паливо АБ</th>
                         <th style="text-align: center;">AdBlue</th>
@@ -951,8 +1273,9 @@ function showNoSubdivisionDetails() {
                 </thead>
                 <tbody>
                     <tr style="background: #eef9ff;">
-                        <td rowspan="3" style="vertical-align: middle; border-bottom: 2px solid #2980b9;">
-                            <strong style="color: #2980b9;">Обраний період</strong> <small style="color: #7f8c8d;">(${currentCustomPeriod})</small>
+                        <td rowspan="3" style="vertical-align: middle; border-bottom: 2px solid #2980b9; text-align: center;">
+                            <div><strong style="color: #2980b9;">Обраний період</strong> <small style="color: #7f8c8d;">(${currentCustomPeriod})</small></div>
+                            ${buildPeriodSelectorWidgetHtml(periodsOptionsHtml, currentCustomPeriod)}
                         </td>
                         <td style="text-align: center; color: #555; font-size: 12px;">🚗 ${statsCustom.cars.dpFuel.toFixed(1)} л</td>
                         <td style="text-align: center; color: #555; font-size: 12px;">🚗 ${statsCustom.cars.abFuel.toFixed(1)} л</td>
@@ -976,8 +1299,9 @@ function showNoSubdivisionDetails() {
                     </tr>
 
                     <tr style="background: #fafafa;">
-                        <td rowspan="3" style="vertical-align: middle; border-bottom: 2px solid #ccc;">
-                            <strong>30 днів</strong> <small style="color: #7f8c8d;">(останні 3 періоди)</small>
+                        <td rowspan="3" style="vertical-align: middle; border-bottom: 2px solid #ccc; text-align: center;">
+                            <div><strong>30 днів</strong> <small style="color: #7f8c8d;">(за місяць)</small></div>
+                            ${buildMonthSelectorWidgetHtml()}
                         </td>
                         <td style="text-align: center; color: #555; font-size: 12px;">🚗 ${stats30.cars.dpFuel.toFixed(1)} л</td>
                         <td style="text-align: center; color: #555; font-size: 12px;">🚗 ${stats30.cars.abFuel.toFixed(1)} л</td>
@@ -1048,14 +1372,10 @@ function showPolkDetails() {
     if (!container) return;
 
     const periods = getSavedPeriodsList();
-    const customPeriodInput = document.getElementById('sub-custom-period-input');
-    const customPeriodSelect = document.getElementById('sub-custom-period-select');
-    
-    let currentCustomPeriod = customPeriodInput ? customPeriodInput.value.trim() : "";
-    if (!currentCustomPeriod) {
-        currentCustomPeriod = customPeriodSelect ? customPeriodSelect.value : (periods[0] || "01.10-10.10");
-        if (customPeriodInput) customPeriodInput.value = currentCustomPeriod;
+    if (!activeSubdivisionPeriod || !periods.includes(activeSubdivisionPeriod)) {
+        activeSubdivisionPeriod = periods[periods.length - 1] || "01.10-10.10";
     }
+    let currentCustomPeriod = activeSubdivisionPeriod;
 
     const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
     const activePolkCars = sourceCars.filter(c => !shouldHideItemInReport('car', c.id, c.note, currentCustomPeriod));
@@ -1068,8 +1388,8 @@ function showPolkDetails() {
     } catch(e) {}
 
     let statsCustom = calculatePolkStatsDetailed([currentCustomPeriod]);
-    let last3Periods = periods.slice(0, 3);
-    let stats30 = calculatePolkStatsDetailed(last3Periods);
+    let monthPeriods = getThreePeriodsForMonth(activeSubdivisionMonth);
+    let stats30 = calculatePolkStatsDetailed(monthPeriods);
     let statsAll = calculatePolkStatsDetailed(periods);
 
     let polkCarsHtml = activePolkCars.length > 0 ? activePolkCars.map(c => '<li style="margin-bottom: 4px;"><strong>' + c.plate + '</strong> — ' + c.model + ' (<span style="color: #2980b9; font-weight: bold;">' + (c.subdivision || 'Без підрозділу') + '</span>, паливо: ' + c.fuelType + ')</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає техніки</li>';
@@ -1079,15 +1399,7 @@ function showPolkDetails() {
     let html = `
         <div id="subdivision-print-area" style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); position: relative;">
             
-            <div class="no-print" style="position: absolute; top: 20px; right: 20px; display: flex; align-items: center; gap: 8px; background: #f8f9fa; padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1;">
-                <label style="font-weight: bold; font-size: 13px; color: #2c3e50;">Період:</label>
-                <select id="sub-custom-period-select" onchange="changePolkCustomPeriod(this.value)" style="padding: 4px; font-size: 13px; border-radius: 4px; border: 1px solid #ccc; cursor: pointer;">
-                    ${periodsOptionsHtml}
-                    <option value="custom" ${!periods.includes(currentCustomPeriod) ? 'selected' : ''}>Власний...</option>
-                </select>
-                <input type="text" id="sub-custom-period-input" value="${currentCustomPeriod}" placeholder="01.10-10.10" oninput="showPolkDetails()" style="width: 100px; text-align: center; padding: 4px; font-size: 13px; border-radius: 4px; border: 1px solid #ccc;">
-                <button class="action-btn print-btn" onclick="printSubdivisionReport()" style="background-color: #337ab7; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; white-space: nowrap;"><span style="font-size: 14px; margin-right: 6px; vertical-align: middle;">🖨️</span> Друк звіту</button>
-            </div>
+            ${buildSubdivisionTopPrintButtonHtml()}
 
             <h3 style="color: #2c3e50; margin-top: 0; margin-bottom: 15px;">Зведений звіт по всьому <span style="color: #8e44ad;">ПОЛКУ</span></h3>
             
@@ -1109,7 +1421,7 @@ function showPolkDetails() {
             <table class="data-table" style="width: 100%;">
                 <thead>
                     <tr>
-                        <th style="text-align: left; width: 220px;">Період звіту / Категорія</th>
+                        <th style="text-align: left; width: 250px;">Період звіту / Категорія</th>
                         <th style="text-align: center;">Паливо ДП</th>
                         <th style="text-align: center;">Паливо АБ</th>
                         <th style="text-align: center;">AdBlue</th>
@@ -1119,8 +1431,9 @@ function showPolkDetails() {
                 </thead>
                 <tbody>
                     <tr style="background: #eef9ff;">
-                        <td rowspan="3" style="vertical-align: middle; border-bottom: 2px solid #2980b9;">
-                            <strong style="color: #2980b9;">Обраний період</strong> <small style="color: #7f8c8d;">(${currentCustomPeriod})</small>
+                        <td rowspan="3" style="vertical-align: middle; border-bottom: 2px solid #2980b9; text-align: center;">
+                            <div><strong style="color: #2980b9;">Обраний період</strong> <small style="color: #7f8c8d;">(${currentCustomPeriod})</small></div>
+                            ${buildPeriodSelectorWidgetHtml(periodsOptionsHtml, currentCustomPeriod)}
                         </td>
                         <td style="text-align: center; color: #555; font-size: 12px;">🚗 ${statsCustom.cars.dpFuel.toFixed(1)} л</td>
                         <td style="text-align: center; color: #555; font-size: 12px;">🚗 ${statsCustom.cars.abFuel.toFixed(1)} л</td>
@@ -1144,8 +1457,9 @@ function showPolkDetails() {
                     </tr>
 
                     <tr style="background: #fafafa;">
-                        <td rowspan="3" style="vertical-align: middle; border-bottom: 2px solid #ccc;">
-                            <strong>30 днів</strong> <small style="color: #7f8c8d;">(останні 3 періоди)</small>
+                        <td rowspan="3" style="vertical-align: middle; border-bottom: 2px solid #ccc; text-align: center;">
+                            <div><strong>30 днів</strong> <small style="color: #7f8c8d;">(за місяць)</small></div>
+                            ${buildMonthSelectorWidgetHtml()}
                         </td>
                         <td style="text-align: center; color: #555; font-size: 12px;">🚗 ${stats30.cars.dpFuel.toFixed(1)} л</td>
                         <td style="text-align: center; color: #555; font-size: 12px;">🚗 ${stats30.cars.abFuel.toFixed(1)} л</td>
@@ -1249,30 +1563,46 @@ function calculateSubStatsDetailed(subName, periodList) {
             }
         } catch(e) {}
 
+        let repData = {};
         try {
             const stored = localStorage.getItem('report_data_' + p);
-            if (stored) {
-                const data = JSON.parse(stored);
-                subCars.forEach(car => {
-                    if (data[car.id]) {
-                        const refFuel = evaluateExpression(data[car.id].refuelFuel);
-                        const fType = (car.fuelType || '').toUpperCase();
-                        if (fType.includes('ДП')) {
-                            carsStat.dpFuel += refFuel;
-                        } else {
-                            carsStat.abFuel += refFuel;
-                        }
-                        carsStat.adblue += evaluateExpression(data[car.id].refuelAdBlue);
-                        
-                        let oilParsed = parseFluidEntries(data[car.id].refuelOil);
-                        mergeFluidMaps(carsStat.oilMap, oilParsed);
-
-                        let washerParsed = parseFluidEntries(data[car.id].refuelWasher);
-                        mergeFluidMaps(carsStat.washerMap, washerParsed);
-                    }
-                });
-            }
+            if (stored) repData = JSON.parse(stored);
         } catch(e) {}
+
+        subCars.forEach(car => {
+            let carRec = repData[car.id];
+            if (!carRec) {
+                try {
+                    const cardRaw = localStorage.getItem(`isolated_car_routes_${p}_${car.id}`);
+                    if (cardRaw) {
+                        const cardObj = JSON.parse(cardRaw);
+                        if (cardObj && cardObj.topFields) {
+                            carRec = {
+                                refuelFuel: cardObj.topFields.fuelReceived || '',
+                                refuelAdBlue: cardObj.topFields.adblueReceived || ''
+                            };
+                        }
+                    }
+                } catch (e) {}
+            }
+
+            if (carRec) {
+                const refFuel = evaluateExpression(carRec.refuelFuel);
+                const fType = (car.fuelType || '').toUpperCase();
+                if (fType.includes('ДП')) {
+                    carsStat.dpFuel += refFuel;
+                } else {
+                    carsStat.abFuel += refFuel;
+                }
+                carsStat.adblue += evaluateExpression(carRec.refuelAdBlue);
+                
+                let oilParsed = parseFluidEntries(carRec.refuelOil);
+                mergeFluidMaps(carsStat.oilMap, oilParsed);
+
+                let washerParsed = parseFluidEntries(carRec.refuelWasher);
+                mergeFluidMaps(carsStat.washerMap, washerParsed);
+            }
+        });
 
         try {
             const eqStored = localStorage.getItem('equipment_report_data_' + p);
@@ -1337,30 +1667,46 @@ function calculateNoSubStatsDetailed(periodList) {
             }
         } catch(e) {}
 
+        let repData = {};
         try {
             const stored = localStorage.getItem('report_data_' + p);
-            if (stored) {
-                const data = JSON.parse(stored);
-                subCars.forEach(car => {
-                    if (data[car.id]) {
-                        const refFuel = evaluateExpression(data[car.id].refuelFuel);
-                        const fType = (car.fuelType || '').toUpperCase();
-                        if (fType.includes('ДП')) {
-                            carsStat.dpFuel += refFuel;
-                        } else {
-                            carsStat.abFuel += refFuel;
-                        }
-                        carsStat.adblue += evaluateExpression(data[car.id].refuelAdBlue);
-                        
-                        let oilParsed = parseFluidEntries(data[car.id].refuelOil);
-                        mergeFluidMaps(carsStat.oilMap, oilParsed);
-
-                        let washerParsed = parseFluidEntries(data[car.id].refuelWasher);
-                        mergeFluidMaps(carsStat.washerMap, washerParsed);
-                    }
-                });
-            }
+            if (stored) repData = JSON.parse(stored);
         } catch(e) {}
+
+        subCars.forEach(car => {
+            let carRec = repData[car.id];
+            if (!carRec) {
+                try {
+                    const cardRaw = localStorage.getItem(`isolated_car_routes_${p}_${car.id}`);
+                    if (cardRaw) {
+                        const cardObj = JSON.parse(cardRaw);
+                        if (cardObj && cardObj.topFields) {
+                            carRec = {
+                                refuelFuel: cardObj.topFields.fuelReceived || '',
+                                refuelAdBlue: cardObj.topFields.adblueReceived || ''
+                            };
+                        }
+                    }
+                } catch (e) {}
+            }
+
+            if (carRec) {
+                const refFuel = evaluateExpression(carRec.refuelFuel);
+                const fType = (car.fuelType || '').toUpperCase();
+                if (fType.includes('ДП')) {
+                    carsStat.dpFuel += refFuel;
+                } else {
+                    carsStat.abFuel += refFuel;
+                }
+                carsStat.adblue += evaluateExpression(carRec.refuelAdBlue);
+                
+                let oilParsed = parseFluidEntries(carRec.refuelOil);
+                mergeFluidMaps(carsStat.oilMap, oilParsed);
+
+                let washerParsed = parseFluidEntries(carRec.refuelWasher);
+                mergeFluidMaps(carsStat.washerMap, washerParsed);
+            }
+        });
 
         try {
             const eqStored = localStorage.getItem('equipment_report_data_' + p);
@@ -1425,30 +1771,46 @@ function calculatePolkStatsDetailed(periodList) {
             }
         } catch(e) {}
 
+        let repData = {};
         try {
             const stored = localStorage.getItem('report_data_' + p);
-            if (stored) {
-                const data = JSON.parse(stored);
-                activePolkCars.forEach(car => {
-                    if (data[car.id]) {
-                        const refFuel = evaluateExpression(data[car.id].refuelFuel);
-                        const fType = (car.fuelType || '').toUpperCase();
-                        if (fType.includes('ДП')) {
-                            carsStat.dpFuel += refFuel;
-                        } else {
-                            carsStat.abFuel += refFuel;
-                        }
-                        carsStat.adblue += evaluateExpression(data[car.id].refuelAdBlue);
-
-                        let oilParsed = parseFluidEntries(data[car.id].refuelOil);
-                        mergeFluidMaps(carsStat.oilMap, oilParsed);
-
-                        let washerParsed = parseFluidEntries(data[car.id].refuelWasher);
-                        mergeFluidMaps(carsStat.washerMap, washerParsed);
-                    }
-                });
-            }
+            if (stored) repData = JSON.parse(stored);
         } catch(e) {}
+
+        activePolkCars.forEach(car => {
+            let carRec = repData[car.id];
+            if (!carRec) {
+                try {
+                    const cardRaw = localStorage.getItem(`isolated_car_routes_${p}_${car.id}`);
+                    if (cardRaw) {
+                        const cardObj = JSON.parse(cardRaw);
+                        if (cardObj && cardObj.topFields) {
+                            carRec = {
+                                refuelFuel: cardObj.topFields.fuelReceived || '',
+                                refuelAdBlue: cardObj.topFields.adblueReceived || ''
+                            };
+                        }
+                    }
+                } catch (e) {}
+            }
+
+            if (carRec) {
+                const refFuel = evaluateExpression(carRec.refuelFuel);
+                const fType = (car.fuelType || '').toUpperCase();
+                if (fType.includes('ДП')) {
+                    carsStat.dpFuel += refFuel;
+                } else {
+                    carsStat.abFuel += refFuel;
+                }
+                carsStat.adblue += evaluateExpression(carRec.refuelAdBlue);
+
+                let oilParsed = parseFluidEntries(carRec.refuelOil);
+                mergeFluidMaps(carsStat.oilMap, oilParsed);
+
+                let washerParsed = parseFluidEntries(carRec.refuelWasher);
+                mergeFluidMaps(carsStat.washerMap, washerParsed);
+            }
+        });
 
         try {
             const eqStored = localStorage.getItem('equipment_report_data_' + p);
@@ -1521,7 +1883,6 @@ function importDataFromJson(input) {
 }
 
 function transferDataToReport() {
-    // Визначаємо активний ID автомобіля з усіх можливих глобальних змінних
     let targetCarId = (typeof currentCarId !== 'undefined' && currentCarId) ? currentCarId : 
                       ((typeof activeDetailCarId !== 'undefined' && activeDetailCarId) ? activeDetailCarId : null);
 
@@ -1530,13 +1891,23 @@ function transferDataToReport() {
         return;
     }
 
-    const periodStr = document.getElementById('report-custom-period')?.value.trim() || "01.10-10.10";
-    
+    const cardPeriodSelect = document.getElementById('card-period-select');
+    const periodStr = (cardPeriodSelect && cardPeriodSelect.value) 
+        ? cardPeriodSelect.value.trim() 
+        : (document.getElementById('report-custom-period')?.value.trim() || "01.10-10.10");
+
+    if (typeof saveCarRoutesForPeriod === 'function') {
+        saveCarRoutesForPeriod(periodStr, targetCarId);
+    }
+
     let periods = getSavedPeriodsList();
     if (!periods.includes(periodStr)) {
         periods.push(periodStr);
         localStorage.setItem('app_saved_periods_list', JSON.stringify(periods));
     }
+
+    activeReportPeriod = periodStr;
+    activeSubdivisionPeriod = periodStr;
     populatePeriodDropdown(periodStr);
 
     const storageKey = 'report_data_' + periodStr;
@@ -1548,37 +1919,23 @@ function transferDataToReport() {
         console.error(e);
     }
 
+    const fuelStart = document.getElementById('fuel-start')?.value || '';
+    const adblueStart = document.getElementById('adblue-start')?.value || '';
+    const startOdo = document.getElementById('odo-1')?.value || '';
     const fuelReceived = document.getElementById('fuel-received')?.value || '';
     const adblueReceived = document.getElementById('adblue-received')?.value || '';
-    const fuelLeft = document.getElementById('fuel-left')?.textContent || '';
-    const adblueLeft = document.getElementById('adblue-left')?.textContent || '';
-    const finalOdo = document.getElementById('odo-2')?.value || '';
+    const fuelLeft = document.getElementById('fuel-left')?.textContent?.trim() || '';
+    const adblueLeft = document.getElementById('adblue-left')?.textContent?.trim() || '';
+    const finalOdo = document.getElementById('odo-2')?.value || startOdo || '';
+
+    const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
+    const car = sourceCars.find(c => Number(c.id) === Number(targetCarId));
 
     if (!savedReportData[targetCarId]) {
-        let autoPrevFuel = '';
-        let autoPrevAdBlue = '';
-        let autoPrevOdo = '';
-        const prevPeriodKey = getPreviousPeriodKey(periodStr);
-        if (prevPeriodKey) {
-            try {
-                const storedPrev = localStorage.getItem('report_data_' + prevPeriodKey);
-                if (storedPrev) {
-                    const prevData = JSON.parse(storedPrev);
-                    if (prevData[targetCarId]) {
-                        autoPrevFuel = prevData[targetCarId].leftFuel || '';
-                        autoPrevAdBlue = prevData[targetCarId].leftAdBlue || '';
-                        autoPrevOdo = prevData[targetCarId].odo || '';
-                    }
-                }
-            } catch(e) {}
-        }
-
-        const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
-        const car = sourceCars.find(c => Number(c.id) === Number(targetCarId));
         savedReportData[targetCarId] = {
-            prevFuel: autoPrevFuel,
-            prevAdBlue: autoPrevAdBlue,
-            prevOdo: autoPrevOdo,
+            prevFuel: fuelStart,
+            prevAdBlue: adblueStart,
+            prevOdo: startOdo,
             refuelFuel: '',
             refuelAdBlue: '',
             refuelOil: '',
@@ -1589,98 +1946,41 @@ function transferDataToReport() {
             leftAdBlue: '',
             odo: ''
         };
+    } else {
+        if (fuelStart !== '') savedReportData[targetCarId].prevFuel = fuelStart;
+        if (adblueStart !== '') savedReportData[targetCarId].prevAdBlue = adblueStart;
+        if (startOdo !== '') savedReportData[targetCarId].prevOdo = startOdo;
     }
 
     savedReportData[targetCarId].refuelFuel = fuelReceived;
     if (adblueReceived !== '') {
         savedReportData[targetCarId].refuelAdBlue = adblueReceived;
     }
-    if (fuelLeft && fuelLeft !== '0.0') {
+    if (fuelLeft !== '') {
         savedReportData[targetCarId].leftFuel = fuelLeft;
     }
-    if (adblueLeft && adblueLeft !== '0.0') {
+    if (adblueLeft !== '' && car && car.hasAdBlue) {
         savedReportData[targetCarId].leftAdBlue = adblueLeft;
     }
-    if (finalOdo) {
+    if (finalOdo !== '') {
         savedReportData[targetCarId].odo = finalOdo;
     }
 
     localStorage.setItem(storageKey, JSON.stringify(savedReportData));
 
-    const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
-    const currentCar = sourceCars.find(c => Number(c.id) === Number(targetCarId));
-    const carName = currentCar ? currentCar.plate + ' (' + currentCar.model + ')' : 'автомобіля';
-    
+    const carName = car ? car.plate + ' (' + car.model + ')' : 'автомобіля';
     alert('Дані для ' + carName + ' успішно перенесено у звіт за період "' + periodStr + '"!');
 }
 
 function saveReportData() {
-    const periodStr = document.getElementById('report-custom-period').value.trim() || "01.10-10.10";
-    
-    let periods = getSavedPeriodsList();
-    if (!periods.includes(periodStr)) {
-        periods.push(periodStr);
-        localStorage.setItem('app_saved_periods_list', JSON.stringify(periods));
-    }
-    populatePeriodDropdown(periodStr);
-
-    const storageKey = 'report_data_' + periodStr;
-    const rows = document.querySelectorAll('#report-tbody tr');
-    let reportData = {};
-
-    rows.forEach(row => {
-        const carIdInput = row.querySelector('.report-cell-input');
-        if (carIdInput) {
-            const carId = carIdInput.getAttribute('data-car');
-            reportData[carId] = {
-                prevFuel: row.querySelector('.report-cell-input[data-field="prevFuel"]')?.value || '',
-                prevAdBlue: row.querySelector('.report-cell-input[data-field="prevAdBlue"]')?.value || '',
-                prevOdo: row.querySelector('.report-cell-input[data-field="prevOdo"]')?.value || '',
-                refuelFuel: row.querySelector('.report-cell-input[data-field="refuelFuel"]')?.value || '',
-                refuelAdBlue: row.querySelector('.report-cell-input[data-field="refuelAdBlue"]')?.value || '',
-                refuelOil: row.querySelector('.report-cell-input[data-field="refuelOil"]')?.value || '',
-                refuelWasher: row.querySelector('.report-cell-input[data-field="refuelWasher"]')?.value || '',
-                note: row.querySelector('.report-cell-input[data-field="note"]')?.value || '',
-                docNo: row.querySelector('.report-cell-input[data-field="docNo"]')?.value || '',
-                leftFuel: row.querySelector('.report-cell-input[data-field="leftFuel"]')?.value || '',
-                leftAdBlue: row.querySelector('.report-cell-input[data-field="leftAdBlue"]')?.value || '',
-                odo: row.querySelector('.report-cell-input[data-field="odo"]')?.value || ''
-            };
-        }
-    });
-
-    localStorage.setItem(storageKey, JSON.stringify(reportData));
+    saveCurrentReportSilently();
+    const periodStr = document.getElementById('report-custom-period')?.value.trim() || activeReportPeriod || "01.10-10.10";
     alert('Звіт за період "' + periodStr + '" успішно збережено!');
 }
 
 document.addEventListener('input', function(e) {
     if (e.target.classList.contains('report-cell-input')) {
-        const periodStr = document.getElementById('report-custom-period').value.trim() || "01.10-10.10";
-        const storageKey = 'report_data_' + periodStr;
-        const rows = document.querySelectorAll('#report-tbody tr');
-        let reportData = {};
-
-        rows.forEach(row => {
-            const carIdInput = row.querySelector('.report-cell-input');
-            if (carIdInput) {
-                const carId = carIdInput.getAttribute('data-car');
-                reportData[carId] = {
-                    prevFuel: row.querySelector('.report-cell-input[data-field="prevFuel"]')?.value || '',
-                    prevAdBlue: row.querySelector('.report-cell-input[data-field="prevAdBlue"]')?.value || '',
-                    prevOdo: row.querySelector('.report-cell-input[data-field="prevOdo"]')?.value || '',
-                    refuelFuel: row.querySelector('.report-cell-input[data-field="refuelFuel"]')?.value || '',
-                    refuelAdBlue: row.querySelector('.report-cell-input[data-field="refuelAdBlue"]')?.value || '',
-                    refuelOil: row.querySelector('.report-cell-input[data-field="refuelOil"]')?.value || '',
-                    refuelWasher: row.querySelector('.report-cell-input[data-field="refuelWasher"]')?.value || '',
-                    note: row.querySelector('.report-cell-input[data-field="note"]')?.value || '',
-                    docNo: row.querySelector('.report-cell-input[data-field="docNo"]')?.value || '',
-                    leftFuel: row.querySelector('.report-cell-input[data-field="leftFuel"]')?.value || '',
-                    leftAdBlue: row.querySelector('.report-cell-input[data-field="leftAdBlue"]')?.value || '',
-                    odo: row.querySelector('.report-cell-input[data-field="odo"]')?.value || ''
-                };
-            }
-        });
-        localStorage.setItem(storageKey, JSON.stringify(reportData));
+        saveCurrentReportSilently();
         updateReportTotals();
     }
 });

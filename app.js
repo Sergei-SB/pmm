@@ -11,7 +11,7 @@ let activeDetailCarId = null;
 
 document.addEventListener("DOMContentLoaded", () => {
     loadCarsModifications();
-    renderCarsTable();
+    filterCarsByCategory('all');
     populateCarSelector();
     injectCardPrintButton();
     initDestroyedViewFeature();
@@ -272,6 +272,9 @@ function saveCarsModificationsToStorage() {
         };
     });
     localStorage.setItem('cars_modifications_data', JSON.stringify(mods));
+    if (typeof saveCarsToStorage === 'function') {
+        saveCarsToStorage();
+    }
 }
 
 function fmt(val, decimals = 2) {
@@ -318,7 +321,7 @@ function switchView(viewName) {
     if (viewName === 'base') {
         document.getElementById('base-view').classList.add('active');
         if (navButtons[0]) navButtons[0].classList.add('active');
-        if (topSearchBox) topSearchBox.style.display = 'block';
+        if (topSearchBox) topSearchBox.style.display = 'flex';
         renderCarsTable(); 
     } else if (viewName === 'card') {
         document.getElementById('card-view').classList.add('active');
@@ -339,8 +342,6 @@ function switchView(viewName) {
     } else if (viewName === 'generators') {
         document.getElementById('generators-view').classList.add('active');
         if (topSearchBox) topSearchBox.style.display = 'none';
-        
-        // Примусово відкриваємо вкладку генераторів при кожному вході в розділ
         if (typeof switchEquipmentTab === 'function') {
             switchEquipmentTab('generators');
         } else if (typeof renderGeneratorsView === 'function') {
@@ -359,14 +360,9 @@ function switchView(viewName) {
         if (typeof renderEquipmentReportView === 'function') {
             renderEquipmentReportView();
         }
-    } else if (viewName === 'destroyed-view') {
+    } else if (viewName === 'destroyed-view' || viewName === 'destroyed') {
         const destView = document.getElementById('destroyed-view');
         if (destView) destView.classList.add('active');
-        navButtons.forEach(btn => {
-            if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes('destroyed-view')) {
-                btn.classList.add('active');
-            }
-        });
         if (topSearchBox) topSearchBox.style.display = 'none';
         if (typeof renderDestroyedEquipmentView === 'function') {
             renderDestroyedEquipmentView();
@@ -386,16 +382,12 @@ function getAllEquipmentItemsUnified() {
     if (Array.isArray(genArr)) {
         genArr.forEach((item, index) => {
             const uid = 'gen_' + (item.id !== undefined ? item.id : index);
-            let note = item.note || '';
-            let subdivision = item.locationSubdivision || item.subdivision || '';
-            let model = item.model || item.name || 'Генератор #' + (index + 1);
-            
             items.push({
                 uniqueId: uid,
                 category: 'Генератор',
-                model: model,
-                subdivision: subdivision,
-                note: note,
+                model: item.model || item.name || 'Генератор #' + (index + 1),
+                subdivision: item.locationSubdivision || item.subdivision || '',
+                note: item.note || '',
                 rawItem: item,
                 arrayType: 'generators'
             });
@@ -408,16 +400,12 @@ function getAllEquipmentItemsUnified() {
     if (Array.isArray(webArr)) {
         webArr.forEach((item, index) => {
             const uid = 'web_' + (item.id !== undefined ? item.id : index);
-            let note = item.note || '';
-            let subdivision = item.locationSubdivision || item.subdivision || '';
-            let model = item.model || item.name || 'Webasto #' + (index + 1);
-
             items.push({
                 uniqueId: uid,
                 category: 'Webasto',
-                model: model,
-                subdivision: subdivision,
-                note: note,
+                model: item.model || item.name || 'Webasto #' + (index + 1),
+                subdivision: item.locationSubdivision || item.subdivision || '',
+                note: item.note || '',
                 rawItem: item,
                 arrayType: 'webasto'
             });
@@ -430,16 +418,12 @@ function getAllEquipmentItemsUnified() {
     if (Array.isArray(heatArr)) {
         heatArr.forEach((item, index) => {
             const uid = 'heat_' + (item.id !== undefined ? item.id : index);
-            let note = item.note || '';
-            let subdivision = item.locationSubdivision || item.subdivision || '';
-            let model = item.model || item.name || 'Пушка #' + (index + 1);
-
             items.push({
                 uniqueId: uid,
                 category: 'Теплова пушка',
-                model: model,
-                subdivision: subdivision,
-                note: note,
+                model: item.model || item.name || 'Пушка #' + (index + 1),
+                subdivision: item.locationSubdivision || item.subdivision || '',
+                note: item.note || '',
                 rawItem: item,
                 arrayType: 'heaters'
             });
@@ -452,16 +436,12 @@ function getAllEquipmentItemsUnified() {
     if (Array.isArray(sawArr)) {
         sawArr.forEach((item, index) => {
             const uid = 'saw_' + (item.id !== undefined ? item.id : index);
-            let note = item.note || '';
-            let subdivision = item.locationSubdivision || item.subdivision || '';
-            let model = item.model || item.name || 'Пила #' + (index + 1);
-
             items.push({
                 uniqueId: uid,
                 category: 'Бензопила',
-                model: model,
-                subdivision: subdivision,
-                note: note,
+                model: item.model || item.name || 'Пила #' + (index + 1),
+                subdivision: item.locationSubdivision || item.subdivision || '',
+                note: item.note || '',
                 rawItem: item,
                 arrayType: 'chainsaws'
             });
@@ -471,36 +451,17 @@ function getAllEquipmentItemsUnified() {
     return items;
 }
 
-function filterCarsByCategory(category) {
-    currentCategoryFilter = category;
-    
-    document.getElementById('btn-cat-all')?.classList.remove('active');
-    document.getElementById('btn-cat-car')?.classList.remove('active');
-    document.getElementById('btn-cat-truck')?.classList.remove('active');
-    document.getElementById('btn-cat-moto')?.classList.remove('active');
-    document.getElementById('btn-cat-quad')?.classList.remove('active');
-
-    if (category === 'all') document.getElementById('btn-cat-all')?.classList.add('active');
-    if (category === 'легковий') document.getElementById('btn-cat-car')?.classList.add('active');
-    if (category === 'вантажний') document.getElementById('btn-cat-truck')?.classList.add('active');
-    if (category === 'мотоцикл') document.getElementById('btn-cat-moto')?.classList.add('active');
-    if (category === 'квадроцикл') document.getElementById('btn-cat-quad')?.classList.add('active');
-
-    const searchInput = document.getElementById('base-search-input');
-    renderCarsTable(searchInput ? searchInput.value : '');
-}
-
+// Перевірка, чи є авто вантажним
 function isCarTruck(car) {
     if (!car) return false;
-    const carId = Number(car.id);
-    if (carId === 2 || carId === 3 || carId === 8 || carId === 9) return true;
-    
-    const vType = String(car.vehicleType || "").toLowerCase();
-    const cat = String(car.category || "").toLowerCase();
+    const vType = String(car.vehicleType || "").toLowerCase().trim();
+    if (vType === 'легковий' || vType === 'мотоцикл' || vType === 'квадроцикл') return false;
+    if (vType.includes("вантаж")) return true;
+
+    const cat = String(car.category || "").toLowerCase().trim();
     const model = String(car.model || "").toLowerCase();
     
     return (
-        vType.includes("вантаж") || 
         cat === "truck" || 
         cat === "minibus" || 
         cat === "special" ||
@@ -514,15 +475,51 @@ function isCarTruck(car) {
     );
 }
 
+// Точне визначення групи автомобіля для фільтрації кнопками
 function getCarGroup(car) {
     if (!car) return 'легковий';
-    const vType = String(car.vehicleType || "").toLowerCase();
-    const cat = String(car.category || "").toLowerCase();
+    const vType = String(car.vehicleType || "").toLowerCase().trim();
+    const cat = String(car.category || "").toLowerCase().trim();
     
     if (vType === 'мотоцикл' || cat === 'motorcycle') return 'мотоцикл';
     if (vType === 'квадроцикл' || cat === 'quad') return 'квадроцикл';
+    if (vType === 'вантажний' || cat === 'truck') return 'вантажний';
+    if (vType === 'легковий' || cat === 'passenger') return 'легковий';
     if (isCarTruck(car)) return 'вантажний';
     return 'легковий';
+}
+
+// Фільтрація кнопками: Усі / Легкові / Вантажні / Мотоцикли / Квадроцикли
+function filterCarsByCategory(category) {
+    currentCategoryFilter = category;
+    
+    const btnMap = {
+        'all': 'btn-cat-all',
+        'легковий': 'btn-cat-car',
+        'вантажний': 'btn-cat-truck',
+        'мотоцикл': 'btn-cat-moto',
+        'квадроцикл': 'btn-cat-quad'
+    };
+
+    Object.keys(btnMap).forEach(key => {
+        const btn = document.getElementById(btnMap[key]);
+        if (btn) {
+            if (key === category) {
+                btn.classList.add('active');
+                btn.style.backgroundColor = '#1b5e20';
+                btn.style.boxShadow = 'inset 0 2px 4px rgba(0,0,0,0.4)';
+                btn.style.border = '1px solid #fff';
+            } else {
+                btn.classList.remove('active');
+                btn.style.backgroundColor = '#27ae60';
+                btn.style.boxShadow = 'none';
+                btn.style.border = 'none';
+            }
+        }
+    });
+
+    const searchInput = document.getElementById('base-search-input');
+    renderCarsTable(searchInput ? searchInput.value : '');
 }
 
 function updateCarVehicleType(carId, newType) {
@@ -540,6 +537,7 @@ function updateCarVehicleType(carId, newType) {
     }
 }
 
+// Рендеринг таблиці Реєстру транспортних засобів із підтримкою всіх фільтрів
 function renderCarsTable(filterQuery = '') {
     const tbody = document.getElementById('cars-tbody');
     if (!tbody) return;
@@ -548,13 +546,16 @@ function renderCarsTable(filterQuery = '') {
     const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
     if (safeCars.length === 0) return;
 
+    // 1. Фільтр за підрозділом
     const subFilterEl = document.getElementById('base-subdivision-filter');
     const currentSubVal = subFilterEl ? subFilterEl.value : 'all';
 
     if (subFilterEl) {
         const subs = new Set();
         safeCars.forEach(c => { 
-            if (c.subdivision) subs.add(c.subdivision.trim()); 
+            if (!isItemDestroyed(c.note) && c.subdivision && c.subdivision.trim() !== '') {
+                subs.add(c.subdivision.trim()); 
+            }
         });
         let opts = '<option value="all">Усі</option>';
         subs.forEach(sub => {
@@ -567,15 +568,55 @@ function renderCarsTable(filterQuery = '') {
     }
     const selectedSub = subFilterEl ? subFilterEl.value : 'all';
 
+    // 2. Фільтр за номером авто
+    const plateFilterEl = document.getElementById('base-plate-filter');
+    const currentPlateVal = plateFilterEl ? plateFilterEl.value : 'all';
+
+    if (plateFilterEl) {
+        const plates = new Set();
+        safeCars.forEach(c => {
+            if (!isItemDestroyed(c.note) && c.plate && c.plate.trim() !== '') {
+                plates.add(c.plate.trim());
+            }
+        });
+        let pOpts = '<option value="all">Усі</option>';
+        plates.forEach(p => {
+            pOpts += `<option value="${p}">${p}</option>`;
+        });
+        plateFilterEl.innerHTML = pOpts;
+        if (plates.has(currentPlateVal) || currentPlateVal === 'all') {
+            plateFilterEl.value = currentPlateVal;
+        }
+    }
+    const selectedPlate = plateFilterEl ? plateFilterEl.value : 'all';
+
+    // 3. Пошуковий запит
     const searchInput = document.getElementById('base-search-input');
     const query = filterQuery !== '' ? filterQuery : (searchInput ? searchInput.value : '');
     const upperVal = query.toUpperCase().trim();
     
+    // 4. Фільтрація автомобілів
     const filteredCars = safeCars.filter(car => {
+        if (isItemDestroyed(car.note)) return false;
+        if (!car.plate || String(car.plate).trim() === '') return false;
+
+        // Фільтр за кнопками категорій: Усі / Легкові / Вантажні / Мотоцикли / Квадроцикли
+        const group = getCarGroup(car);
+        if (currentCategoryFilter !== 'all' && group !== currentCategoryFilter) {
+            return false;
+        }
+
+        // Фільтр за підрозділом
         if (selectedSub !== 'all' && (car.subdivision || '').trim() !== selectedSub) {
             return false;
         }
 
+        // Фільтр за номером
+        if (selectedPlate !== 'all' && (car.plate || '').trim() !== selectedPlate) {
+            return false;
+        }
+
+        // Текстовий пошук
         if (!upperVal) return true;
         return (
             (car.plate || '').toUpperCase().includes(upperVal) || 
@@ -589,18 +630,19 @@ function renderCarsTable(filterQuery = '') {
 
     filteredCars.forEach((car, index) => {
         const tr = document.createElement('tr');
+        const group = getCarGroup(car);
         
         tr.innerHTML = `
             <td>${index + 1}</td>
             <td>
                 <select class="table-cell-input" onchange="updateCarVehicleType(${car.id}, this.value)" style="font-size: 11px; padding: 2px; cursor: pointer;">
-                    <option value="легковий" ${car.vehicleType === 'легковий' ? 'selected' : ''}>Легковий</option>
-                    <option value="вантажний" ${car.vehicleType === 'вантажний' ? 'selected' : ''}>Вантажний</option>
-                    <option value="мотоцикл" ${car.vehicleType === 'мотоцикл' ? 'selected' : ''}>Мотоцикл</option>
-                    <option value="квадроцикл" ${car.vehicleType === 'квадроцикл' ? 'selected' : ''}>Квадроцикл</option>
+                    <option value="легковий" ${group === 'легковий' ? 'selected' : ''}>Легковий</option>
+                    <option value="вантажний" ${group === 'вантажний' ? 'selected' : ''}>Вантажний</option>
+                    <option value="мотоцикл" ${group === 'мотоцикл' ? 'selected' : ''}>Мотоцикл</option>
+                    <option value="квадроцикл" ${group === 'квадроцикл' ? 'selected' : ''}>Квадроцикл</option>
                 </select>
             </td>
-            <td><span onclick="openCarCardFromBase(${car.id})" title="Відкрити картку та маршрути" <td><span onclick="openCarCard(${car.id})" style="cursor: pointer; color: #000; font-weight: bold; text-decoration: none;" title="Відкрити картку авто">${car.plate || ''}</span></td>
+            <td><span onclick="openCarCard(${car.id})" style="cursor: pointer; color: #000; font-weight: bold; text-decoration: none;" title="Відкрити картку авто">${car.plate || ''}</span></td>
             <td>${car.model || ''}</td>
             <td>${car.subdivision || '—'}</td>
             <td>${car.consumption || 0} л</td>
@@ -622,6 +664,10 @@ function renderCarsTable(filterQuery = '') {
         `;
         tbody.appendChild(tr);
     });
+
+    if (typeof updateRoleUI === 'function') {
+        updateRoleUI();
+    }
 }
 
 function updateCarProp(carId, propName, val) {
@@ -698,7 +744,7 @@ function handleCarSearchInput(val, event) {
 }
 
 function openCarCard(carId) {
-    currentCarId = Number(carId); // Жорстко фіксуємо ID обраного автомобіля
+    currentCarId = Number(carId);
     switchView('card');
     loadCarCard(currentCarId);
 }

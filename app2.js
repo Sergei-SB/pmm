@@ -1,15 +1,22 @@
 // ==========================================
-// ФІНАЛЬНИЙ РОБОЧИЙ КОД app2.js (ВИПРАВЛЕНИЙ)
+// ФІНАЛЬНИЙ РОБОЧИЙ КОД app2.js 
+// (СТАРТ З 01.10-10.10, АВТОМАТИЧНА ГЕНЕРАЦІЯ ПЕРІОДІВ ТА ПЕРЕНОС ЗАЛИШКІВ)
 // ==========================================
 
 let activeCarPeriod = getDefaultPeriodByCurrentDate();
 let isRestoringState = false;
 
+// Визначає поточний 10-денний період за сьогоднішньою датою
 function getDefaultPeriodByCurrentDate() {
     const now = new Date();
     const day = now.getDate();
     const month = now.getMonth() + 1;
     const year = now.getFullYear();
+
+    // Якщо системна дата раніше жовтня 2026 — повертаємо стартовий період 01.10-10.10
+    if (year < 2026 || (year === 2026 && month < 10)) {
+        return "01.10-10.10";
+    }
 
     const mm = String(month).padStart(2, '0');
     const lastDayOfMonth = new Date(year, month, 0).getDate();
@@ -23,13 +30,34 @@ function getDefaultPeriodByCurrentDate() {
     }
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-    setTimeout(() => {
-        hookIntoLoadCarCard();
-        loadCarDataForActivePeriod();
-    }, 500);
-});
+// Обчислює наступний 10-денний період після переданого (напр. "01.10-10.10" -> "11.10-20.10")
+function getNextTenDayPeriod(periodStr, yearHint = 2026) {
+    if (!periodStr) return "01.10-10.10";
+    const startPart = periodStr.split('-')[0].trim();
+    const parts = startPart.split('.');
+    const day = parseInt(parts[0], 10);
+    let month = parseInt(parts[1], 10);
+    let year = parts[2] ? parseInt(parts[2], 10) : yearHint;
 
+    const mm = String(month).padStart(2, '0');
+
+    if (day === 1) {
+        return `11.${mm}-20.${mm}`;
+    } else if (day === 11) {
+        const lastDay = new Date(year, month, 0).getDate();
+        return `21.${mm}-${lastDay}.${mm}`;
+    } else {
+        month += 1;
+        if (month > 12) {
+            month = 1;
+            year += 1;
+        }
+        const nextMm = String(month).padStart(2, '0');
+        return `01.${nextMm}-10.${nextMm}`;
+    }
+}
+
+// Перетворює рядок періоду в число для правильного хронологічного сортування
 function parsePeriodDateVal(periodStr) {
     if (!periodStr) return 0;
     const cleanStr = periodStr.split('-')[0].trim();
@@ -37,50 +65,55 @@ function parsePeriodDateVal(periodStr) {
     if (parts.length >= 2) {
         const day = parseInt(parts[0], 10) || 0;
         const month = parseInt(parts[1], 10) || 0;
-        const year = parts[2] ? parseInt(parts[2], 10) : 2026;
+        const defaultYear = month >= 10 ? 2026 : 2027;
+        const year = parts[2] ? parseInt(parts[2], 10) : defaultYear;
         return year * 10000 + month * 100 + day;
     }
     return 0;
 }
 
+// Перевіряє, щоб період був не раніше 01.10 (відсікає старі 05, 06, 07, 08, 09 місяці)
+function isValidPeriodFromOctober(periodStr) {
+    if (!periodStr || !periodStr.includes('-')) return false;
+    const cleanStr = periodStr.split('-')[0].trim();
+    const parts = cleanStr.split('.');
+    if (parts.length < 2) return false;
+    const month = parseInt(parts[1], 10);
+    return month >= 10;
+}
+
+// Автоматично формує список періодів починаючи з 01.10-10.10 до поточної дати
 function getSortedPeriods() {
-    let currentAuto = getDefaultPeriodByCurrentDate();
-    let basePeriods = [
-        "21.05-31.05", "01.06-10.06", "11.06-20.06", "21.06-30.06",
-        "01.07-10.07", "11.07-20.07", "21.07-31.07", "01.08-10.08",
-        "11.08-20.08", "21.08-31.08", "01.09-10.09", "11.09-20.09",
-        "21.09-30.09", "01.10-10.10", "11.10-20.10", "21.10-31.10",
-        "01.11-10.11", "11.11-20.11", "21.11-30.11", "01.12-10.12",
-        "11.12-20.12", "21.12-31.12"
-    ];
-    
-    if (!basePeriods.includes(currentAuto)) {
-        basePeriods.push(currentAuto);
+    let periods = ["01.10-10.10"];
+    const targetCurrent = getDefaultPeriodByCurrentDate();
+
+    let curr = "01.10-10.10";
+    let safetyCounter = 0;
+    while (parsePeriodDateVal(curr) < parsePeriodDateVal(targetCurrent) && safetyCounter < 36) {
+        curr = getNextTenDayPeriod(curr);
+        if (!periods.includes(curr)) {
+            periods.push(curr);
+        }
+        safetyCounter++;
     }
 
     try {
         const stored = localStorage.getItem('app_saved_periods_list');
         if (stored) {
             const customList = JSON.parse(stored);
-            customList.forEach(p => {
-                if (!basePeriods.includes(p)) basePeriods.push(p);
-            });
-        }
-    } catch(e) {}
-
-    for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.includes('_isolated_car_routes_')) {
-            const parts = key.split('_isolated_car_routes_');
-            if (parts.length > 1) {
-                const p = parts[1].split('_')[0];
-                if (p && !basePeriods.includes(p)) basePeriods.push(p);
+            if (Array.isArray(customList)) {
+                customList.forEach(p => {
+                    if (isValidPeriodFromOctober(p) && !periods.includes(p)) {
+                        periods.push(p);
+                    }
+                });
             }
         }
-    }
+    } catch (e) {}
 
-    basePeriods.sort((a, b) => parsePeriodDateVal(a) - parsePeriodDateVal(b));
-    return basePeriods;
+    periods.sort((a, b) => parsePeriodDateVal(a) - parsePeriodDateVal(b));
+    localStorage.setItem('app_saved_periods_list', JSON.stringify(periods));
+    return periods;
 }
 
 function getPrevPeriodKey(currPeriod) {
@@ -95,103 +128,181 @@ function getRoutesKey(carId, period) {
 }
 
 function getStrictActivePeriod() {
-    const selectEl = document.getElementById('car-period-select');
+    const selectEl = document.getElementById('card-period-select') || document.getElementById('car-period-select');
     if (selectEl && selectEl.value) {
         activeCarPeriod = selectEl.value;
     }
     return activeCarPeriod;
 }
 
-function shiftCarPeriod(direction) {
-    manualSaveCarRoutes(); 
-    const periods = getSortedPeriods();
-    let current = getStrictActivePeriod();
-    let idx = periods.indexOf(current);
-    if (idx !== -1) {
-        idx += direction;
-        if (idx >= 0 && idx < periods.length) {
-            activeCarPeriod = periods[idx];
-            const selectEl = document.getElementById('car-period-select');
-            if (selectEl) selectEl.value = activeCarPeriod;
-            loadCarDataForActivePeriod();
-        }
-    }
-}
+// Заповнення випадаючого списку періодів у Картці авто
+window.initCardPeriodsSelect = function() {
+    const selectEl = document.getElementById('card-period-select') || document.getElementById('car-period-select');
+    if (!selectEl) return;
 
-function onCarPeriodChange(val) {
+    const periods = getSortedPeriods();
+    if (!periods.includes(activeCarPeriod)) {
+        activeCarPeriod = periods[0] || "01.10-10.10";
+    }
+
+    selectEl.innerHTML = periods.map(p => `<option value="${p}" ${p === activeCarPeriod ? 'selected' : ''}>${p}</option>`).join('');
+    selectEl.value = activeCarPeriod;
+};
+
+// Перемикання періоду випадаючим списком
+window.onCardPeriodChange = function(val) {
     if (!val) return;
-    manualSaveCarRoutes(); 
+    saveCarRoutesForPeriod(activeCarPeriod);
     activeCarPeriod = val;
+    const selectEl = document.getElementById('card-period-select') || document.getElementById('car-period-select');
+    if (selectEl) selectEl.value = activeCarPeriod;
     loadCarDataForActivePeriod();
-}
+};
+window.onCarPeriodChange = window.onCardPeriodChange;
+
+// Перемикання періоду стрілочками ◄ (-1) та ► (+1)
+window.navigateCardPeriod = function(direction) {
+    saveCarRoutesForPeriod(activeCarPeriod);
+
+    let periods = getSortedPeriods();
+    let idx = periods.indexOf(activeCarPeriod);
+    if (idx === -1) idx = 0;
+
+    let newIdx = idx + direction;
+
+    // Якщо натиснуто ► на останньому періоді — автоматично створюємо наступний 10-денний період
+    if (direction > 0 && newIdx >= periods.length) {
+        const nextPeriod = getNextTenDayPeriod(periods[periods.length - 1]);
+        if (!periods.includes(nextPeriod)) {
+            periods.push(nextPeriod);
+            localStorage.setItem('app_saved_periods_list', JSON.stringify(periods));
+            initCardPeriodsSelect();
+            if (typeof populatePeriodDropdown === 'function') {
+                populatePeriodDropdown(nextPeriod);
+            }
+        }
+        newIdx = periods.indexOf(nextPeriod);
+    }
+
+    if (newIdx >= 0 && newIdx < periods.length) {
+        activeCarPeriod = periods[newIdx];
+        const selectEl = document.getElementById('card-period-select') || document.getElementById('car-period-select');
+        if (selectEl) selectEl.value = activeCarPeriod;
+        loadCarDataForActivePeriod();
+    }
+};
+window.shiftCarPeriod = window.navigateCardPeriod;
+
+// Кнопка "Зберегти дані" на картці
+window.saveActiveCardPeriodData = function() {
+    saveCarRoutesForPeriod(getStrictActivePeriod());
+    alert(`Дані для періоду "${activeCarPeriod}" успішно збережено!`);
+};
 
 function hookIntoLoadCarCard() {
-    if (typeof window.loadCarCard === 'function') {
+    if (typeof window.loadCarCard === 'function' && !window._loadCarCardHooked) {
+        window._loadCarCardHooked = true;
         const originalLoadCarCard = window.loadCarCard;
         window.loadCarCard = function(carId) {
+            if (!isRestoringState && typeof currentCarId !== 'undefined' && currentCarId && Number(currentCarId) !== Number(carId)) {
+                saveCarRoutesForPeriod(activeCarPeriod, currentCarId);
+            }
             originalLoadCarCard.apply(this, arguments);
             if (!isRestoringState) {
-                setTimeout(() => loadCarDataForActivePeriod(), 50);
+                loadCarDataForActivePeriod();
             }
         };
     }
 }
 
+// Завантаження даних для активного періоду (та перенесення залишків із попереднього)
 function loadCarDataForActivePeriod() {
     if (typeof currentCarId === 'undefined' || !currentCarId) return;
     isRestoringState = true;
 
     const period = getStrictActivePeriod();
-
     const dataKey = getRoutesKey(currentCarId, period);
     let periodData = null;
 
     try {
         const stored = localStorage.getItem(dataKey);
         if (stored) periodData = JSON.parse(stored);
-    } catch(e) {}
+    } catch (e) {}
 
-    // 1. Відновлюємо нижню таблицю маршрутів
+    const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
+    const car = safeCars.find(c => Number(c.id) === Number(currentCarId));
+    const truckActive = (car && typeof isCarTruck === 'function') ? isCarTruck(car) : false;
+
+    // 1. ВІДНОВЛЕННЯ ТАБЛИЦІ МАРШРУТІВ (клітинок "Всього" тощо)
+    // Для нового періоду створюються чисті рядки без старих цифр у "Всього"
     const tbody = document.getElementById('routes-tbody');
     if (tbody) {
         if (periodData && periodData.rows && Array.isArray(periodData.rows) && periodData.rows.length > 0) {
             tbody.innerHTML = '';
             periodData.rows.forEach(rData => {
                 if (typeof addRouteRow === 'function') {
-                    addRouteRow(rData.name || '', rData.time || '8:30', '');
+                    addRouteRow(rData.name || 'Виконання БЗ Харків', rData.time || '8:30', '', truckActive);
                     const lastRow = tbody.lastElementChild;
-                    if (lastRow && rData.inputs) {
+                    if (lastRow && Array.isArray(rData.inputs)) {
                         const inputs = lastRow.querySelectorAll('input');
                         rData.inputs.forEach((val, idx) => {
-                            if (inputs[idx]) inputs[idx].value = val;
+                            if (inputs[idx] && !inputs[idx].hasAttribute('readonly')) {
+                                inputs[idx].value = val;
+                            }
                         });
                     }
                 }
             });
         } else {
-            const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
-            const car = safeCars.find(c => Number(c.id) === Number(currentCarId));
-            if (car && typeof initDefaultRoutes === 'function' && typeof isCarTruck === 'function') {
-                initDefaultRoutes(isCarTruck(car));
+            if (typeof initDefaultRoutes === 'function') {
+                initDefaultRoutes(truckActive);
             }
         }
     }
 
-    // 2. Отримуємо дані попереднього періоду
+    // 2. ОТРИМАННЯ ДАНИХ ПОПЕРЕДНЬОГО ПЕРІОДУ ДЛЯ ПЕРЕНОСУ ЗАЛИШКІВ
     const prevKey = getPrevPeriodKey(period);
-    let prevData = null;
+    let prevEndOdo = '';
+    let prevLeftFuel = '';
+    let prevLeftAdblue = '';
+
     if (prevKey) {
         try {
             const prevStored = localStorage.getItem(getRoutesKey(currentCarId, prevKey));
-            if (prevStored) prevData = JSON.parse(prevStored);
-        } catch(e) {}
+            if (prevStored) {
+                const prevData = JSON.parse(prevStored);
+                if (prevData && prevData.topFields) {
+                    if (prevData.topFields.odo2 !== undefined && prevData.topFields.odo2 !== '') {
+                        prevEndOdo = prevData.topFields.odo2;
+                    }
+                    if (prevData.topFields.savedFuelLeft !== undefined && prevData.topFields.savedFuelLeft !== '') {
+                        prevLeftFuel = prevData.topFields.savedFuelLeft;
+                    }
+                    if (prevData.topFields.savedAdblueLeft !== undefined && prevData.topFields.savedAdblueLeft !== '') {
+                        prevLeftAdblue = prevData.topFields.savedAdblueLeft;
+                    }
+                }
+            }
+        } catch (e) {}
+
+        try {
+            const repStored = localStorage.getItem('report_data_' + prevKey);
+            if (repStored) {
+                const repData = JSON.parse(repStored);
+                if (repData && repData[currentCarId]) {
+                    if (!prevEndOdo && repData[currentCarId].odo) prevEndOdo = repData[currentCarId].odo;
+                    if (!prevLeftFuel && repData[currentCarId].leftFuel) prevLeftFuel = repData[currentCarId].leftFuel;
+                    if (!prevLeftAdblue && repData[currentCarId].leftAdBlue) prevLeftAdblue = repData[currentCarId].leftAdBlue;
+                }
+            }
+        } catch (e) {}
     }
 
-    // Початковий одометр
+    // 3. ВСТАНОВЛЕННЯ ПОЧАТКОВОГО ОДОМЕТРА (Кінцевий одометр попереднього -> Початковий одометр наступного)
     const odo1El = document.getElementById('odo-1');
     if (odo1El) {
-        if (prevData && prevData.topFields && prevData.topFields.odo2 !== undefined && prevData.topFields.odo2 !== '') {
-            odo1El.value = prevData.topFields.odo2; 
+        if (prevEndOdo !== '') {
+            odo1El.value = prevEndOdo;
         } else if (periodData && periodData.topFields && periodData.topFields.odo1 !== undefined) {
             odo1El.value = periodData.topFields.odo1;
         } else {
@@ -199,11 +310,11 @@ function loadCarDataForActivePeriod() {
         }
     }
 
-    // Паливо на початок
+    // 4. ВСТАНОВЛЕННЯ ПАЛИВА "НА ПОЧАТКУ" (Залишок попереднього -> На початку наступного)
     const fuelStartEl = document.getElementById('fuel-start');
     if (fuelStartEl) {
-        if (prevData && prevData.topFields && prevData.topFields.savedFuelLeft !== undefined && prevData.topFields.savedFuelLeft !== '') {
-            fuelStartEl.value = prevData.topFields.savedFuelLeft; 
+        if (prevLeftFuel !== '') {
+            fuelStartEl.value = prevLeftFuel;
         } else if (periodData && periodData.topFields && periodData.topFields.fuelStart !== undefined) {
             fuelStartEl.value = periodData.topFields.fuelStart;
         } else {
@@ -216,11 +327,11 @@ function loadCarDataForActivePeriod() {
         fuelRecEl.value = (periodData && periodData.topFields) ? (periodData.topFields.fuelReceived || '') : '';
     }
 
-    // AdBlue на початок
+    // 5. ВСТАНОВЛЕННЯ ADBLUE "НА ПОЧАТКУ"
     const adBlueStartEl = document.getElementById('adblue-start');
     if (adBlueStartEl) {
-        if (prevData && prevData.topFields && prevData.topFields.savedAdblueLeft !== undefined && prevData.topFields.savedAdblueLeft !== '') {
-            adBlueStartEl.value = prevData.topFields.savedAdblueLeft; 
+        if (prevLeftAdblue !== '') {
+            adBlueStartEl.value = prevLeftAdblue;
         } else if (periodData && periodData.topFields && periodData.topFields.adblueStart !== undefined) {
             adBlueStartEl.value = periodData.topFields.adblueStart;
         } else {
@@ -237,21 +348,26 @@ function loadCarDataForActivePeriod() {
         updateRouteTotals();
     }
 
-    setTimeout(() => {
-        isRestoringState = false;
-    }, 200);
+    isRestoringState = false;
 }
 
-function manualSaveCarRoutes() {
-    if (typeof currentCarId === 'undefined' || !currentCarId) return;
+// Збереження стану картки за конкретний період та авто
+function saveCarRoutesForPeriod(periodToSave, carIdToSave) {
+    if (isRestoringState) return;
+    const targetCarId = carIdToSave || (typeof currentCarId !== 'undefined' ? currentCarId : null);
+    if (!targetCarId) return;
 
-    const period = getStrictActivePeriod();
+    const period = periodToSave || getStrictActivePeriod();
     if (!period) return;
 
-    const dataKey = getRoutesKey(currentCarId, period);
-    
+    if (typeof updateRouteTotals === 'function') {
+        updateRouteTotals();
+    }
+
+    const dataKey = getRoutesKey(targetCarId, period);
     const rowsData = [];
     const rows = document.querySelectorAll('#routes-tbody tr');
+
     rows.forEach(row => {
         const inputs = row.querySelectorAll('input');
         const inputValues = Array.from(inputs).map(inp => inp.value);
@@ -262,35 +378,55 @@ function manualSaveCarRoutes() {
         });
     });
 
+    const odo1Val = document.getElementById('odo-1')?.value || '';
+    let odo2Val = document.getElementById('odo-2')?.value || '';
+    if (!odo2Val && odo1Val) {
+        odo2Val = odo1Val;
+    }
+
     const topFields = {
         fuelStart: document.getElementById('fuel-start')?.value || '',
         fuelReceived: document.getElementById('fuel-received')?.value || '',
-        odo1: document.getElementById('odo-1')?.value || '',
-        odo2: document.getElementById('odo-2')?.value || '', 
-        savedFuelLeft: document.getElementById('fuel-left')?.textContent || '', 
+        odo1: odo1Val,
+        odo2: odo2Val,
+        savedFuelLeft: document.getElementById('fuel-left')?.textContent?.trim() || '',
         adblueStart: document.getElementById('adblue-start')?.value || '',
         adblueReceived: document.getElementById('adblue-received')?.value || '',
-        savedAdblueLeft: document.getElementById('adblue-left')?.textContent || '' 
+        savedAdblueLeft: document.getElementById('adblue-left')?.textContent?.trim() || ''
     };
 
-    const packageData = {
+    localStorage.setItem(dataKey, JSON.stringify({
         topFields: topFields,
         rows: rowsData
-    };
-
-    localStorage.setItem(dataKey, JSON.stringify(packageData));
-
-    const saveBtn = document.getElementById('manual-save-period-btn');
-    if (saveBtn) {
-        const originalText = saveBtn.textContent;
-        saveBtn.textContent = "✔ Збережено!";
-        saveBtn.style.background = "#2ecc71";
-        setTimeout(() => {
-            saveBtn.textContent = originalText;
-            saveBtn.style.background = "#27ae60";
-        }, 1200);
-    }
+    }));
 }
+
+function manualSaveCarRoutes() {
+    saveCarRoutesForPeriod(getStrictActivePeriod());
+}
+
+document.addEventListener('input', function(e) {
+    if (isRestoringState) return;
+    if (
+        e.target.closest('#routes-tbody') ||
+        e.target.id === 'fuel-start' ||
+        e.target.id === 'fuel-received' ||
+        e.target.id === 'adblue-start' ||
+        e.target.id === 'adblue-received' ||
+        e.target.id === 'odo-1' ||
+        e.target.id === 'odo-2'
+    ) {
+        saveCarRoutesForPeriod(getStrictActivePeriod());
+    }
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+    initCardPeriodsSelect();
+    hookIntoLoadCarCard();
+    setTimeout(() => {
+        loadCarDataForActivePeriod();
+    }, 150);
+});
 
 // ==========================================
 // ВИПРАВЛЕННЯ ТА АКТИВАЦІЯ ВЕРХНІХ КНОПОК НАВІГАЦІЇ
@@ -304,7 +440,9 @@ window.switchView = function(viewName) {
         'subdivisions': 'subdivisions-view',
         'generators': 'generators-view',
         'aggregates-calc': 'aggregates-calc-view',
-        'destroyed': 'destroyed-view'
+        'destroyed': 'destroyed-view',
+        'dev-panel': 'dev-panel-view',
+        'car-details': 'car-details-view'
     };
 
     let targetSectionId = viewMapping[viewName] || (viewName + '-view');
@@ -328,7 +466,17 @@ window.switchView = function(viewName) {
         }
     });
 
-    if (viewName === 'subdivisions' && typeof renderSubdivisionsView === 'function') {
+    const topSearchBox = document.getElementById('top-search-box');
+    if (topSearchBox) {
+        topSearchBox.style.display = (viewName === 'base') ? 'flex' : 'none';
+    }
+
+    if (viewName === 'base' && typeof renderCarsTable === 'function') {
+        renderCarsTable();
+    } else if (viewName === 'card') {
+        initCardPeriodsSelect();
+        loadCarDataForActivePeriod();
+    } else if (viewName === 'subdivisions' && typeof renderSubdivisionsView === 'function') {
         renderSubdivisionsView();
     } else if (viewName === 'generators' && typeof switchEquipmentTab === 'function') {
         switchEquipmentTab('generators');
@@ -338,5 +486,7 @@ window.switchView = function(viewName) {
         renderAggregatesCalcView();
     } else if (viewName === 'destroyed' && typeof renderDestroyedEquipmentView === 'function') {
         renderDestroyedEquipmentView();
+    } else if (viewName === 'dev-panel' && typeof renderDevPanelView === 'function') {
+        renderDevPanelView();
     }
 };
