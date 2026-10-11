@@ -537,7 +537,6 @@ function updateCarVehicleType(carId, newType) {
     }
 }
 
-// Рендеринг таблиці Реєстру транспортних засобів із підтримкою всіх фільтрів
 function renderCarsTable(filterQuery = '') {
     const tbody = document.getElementById('cars-tbody');
     if (!tbody) return;
@@ -546,7 +545,6 @@ function renderCarsTable(filterQuery = '') {
     const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
     if (safeCars.length === 0) return;
 
-    // 1. Фільтр за підрозділом
     const subFilterEl = document.getElementById('base-subdivision-filter');
     const currentSubVal = subFilterEl ? subFilterEl.value : 'all';
 
@@ -568,16 +566,19 @@ function renderCarsTable(filterQuery = '') {
     }
     const selectedSub = subFilterEl ? subFilterEl.value : 'all';
 
-    // 2. Фільтр за номером авто
+    // 2. Фільтр за номером авто (тільки автомобілі обраного підрозділу та категорії)
     const plateFilterEl = document.getElementById('base-plate-filter');
     const currentPlateVal = plateFilterEl ? plateFilterEl.value : 'all';
 
     if (plateFilterEl) {
         const plates = new Set();
         safeCars.forEach(c => {
-            if (!isItemDestroyed(c.note) && c.plate && c.plate.trim() !== '') {
-                plates.add(c.plate.trim());
-            }
+            if (isItemDestroyed(c.note)) return;
+            if (!c.plate || c.plate.trim() === '' || c.plate.trim() === '—') return;
+            if (selectedSub !== 'all' && (c.subdivision || '').trim() !== selectedSub) return;
+            const grp = getCarGroup(c);
+            if (currentCategoryFilter !== 'all' && grp !== currentCategoryFilter) return;
+            plates.add(c.plate.trim());
         });
         let pOpts = '<option value="all">Усі</option>';
         plates.forEach(p => {
@@ -586,37 +587,33 @@ function renderCarsTable(filterQuery = '') {
         plateFilterEl.innerHTML = pOpts;
         if (plates.has(currentPlateVal) || currentPlateVal === 'all') {
             plateFilterEl.value = currentPlateVal;
+        } else {
+            plateFilterEl.value = 'all';
         }
     }
     const selectedPlate = plateFilterEl ? plateFilterEl.value : 'all';
 
-    // 3. Пошуковий запит
     const searchInput = document.getElementById('base-search-input');
     const query = filterQuery !== '' ? filterQuery : (searchInput ? searchInput.value : '');
     const upperVal = query.toUpperCase().trim();
     
-    // 4. Фільтрація автомобілів
     const filteredCars = safeCars.filter(car => {
         if (isItemDestroyed(car.note)) return false;
         if (!car.plate || String(car.plate).trim() === '') return false;
 
-        // Фільтр за кнопками категорій: Усі / Легкові / Вантажні / Мотоцикли / Квадроцикли
         const group = getCarGroup(car);
         if (currentCategoryFilter !== 'all' && group !== currentCategoryFilter) {
             return false;
         }
 
-        // Фільтр за підрозділом
         if (selectedSub !== 'all' && (car.subdivision || '').trim() !== selectedSub) {
             return false;
         }
 
-        // Фільтр за номером
         if (selectedPlate !== 'all' && (car.plate || '').trim() !== selectedPlate) {
             return false;
         }
 
-        // Текстовий пошук
         if (!upperVal) return true;
         return (
             (car.plate || '').toUpperCase().includes(upperVal) || 
@@ -747,139 +744,6 @@ function openCarCard(carId) {
     currentCarId = Number(carId);
     switchView('card');
     loadCarCard(currentCarId);
-}
-
-function uploadCarDocument(input) {
-    if (!activeDetailCarId) return;
-    const files = input.files;
-    if (!files || files.length === 0) return;
-
-    const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
-    const car = safeCars.find(c => Number(c.id) === Number(activeDetailCarId));
-    if (!car) return;
-
-    const folderName = `Doc/${car.plate.replace(/[^a-zA-Z0-9А-Яа-яІіЇїЄє]/g, '_')}`;
-    const storageKey = `car_folder_${car.id}`;
-    
-    let folderData = { path: folderName, files: [] };
-    try {
-        const stored = localStorage.getItem(storageKey);
-        if (stored) folderData = JSON.parse(stored);
-    } catch(e) {
-        console.error(e);
-    }
-
-    let processedCount = 0;
-
-    for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const reader = new FileReader();
-
-        reader.onload = function(e) {
-            folderData.files.push({
-                name: file.name,
-                size: (file.size / 1024).toFixed(1) + ' KB',
-                date: new Date().toLocaleDateString(),
-                dataUrl: e.target.result
-            });
-
-            processedCount++;
-            if (processedCount === files.length) {
-                localStorage.setItem(storageKey, JSON.stringify(folderData));
-                input.value = "";
-                renderCarDocuments(car);
-            }
-        };
-
-        reader.readAsDataURL(file);
-    }
-}
-
-function renderCarDocuments(car) {
-    const docsContainer = document.getElementById('car-docs-list');
-    if (!docsContainer) return;
-
-    const folderName = `Doc/${car.plate.replace(/[^a-zA-Z0-9А-Яа-яІіЇїЄє]/g, '_')}`;
-    const storageKey = `car_folder_${car.id}`;
-    
-    let folderData = { path: folderName, files: [] };
-    try {
-        const stored = localStorage.getItem(storageKey);
-        if (stored) folderData = JSON.parse(stored);
-    } catch(e) {
-        console.error(e);
-    }
-
-    let headerHtml = `<div style="margin-bottom: 8px; font-weight: bold; color: #2980b9; font-size: 12px;">📁 Шлях папки: ${folderData.path}</div>`;
-
-    if (folderData.files.length === 0) {
-        docsContainer.innerHTML = headerHtml + '<span style="color: #7f8c8d; font-style: italic;">Папка порожня. Документи не завантажено.</span>';
-        return;
-    }
-
-    let html = headerHtml + '<ul style="list-style-type: none; padding: 0; margin: 0;">';
-    folderData.files.forEach((doc, idx) => {
-        html += `
-            <li style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #e0e0e0; gap: 10px;">
-                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; color: #2980b9;" onclick="viewCarDoc(${car.id},${idx})" title="Натисніть для перегляду">📄 <strong>${doc.name}</strong> <small style="color: #7f8c8d;">(${doc.size}, ${doc.date})</small></span>
-                <div style="display: flex; gap: 5px; flex-shrink: 0;">
-                    ${doc.dataUrl ? `<button class="action-btn" style="padding: 2px 6px; font-size: 11px; background-color: #2980b9;" onclick="viewCarDoc(${car.id},${idx})">Переглянути</button>` : ''}
-                    <button class="delete-row-btn" onclick="deleteCarDoc(${car.id}, ${idx})">Видалити</button>
-                </div>
-            </li>
-        `;
-    });
-    html += '</ul>';
-    docsContainer.innerHTML = html;
-}
-
-function viewCarDoc(carId, index) {
-    const storageKey = `car_folder_${carId}`;
-    try {
-        const stored = localStorage.getItem(storageKey);
-        if (stored) {
-            const folderData = JSON.parse(stored);
-            const doc = folderData.files[index];
-            if (doc && doc.dataUrl) {
-                const win = window.open();
-                const isImage = doc.dataUrl.startsWith('data:image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.name);
-                win.document.write(`
-                    <html>
-                        <head><title>Перегляд: ${doc.name}</title></head>
-                        <body style="margin:0; background:#222; display:flex; justify-content:center; align-items:center; height:100vh;">
-                            ${isImage ? `<img src="${doc.dataUrl}" style="max-width:100%; max-height:100%; object-fit:contain;" />` : `<iframe src="${doc.dataUrl}" style="width:100%; height:100%; border:none;"></iframe>`}
-                        </body>
-                    </html>
-                `);
-            }
-        }
-    } catch(e) {
-        console.error(e);
-        alert('Не вдалося відкрити документ.');
-    }
-}
-
-function deleteCarDoc(carId, index) {
-    if (!confirm("Ви впевнені, що хочете видалити цей документ/фото?")) {
-        return;
-    }
-
-    const storageKey = `car_folder_${carId}`;
-    let folderData = null;
-    try {
-        const stored = localStorage.getItem(storageKey);
-        if (stored) folderData = JSON.parse(stored);
-    } catch(e) {
-        console.error(e);
-    }
-
-    if (folderData && folderData.files) {
-        folderData.files.splice(index, 1);
-        localStorage.setItem(storageKey, JSON.stringify(folderData));
-        const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
-        const car = safeCars.find(c => Number(c.id) === Number(carId));
-        if (car) renderCarDocuments(car);
-    }
 }
 
 function loadCarCard(carId) {
