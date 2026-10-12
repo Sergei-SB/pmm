@@ -217,8 +217,8 @@ window.applyCarsReportColumnRoleStyle = function(isAdminOrHigher) {
             #cars-report-col-th {
                 display: none !important;
             }
-        `;
-    }
+        `;   
+
 };
 
 window.updateRoleUI = function() {

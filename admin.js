@@ -254,6 +254,12 @@ function updateRoleUI() {
         cell.style.display = isAdminOrHigher ? "" : "none";
     });
 
+     // Кнопка "💾 Зберегти зміни" в Картці авто — видима ТІЛЬКИ для Розробника та Адміна
+    const cardSaveBtn = document.getElementById("card-save-btn");
+    if (cardSaveBtn) {
+        cardSaveBtn.style.setProperty("display", isAdminOrHigher ? "inline-flex" : "none", "important");
+    }
+
     // 4. Кнопки у "Картка авто та Маршрути"
     const saveCardBtn = document.querySelector('#car-card-view .card-panel .btn-blue');
     if (saveCardBtn) {
