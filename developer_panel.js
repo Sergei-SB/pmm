@@ -397,29 +397,13 @@ function ensureDevPanelHeaderButtons() {
         headerPanel.appendChild(actionsWrap);
     }
 
-    if (!actionsWrap.querySelector('#btn-dev-export-backup') || !actionsWrap.querySelector('#btn-dev-import-backup')) {
-        actionsWrap.innerHTML = `
-            <button class="action-btn" id="btn-dev-refresh" onclick="refreshDevPanelData()" style="background-color: #2980b9; color: #fff; font-weight: bold; padding: 8px 14px; border-radius: 6px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
-                🔄 Оновити дані
-            </button>
-            <button class="action-btn" id="btn-dev-export-backup" onclick="exportFullDatabaseBackup()" style="background-color: #27ae60; color: #fff; font-weight: bold; padding: 8px 14px; border-radius: 6px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
-                📥 Скачати Бекап Бази
-            </button>
-            <button class="action-btn dev-json-import-btn" id="btn-dev-import-backup" onclick="triggerImportBackupFile()" style="background-color: #e67e22; color: #fff; font-weight: bold; padding: 8px 14px; border-radius: 6px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;" title="Завантажити збережений файл або файли .json у систему">
-                📤 Імпортувати Бекап (JSON)
-            </button>
-            <input type="file" id="dev-backup-import-input" accept=".json,application/json" multiple style="display: none;" onchange="handleImportBackupFiles(event)">
-        `;
-    } else {
-        const importBtns = Array.from(actionsWrap.querySelectorAll('button')).filter(b => (b.textContent || '').includes('Імпортувати Бекап'));
-        if (importBtns.length > 1) {
-            for (let i = 1; i < importBtns.length; i++) {
-                importBtns[i].remove();
-            }
-        }
-    }
+    actionsWrap.innerHTML = `
+        <button class="action-btn" id="btn-dev-refresh" onclick="refreshDevPanelData()" style="background-color: #2980b9; color: #fff; font-weight: bold; padding: 8px 14px; border-radius: 6px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+            🔄 Оновити дані
+        </button>
+        <input type="file" id="dev-backup-import-input" accept=".json,application/json" multiple style="display: none;" onchange="handleImportBackupFiles(event)">
+    `;
 }
-
 function flushAllActiveSiteChangesToStorage() {
     try {
         const detSec = document.getElementById('car-details-view');
