@@ -127,74 +127,81 @@ let docLayoutState = getDefaultLayoutState();
 
 function getDefaultLayoutState() {
     return {
+        pageMargins: {
+            top: 20,
+            bottom: 20,
+            left: 25,
+            right: 18,
+            headersGap: 16
+        },
         leftHeader: {
             text: 'Міністерство оборони України\nВійськова частина А0000',
             html: '',
             x: 0,
             y: 0,
-            rotate: 0,
             width: 240,
-            fontFamily: "'Times New Roman', Times, serif",
+            rotate: 0,
+            fontFamily: "'Times New Roman', serif",
             fontSize: 12,
-            lineHeight: 1.35,
-            align: 'left',
+            lineHeight: 1.25,
             bold: false,
             italic: false,
-            underline: false
+            underline: false,
+            align: 'center'
         },
         rightHeader: {
-            text: 'ЗАТВЕРДЖУЮ\nКомандир військової частини\n________________ Ім\'я ПРІЗВИЩЕ\n"___" ____________ 2026 р.',
+            text: 'Командиру військової частини А0000\n___________________________',
             html: '',
             x: 0,
             y: 0,
-            rotate: 0,
             width: 250,
-            fontFamily: "'Times New Roman', Times, serif",
+            rotate: 0,
+            fontFamily: "'Times New Roman', serif",
             fontSize: 12,
-            lineHeight: 1.35,
-            align: 'right',
+            lineHeight: 1.25,
             bold: false,
             italic: false,
-            underline: false
+            underline: false,
+            align: 'right'
         },
         docTitle: {
-            text: 'НАКАЗ / РАПОРТ / ДОВІДКА',
+            text: 'РАПОРТ',
             html: '',
             x: 0,
             y: 0,
-            rotate: 0,
             gapFromHeaders: 22,
             gapToBody: 18,
-            fontFamily: "'Times New Roman', Times, serif",
+            fontFamily: "'Times New Roman', serif",
             fontSize: 16,
-            lineHeight: 1.35,
-            align: 'center',
-            bold: true,
-            italic: false,
-            underline: false
-        },
-        bodyStyle: {
-            fontFamily: "'Times New Roman', Times, serif",
-            fontSize: 14,
-            lineHeight: 1.5,
-            align: 'justify',
-            bold: false,
-            italic: false,
-            underline: false
-        },
-        signers: {
-            x: 0,
-            y: 0,
-            rotate: 0,
-            fontFamily: "'Times New Roman', Times, serif",
-            fontSize: 14,
-            lineHeight: 1.35,
-            align: 'left',
+            lineHeight: 1.3,
             bold: true,
             italic: false,
             underline: false,
+            align: 'center'
+        },
+        bodyStyle: {
+            fontFamily: "'Times New Roman', serif",
+            fontSize: 14,
+            lineHeight: 1.35,
+            bold: false,
+            italic: false,
+            underline: false,
+            align: 'justify',
+            paddingLeft: 0,
+            paddingRight: 0
+        },
+        signers: {
+            fontFamily: "'Times New Roman', serif",
+            fontSize: 13,
+            lineHeight: 1.25,
+            bold: false,
+            italic: false,
+            underline: false,
+            gapFromBody: 28,
+            colGap: 16,
+            rowGap: 10,
             rows: [
-                { role: 'Командир підрозділу', name: 'Ім\'я ПРІЗВИЩЕ', roleHtml: '', nameHtml: '' }
+                { role: 'Начальник служби ПММ', name: 'Іван ІВАНЕНКО', roleHtml: '', nameHtml: '' }
             ]
         },
         signature: {
