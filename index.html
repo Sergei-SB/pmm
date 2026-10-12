@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Облік палива та обладнання</title>
+    <title>Облік палива та конструктор документів А4</title>
+    <meta name="description" content="Система обліку палива, транспортних засобів, агрегатів та конструктор документів А4 зі збереженням шаблонів фрагментів." />
+    <meta property="og:title" content="Облік палива та конструктор документів А4" />
+    <meta property="og:description" content="Система обліку палива, транспортних засобів, агрегатів та конструктор документів А4 зі збереженням шаблонів фрагментів." />
+    <meta property="og:type" content="website" />
     <link rel="stylesheet" href="style.css">
     <style>
         table thead tr, 
@@ -114,19 +118,18 @@
             <button class="nav-btn" id="nav-btn-equipment" onclick="switchView('generators')" style="display: none;">Облік обладнання</button>
             <button class="nav-btn" onclick="switchView('aggregates-calc')">Розрахунок агрегатів</button>
             <button class="nav-btn" id="nav-btn-destroyed" onclick="switchView('destroyed')" style="display: none;">Знищена техніка</button>
+            <!-- Вкладка Конструктора документів та шаблонів (тільки для Розробника та Адміна) -->
+            <button class="nav-btn" id="nav-btn-documents" onclick="openDocumentsTabView()" style="display: none;">📄 Документи та Шаблони</button>
             <!-- Окрема вкладка Панелі розробника в шапці -->
             <button class="nav-btn" id="nav-btn-dev-panel" onclick="switchView('dev-panel')" style="display: none; background-color: #8e44ad !important; color: white !important;">⚙️ Панель розробника</button>
         </div>
         <div class="nav-right" id="top-search-box" style="display: flex; align-items: center; gap: 10px;">
-            <!-- Кнопка Системної пошти (конвертик) з анімацією блимання -->
             <button id="broadcast-envelope-btn" class="envelope-blinking" onclick="openBroadcastMailModal()" title="Системна пошта (Листи від керівництва)" style="background-color: #2980b9; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 15px; font-weight: bold; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                 ✉️
             </button>
 
-            <!-- Кнопка Зберегти (тільки для розробника) -->
             <button id="header-direct-save-btn" onclick="saveAllDataDirectlyToDoc()" title="Зберегти всі дані" style="background-color: #27ae60; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 15px; font-weight: bold; display: none; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">💾</button>
             
-            <!-- Кнопка Імпорт (тільки для розробника) -->
             <label id="header-direct-import-btn" title="Імпортувати дані з JSON" style="background-color: #8e44ad; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; display: none; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                 📂 Імпорт <input type="file" id="header-import-json-file" accept=".json" onchange="importDataFromJson(this)" style="display: none;">
             </label>
@@ -192,7 +195,7 @@
                             <th>кВт</th>
                             <th>№ двигуна</th>
                             <th>Водій</th>
-                            <th>Звіт</th>
+                            <th id="cars-report-col-th" class="cars-report-col" style="display: none;">Звіт</th>
                         </tr>
                     </thead>
                     <tbody id="cars-tbody"></tbody>
@@ -251,8 +254,10 @@
                             </div>
                         </div>
 
-                        <div class="transfer-btn-container">
-                            <button id="transfer-data-btn" class="action-btn transfer-btn" onclick="transferDataToReport()" style="display: none;">Перенос даних</button>
+                        <div class="transfer-btn-container" style="display: flex; align-items: center; justify-content: center; flex: 1; min-width: 180px;">
+                            <button id="transfer-data-btn" class="action-btn transfer-btn" onclick="transferDataToReport()" style="display: none; background-color: #2980b9; color: white; padding: 10px 18px; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; align-items: center; gap: 6px; box-shadow: 0 3px 8px rgba(41, 128, 185, 0.3); white-space: nowrap;">
+                                📤 Перенесення даних у Звіт (10 днів)
+                            </button>
                         </div>
 
                         <div class="odometer-panel">
@@ -334,7 +339,7 @@
                 <div class="report-controls">
                     <label>Період:</label>
                     <select id="report-period-select" onchange="changeReportPeriod(this.value)"></select>
-                    <input type="text" id="report-custom-period" value="01.10-10.10" placeholder="Напр: 01.10-10.10" oninput="updateReportHeaders()" style="width: 110px; text-align: center; padding: 5px;">
+                    <input type="text" id="report-custom-period" value="01.10-10.10" placeholder="Напр: 01.10-10.10" style="width: 110px; text-align: center; padding: 5px;">
                     <button class="action-btn" onclick="saveReportData()">Зберегти звіт</button>
                 </div>
             </div>
@@ -486,14 +491,17 @@
 
         <!-- РОЗДІЛ: ПАНЕЛЬ РОЗРОБНИКА (ОКРЕМА СТОРІНКА) -->
         <section id="dev-panel-view" class="view-section">
-            <div class="card-header-panel" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div class="card-header-panel" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
                 <h2>⚙️ Окрема Панель управління та безпеки Розробника</h2>
-                <button class="action-btn" onclick="refreshDevPanelData()" style="background-color: #2980b9; font-weight: bold;">🔄 Оновити дані</button>
+                <div id="dev-panel-header-actions" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <button class="action-btn" onclick="refreshDevPanelData()" style="background-color: #2980b9; font-weight: bold;">🔄 Оновити дані</button>
+                    <button class="action-btn" onclick="exportFullDatabaseBackup()" style="background-color: #27ae60; font-weight: bold;">📥 Скачати Бекап Бази</button>
+                    <button class="action-btn" onclick="triggerImportBackupFile()" style="background-color: #e67e22; font-weight: bold;">📤 Імпортувати Бекап (JSON)</button>
+                    <input type="file" id="dev-backup-import-input" accept=".json,application/json" multiple style="display: none;" onchange="handleImportBackupFiles(event)">
+                </div>
             </div>
             
-            <div id="dev-panel-main-container">
-                <!-- Контент сторінки завантажиться через JavaScript -->
-            </div>
+            <div id="dev-panel-main-container"></div>
         </section>
 
     </main>

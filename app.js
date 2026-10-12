@@ -231,22 +231,28 @@ function printCarCardReport() {
 }
 
 function loadCarsModifications() {
+    if (typeof window.reloadCarsFromStorage === 'function') {
+        window.reloadCarsFromStorage();
+    }
     if (typeof carsData === 'undefined' || !Array.isArray(carsData)) return;
     try {
         const stored = localStorage.getItem('cars_modifications_data');
         if (stored) {
             const mods = JSON.parse(stored);
+            const allProps = [
+                'model', 'plate', 'note', 'driver', 'engineNo', 'vin',
+                'vehicleType', 'category', 'subdivision', 'consumption',
+                'fuelType', 'year', 'transmission', 'tankCapacity', 'drive',
+                'emptyWeight', 'totalWeight', 'gears', 'engineVolume', 'kw',
+                'hasAdBlue', 'isMiles', 'formulas', 'destroyDate', 'destroyTime', 'destroyLocation'
+            ];
             carsData.forEach(car => {
                 if (mods[car.id]) {
-                    if (mods[car.id].model !== undefined) car.model = mods[car.id].model;
-                    if (mods[car.id].plate !== undefined) car.plate = mods[car.id].plate;
-                    if (mods[car.id].note !== undefined) car.note = mods[car.id].note;
-                    if (mods[car.id].driver !== undefined) car.driver = mods[car.id].driver;
-                    if (mods[car.id].engineNo !== undefined) car.engineNo = mods[car.id].engineNo;
-                    if (mods[car.id].vin !== undefined) car.vin = mods[car.id].vin;
-                    if (mods[car.id].vehicleType !== undefined) car.vehicleType = mods[car.id].vehicleType;
-                    if (mods[car.id].category !== undefined) car.category = mods[car.id].category;
-                    if (mods[car.id].subdivision !== undefined) car.subdivision = mods[car.id].subdivision;
+                    allProps.forEach(prop => {
+                        if (mods[car.id][prop] !== undefined) {
+                            car[prop] = mods[car.id][prop];
+                        }
+                    });
                 }
             });
         }
@@ -260,6 +266,7 @@ function saveCarsModificationsToStorage() {
     let mods = {};
     carsData.forEach(car => {
         mods[car.id] = {
+            id: car.id,
             model: car.model,
             plate: car.plate,
             note: car.note,
@@ -268,7 +275,24 @@ function saveCarsModificationsToStorage() {
             vin: car.vin,
             vehicleType: car.vehicleType,
             category: car.category,
-            subdivision: car.subdivision
+            subdivision: car.subdivision,
+            consumption: car.consumption,
+            fuelType: car.fuelType,
+            year: car.year,
+            transmission: car.transmission,
+            tankCapacity: car.tankCapacity,
+            drive: car.drive,
+            emptyWeight: car.emptyWeight,
+            totalWeight: car.totalWeight,
+            gears: car.gears,
+            engineVolume: car.engineVolume,
+            kw: car.kw,
+            hasAdBlue: car.hasAdBlue,
+            isMiles: car.isMiles,
+            formulas: car.formulas,
+            destroyDate: car.destroyDate,
+            destroyTime: car.destroyTime,
+            destroyLocation: car.destroyLocation
         };
     });
     localStorage.setItem('cars_modifications_data', JSON.stringify(mods));
@@ -625,6 +649,12 @@ function renderCarsTable(filterQuery = '') {
         );
     });
 
+    const isAdminOrDev = (typeof currentRole !== 'undefined' && (currentRole === 'admin' || currentRole === 'developer'));
+    const reportHeaderTh = document.getElementById('cars-report-col-th');
+    if (reportHeaderTh) {
+        reportHeaderTh.style.display = isAdminOrDev ? '' : 'none';
+    }
+
     filteredCars.forEach((car, index) => {
         const tr = document.createElement('tr');
         const group = getCarGroup(car);
@@ -657,7 +687,7 @@ function renderCarsTable(filterQuery = '') {
             <td>${car.kw || 0}</td>
             <td>${car.engineNo || ''}</td>
             <td><input type="text" class="table-cell-input" value="${car.driver || ''}" oninput="updateCarProp(${car.id}, 'driver', this.value)"></td>
-            <td style="text-align: center;"><button class="action-btn" style="padding: 2px 8px; font-size: 11px;" onclick="openCarDetails(${car.id})">Звіт</button></td>
+            <td class="cars-report-col" style="text-align: center; ${isAdminOrDev ? '' : 'display: none;'}"><button class="action-btn" style="padding: 2px 8px; font-size: 11px;" onclick="openCarDetails(${car.id})">Звіт</button></td>
         `;
         tbody.appendChild(tr);
     });

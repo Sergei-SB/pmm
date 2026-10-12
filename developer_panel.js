@@ -187,12 +187,48 @@ window.logoutDeveloperSession = function() {
     updateRoleUI();
 };
 
+window.applyCarsReportColumnRoleStyle = function(isAdminOrHigher) {
+    let styleEl = document.getElementById('cars-report-col-role-style');
+    if (!styleEl) {
+        styleEl = document.createElement('style');
+        styleEl.id = 'cars-report-col-role-style';
+        document.head.appendChild(styleEl);
+    }
+    if (isAdminOrHigher) {
+        styleEl.textContent = `
+            #cars-table thead tr th:last-child,
+            #cars-table tbody tr td:last-child,
+            #cars-table .cars-report-col,
+            #cars-report-col-th {
+                display: table-cell !important;
+            }
+            #cars-table tbody tr td:last-child button,
+            #cars-table .cars-report-col button {
+                display: inline-block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+            }
+        `;
+    } else {
+        styleEl.textContent = `
+            #cars-table thead tr th:last-child,
+            #cars-table tbody tr td:last-child,
+            #cars-table .cars-report-col,
+            #cars-report-col-th {
+                display: none !important;
+            }
+        `;
+    }
+};
+
 window.updateRoleUI = function() {
     const role = (typeof currentRole !== 'undefined') ? currentRole : 'user';
     const isModOrHigher = (role === "moderator" || role === "admin" || role === "developer");
     const isAdminOrHigher = (role === "admin" || role === "developer");
     const isDev = (role === "developer");
     const secCfg = getRoleSecurityConfig();
+
+    window.applyCarsReportColumnRoleStyle(isAdminOrHigher);
 
     const roles = ["user", "moderator", "admin", "developer"];
     const activeColors = {
@@ -272,6 +308,51 @@ window.updateRoleUI = function() {
         addCarBtn.style.display = isAdminOrHigher ? 'inline-block' : 'none';
     }
 
+    // Повністю приховуємо стовпчик "Звіт" (шапку та всі комірки) у таблиці "База (Реєстр)" для Модератора та Юзера
+    if (typeof window.syncCarsReportColumnVisibility === 'function') {
+        window.syncCarsReportColumnVisibility();
+    } else {
+        const carsTable = document.getElementById('cars-table');
+        if (carsTable) {
+            let reportColIdx = -1;
+            const headers = carsTable.querySelectorAll('thead th');
+            headers.forEach((th, idx) => {
+                if (th.id === 'cars-report-col-th' || th.classList.contains('cars-report-col') || (th.textContent || '').trim() === 'Звіт') {
+                    reportColIdx = idx;
+                    th.style.setProperty('display', isAdminOrHigher ? 'table-cell' : 'none', 'important');
+                }
+            });
+            const rows = carsTable.querySelectorAll('tbody tr');
+            rows.forEach(tr => {
+                let targetTd = tr.querySelector('.cars-report-col');
+                if (!targetTd && reportColIdx >= 0 && tr.children[reportColIdx]) {
+                    targetTd = tr.children[reportColIdx];
+                }
+                if (targetTd) {
+                    targetTd.style.setProperty('display', isAdminOrHigher ? 'table-cell' : 'none', 'important');
+                    const btn = targetTd.querySelector('button');
+                    if (btn) {
+                        btn.style.setProperty('display', isAdminOrHigher ? 'inline-block' : 'none', 'important');
+                    }
+                }
+            });
+        }
+    }
+
+    // Якщо відкрито детальний звіт авто (#car-details-view), а роль змінили на Модератора або Юзера — повертаємо в Базу
+    const carDetailsView = document.getElementById('car-details-view');
+    if (carDetailsView && (carDetailsView.classList.contains('active') || carDetailsView.style.display === 'block') && !isAdminOrHigher) {
+        if (typeof switchView === 'function') switchView('base');
+    }
+
+    const transferDataBtn = document.getElementById('transfer-data-btn');
+    if (transferDataBtn) {
+        transferDataBtn.style.setProperty('display', isAdminOrHigher ? 'inline-flex' : 'none', 'important');
+    }
+    if (typeof syncTransferButtonVisibility === 'function') {
+        syncTransferButtonVisibility();
+    }
+
     if (isDev) {
         ensureDevPanelHeaderButtons();
         renderDeveloperPanel();
@@ -289,7 +370,7 @@ window.refreshDevPanelData = function() {
 };
 
 // =========================================================================
-// ЕКСПОРТ ТА ІМПОРТ БЕКАПУ БАЗИ (JSON)
+// ЕКСПОРТ ТА ІМПОРТ ПОВНОГО БЕКАПУ БАЗИ ТА ВСІХ ЗМІН САЙТУ (JSON)
 // =========================================================================
 
 function ensureDevPanelHeaderButtons() {
@@ -324,16 +405,121 @@ function ensureDevPanelHeaderButtons() {
             <button class="action-btn" id="btn-dev-export-backup" onclick="exportFullDatabaseBackup()" style="background-color: #27ae60; color: #fff; font-weight: bold; padding: 8px 14px; border-radius: 6px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
                 📥 Скачати Бекап Бази
             </button>
-            <button class="action-btn" id="btn-dev-import-backup" onclick="triggerImportBackupFile()" style="background-color: #e67e22; color: #fff; font-weight: bold; padding: 8px 14px; border-radius: 6px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;" title="Завантажити збережений файл або файли .json у систему">
+            <button class="action-btn dev-json-import-btn" id="btn-dev-import-backup" onclick="triggerImportBackupFile()" style="background-color: #e67e22; color: #fff; font-weight: bold; padding: 8px 14px; border-radius: 6px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;" title="Завантажити збережений файл або файли .json у систему">
                 📤 Імпортувати Бекап (JSON)
             </button>
             <input type="file" id="dev-backup-import-input" accept=".json,application/json" multiple style="display: none;" onchange="handleImportBackupFiles(event)">
         `;
+    } else {
+        const importBtns = Array.from(actionsWrap.querySelectorAll('button')).filter(b => (b.textContent || '').includes('Імпортувати Бекап'));
+        if (importBtns.length > 1) {
+            for (let i = 1; i < importBtns.length; i++) {
+                importBtns[i].remove();
+            }
+        }
     }
 }
 
-window.exportFullDatabaseBackup = function() {
+function flushAllActiveSiteChangesToStorage() {
     try {
+        const detSec = document.getElementById('car-details-view');
+        if (detSec && window.activeReportCarId && typeof carsData !== 'undefined' && Array.isArray(carsData)) {
+            const detCar = carsData.find(c => Number(c.id) === Number(window.activeReportCarId));
+            if (detCar) {
+                const getVal = (id) => document.getElementById(id)?.value;
+                if (getVal('det-input-model') !== undefined && getVal('det-input-model') !== '') detCar.model = getVal('det-input-model');
+                if (getVal('det-input-plate') !== undefined && getVal('det-input-plate') !== '') detCar.plate = getVal('det-input-plate');
+                if (getVal('det-input-subdivision') !== undefined) detCar.subdivision = getVal('det-input-subdivision');
+                if (getVal('det-input-driver') !== undefined) detCar.driver = getVal('det-input-driver');
+                if (getVal('det-input-vin') !== undefined) detCar.vin = getVal('det-input-vin');
+                if (getVal('det-input-year') !== undefined && getVal('det-input-year') !== '') detCar.year = parseInt(getVal('det-input-year'), 10) || getVal('det-input-year');
+                if (getVal('det-input-transmission') !== undefined) detCar.transmission = getVal('det-input-transmission');
+                if (getVal('det-input-tank') !== undefined && getVal('det-input-tank') !== '') detCar.tankCapacity = parseFloat(getVal('det-input-tank')) || getVal('det-input-tank');
+                if (getVal('det-input-drive') !== undefined) detCar.drive = getVal('det-input-drive');
+                if (getVal('det-input-emptyWeight') !== undefined && getVal('det-input-emptyWeight') !== '') detCar.emptyWeight = parseFloat(getVal('det-input-emptyWeight')) || getVal('det-input-emptyWeight');
+                if (getVal('det-input-totalWeight') !== undefined && getVal('det-input-totalWeight') !== '') detCar.totalWeight = parseFloat(getVal('det-input-totalWeight')) || getVal('det-input-totalWeight');
+                if (getVal('det-input-gears') !== undefined && getVal('det-input-gears') !== '') detCar.gears = parseInt(getVal('det-input-gears'), 10) || getVal('det-input-gears');
+                if (getVal('det-input-engine') !== undefined && getVal('det-input-engine') !== '') detCar.engineVolume = parseFloat(getVal('det-input-engine')) || getVal('det-input-engine');
+                if (getVal('det-input-kw') !== undefined && getVal('det-input-kw') !== '') detCar.kw = parseFloat(getVal('det-input-kw')) || getVal('det-input-kw');
+                if (getVal('det-input-engineNo') !== undefined) detCar.engineNo = getVal('det-input-engineNo');
+                if (getVal('det-input-consumption') !== undefined && getVal('det-input-consumption') !== '') detCar.consumption = parseFloat(getVal('det-input-consumption')) || getVal('det-input-consumption');
+            }
+        }
+
+        if (typeof saveCarsModificationsToStorage === 'function') {
+            saveCarsModificationsToStorage();
+        }
+        if (typeof saveCarsToStorage === 'function') {
+            saveCarsToStorage();
+        }
+        if (typeof carsData !== 'undefined' && Array.isArray(carsData)) {
+            localStorage.setItem('user_cars_database_v2', JSON.stringify(carsData));
+            localStorage.setItem('cars_backup_array', JSON.stringify(carsData));
+        }
+
+        if (typeof updateRouteTotals === 'function') {
+            updateRouteTotals();
+        }
+        if (typeof saveCarRoutesForPeriod === 'function') {
+            const activePer = (typeof getStrictActivePeriod === 'function') ? getStrictActivePeriod() : (typeof activeCarPeriod !== 'undefined' ? activeCarPeriod : '01.10-10.10');
+            const activeCar = (typeof currentCarId !== 'undefined' && currentCarId) ? currentCarId : 1;
+            saveCarRoutesForPeriod(activePer, activeCar);
+            localStorage.setItem('last_active_car_id', String(activeCar));
+            localStorage.setItem('last_active_car_period', String(activePer));
+        }
+
+        const repInputs = document.querySelectorAll('#report-tbody input.report-cell-input');
+        if (repInputs.length > 0) {
+            const repPeriod = (typeof activeReportPeriod !== 'undefined' && activeReportPeriod)
+                ? activeReportPeriod
+                : (document.getElementById('report-period-select')?.value || '01.10-10.10');
+            let repStore = {};
+            try {
+                const rawRep = localStorage.getItem('report_data_' + repPeriod);
+                if (rawRep) repStore = JSON.parse(rawRep) || {};
+            } catch (e) {}
+            repInputs.forEach(inp => {
+                const cId = inp.getAttribute('data-car');
+                const fld = inp.getAttribute('data-field');
+                if (cId && fld) {
+                    if (!repStore[cId]) repStore[cId] = {};
+                    repStore[cId][fld] = inp.value;
+                }
+            });
+            localStorage.setItem('report_data_' + repPeriod, JSON.stringify(repStore));
+            localStorage.setItem('last_active_report_period', String(repPeriod));
+        }
+
+        if (typeof window.saveAggregatesCalcStateToStorage === 'function') {
+            window.saveAggregatesCalcStateToStorage();
+        }
+        if (typeof getGeneratorsList === 'function') getGeneratorsList();
+        if (typeof getWebastoList === 'function') getWebastoList();
+        if (typeof getHeatersList === 'function') getHeatersList();
+        if (typeof getChainsawsList === 'function') getChainsawsList();
+
+        const docModal = document.getElementById('doc-editor-modal');
+        if (docModal && typeof syncAllRichBlocksToState === 'function') {
+            try { syncAllRichBlocksToState(); } catch (e) {}
+        }
+    } catch (err) {
+        console.error('Помилка фіксації поточних змін перед експортом:', err);
+    }
+}
+
+window.exportFullDatabaseBackup = async function() {
+    try {
+        flushAllActiveSiteChangesToStorage();
+
+        let idbFiles = [];
+        if (typeof window.exportAllDocsFromIndexedDB === 'function') {
+            try {
+                idbFiles = await window.exportAllDocsFromIndexedDB();
+            } catch (e) {
+                idbFiles = [];
+            }
+        }
+
         const allStorage = {};
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
@@ -346,11 +532,107 @@ window.exportFullDatabaseBackup = function() {
             }
         }
 
+        const allSessionStorage = {};
+        try {
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                if (!key) continue;
+                const rawVal = sessionStorage.getItem(key);
+                try {
+                    allSessionStorage[key] = JSON.parse(rawVal);
+                } catch (e) {
+                    allSessionStorage[key] = rawVal;
+                }
+            }
+        } catch (e) {}
+
+        if (Array.isArray(idbFiles) && idbFiles.length > 0 && Array.isArray(allStorage['saved_documents_v2'])) {
+            const idbMap = {};
+            idbFiles.forEach(item => {
+                if (item && item.id) idbMap[item.id] = item;
+            });
+            allStorage['saved_documents_v2'] = allStorage['saved_documents_v2'].map(doc => {
+                if (doc && doc.id && idbMap[doc.id]) {
+                    const bin = idbMap[doc.id];
+                    return {
+                        ...doc,
+                        fileDataUrl: doc.fileDataUrl || bin.fileDataUrl || '',
+                        extractedText: doc.extractedText || bin.extractedText || '',
+                        extractedHtml: doc.extractedHtml || bin.extractedHtml || ''
+                    };
+                }
+                return doc;
+            });
+        }
+
+        const carRoutesByPeriod = {};
+        const carHistoryByPeriod = {};
+        const reports10DaysByPeriod = {};
+        const carFoldersDocs = {};
+
+        Object.keys(allStorage).forEach(k => {
+            if (k.startsWith('isolated_car_routes_')) {
+                carRoutesByPeriod[k] = allStorage[k];
+            } else if (k.startsWith('car_history_data_')) {
+                carHistoryByPeriod[k] = allStorage[k];
+            } else if (k.startsWith('report_data_')) {
+                reports10DaysByPeriod[k] = allStorage[k];
+            } else if (k.startsWith('car_folder_')) {
+                carFoldersDocs[k] = allStorage[k];
+            }
+        });
+
+        const currentCarsArray = (typeof carsData !== 'undefined' && Array.isArray(carsData))
+            ? carsData
+            : (allStorage['user_cars_database_v2'] || allStorage['cars_backup_array'] || []);
+
         const backupPayload = {
-            app: "Облік палива та конструктор документів А4",
-            version: "2.0",
+            app: "Облік палива та конструктор документів А4 — Повний Бекап Сайту",
+            version: "3.0-FULL",
             exportDate: new Date().toISOString(),
             exportDateLocale: new Date().toLocaleString('uk-UA'),
+            summary: {
+                totalLocalStorageKeys: Object.keys(allStorage).length,
+                totalCars: Array.isArray(currentCarsArray) ? currentCarsArray.length : 0,
+                totalCarRouteRecords: Object.keys(carRoutesByPeriod).length,
+                totalReportPeriods: Object.keys(reports10DaysByPeriod).length,
+                totalCarDocumentFolders: Object.keys(carFoldersDocs).length,
+                totalA4Documents: Array.isArray(allStorage['saved_documents_v2']) ? allStorage['saved_documents_v2'].length : 0,
+                totalIndexedDBFiles: idbFiles.length
+            },
+            fullSiteSnapshot: {
+                carsDatabase: currentCarsArray,
+                carsModifications: allStorage['cars_modifications_data'] || {},
+                periodsList: allStorage['app_saved_periods_list'] || [],
+                carCardsAndRoutesByPeriod: carRoutesByPeriod,
+                carHistoryByPeriod: carHistoryByPeriod,
+                reports10DaysByPeriod: reports10DaysByPeriod,
+                carFoldersDocuments: carFoldersDocs,
+                equipmentDatabase: {
+                    generators: allStorage['generators_custom_data'] || [],
+                    webasto: allStorage['webasto_custom_data'] || [],
+                    heaters: allStorage['heaters_custom_data'] || [],
+                    chainsaws: allStorage['chainsaws_custom_data'] || [],
+                    equipmentPeriods: allStorage['eq_saved_periods_list'] || []
+                },
+                aggregatesCalculatorState: allStorage['aggregates_calc_saved_state'] || null,
+                documentsA4: {
+                    savedDocuments: allStorage['saved_documents_v2'] || [],
+                    fragmentTemplates: allStorage['doc_fragment_templates_v1'] || {},
+                    marginsMmState: allStorage['doc_margins_mm_state_v1'] || null,
+                    marginsMmTemplates: allStorage['doc_margins_mm_templates_v1'] || []
+                },
+                systemSettingsAndMail: {
+                    passwords: allStorage['dev_system_passwords'] || {},
+                    roleSecurityConfig: allStorage['dev_role_security_config'] || {},
+                    managedUsers: allStorage['dev_managed_users'] || [],
+                    securityLogs: allStorage['dev_security_logs'] || [],
+                    roleTimeStats: allStorage['dev_role_time_stats'] || {},
+                    broadcastMail: allStorage['broadcastStorageList_v2'] || []
+                }
+            },
+            indexedDBFiles: idbFiles,
+            sessionStorageData: allSessionStorage,
             localStorageData: allStorage
         };
 
@@ -362,14 +644,22 @@ window.exportFullDatabaseBackup = function() {
         const dateStamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
         const a = document.createElement('a');
         a.href = url;
-        a.download = `backup_fuel_system_${dateStamp}.json`;
+        a.download = `full_site_backup_${dateStamp}.json`;
         document.body.appendChild(a);
         a.click();
         a.remove();
         URL.revokeObjectURL(url);
 
-        addSecurityLog('info', 'Експорт бекапу бази (JSON)', `Збережено ключів: ${Object.keys(allStorage).length}`);
-        showDevNotification(`✅ Бекап бази успішно скачано (${Object.keys(allStorage).length} розділів даних)!`, '#27ae60');
+        const s = backupPayload.summary;
+        addSecurityLog(
+            'info',
+            'Повний експорт бекапу сайту (JSON)',
+            `Авто: ${s.totalCars}, Картки/Маршрути: ${s.totalCarRouteRecords}, Звіти: ${s.totalReportPeriods}, Документи А4: ${s.totalA4Documents}, Файли авто: ${s.totalCarDocumentFolders}, Всього розділів: ${s.totalLocalStorageKeys}`
+        );
+        showDevNotification(
+            `✅ Повний Бекап Сайту скачано!<br>Авто: <b>${s.totalCars}</b> | Маршрути/Картки: <b>${s.totalCarRouteRecords}</b> | Звіти: <b>${s.totalReportPeriods}</b> | Документи: <b>${s.totalA4Documents + s.totalCarDocumentFolders}</b>`,
+            '#27ae60'
+        );
         renderDeveloperPanel();
     } catch (err) {
         console.error(err);
@@ -394,11 +684,115 @@ window.triggerImportBackupFile = function() {
     input.click();
 };
 
-function applyParsedJsonToStorage(parsed) {
+async function applyParsedJsonToStorage(parsed) {
     if (!parsed || typeof parsed !== 'object') return 0;
     let importedKeysCount = 0;
 
-    // 1. Стандартний файл бекапу з полем localStorageData / localStorage / storage / data
+    if (Array.isArray(parsed.indexedDBFiles) && parsed.indexedDBFiles.length > 0 && typeof window.restoreAllDocsToIndexedDB === 'function') {
+        try {
+            await window.restoreAllDocsToIndexedDB(parsed.indexedDBFiles);
+        } catch (e) {}
+    }
+
+    const docsCandidate = parsed.fullSiteSnapshot?.documentsA4?.savedDocuments
+        || parsed.localStorageData?.saved_documents_v2
+        || (Array.isArray(parsed) && parsed[0] && (parsed[0].layout || String(parsed[0].id || '').startsWith('doc_')) ? parsed : null);
+
+    if (Array.isArray(docsCandidate) && typeof window.restoreAllDocsToIndexedDB === 'function') {
+        const extractedBins = docsCandidate
+            .filter(d => d && d.id && (d.fileDataUrl || d.extractedText || d.extractedHtml))
+            .map(d => ({
+                id: d.id,
+                fileDataUrl: d.fileDataUrl || '',
+                extractedText: d.extractedText || '',
+                extractedHtml: d.extractedHtml || ''
+            }));
+        if (extractedBins.length > 0) {
+            try { await window.restoreAllDocsToIndexedDB(extractedBins); } catch (e) {}
+        }
+    }
+
+    if (parsed.sessionStorageData && typeof parsed.sessionStorageData === 'object') {
+        Object.keys(parsed.sessionStorageData).forEach(k => {
+            try {
+                const v = parsed.sessionStorageData[k];
+                if (v !== undefined && v !== null) {
+                    sessionStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
+                }
+            } catch (e) {}
+        });
+    }
+
+    if (parsed.fullSiteSnapshot && typeof parsed.fullSiteSnapshot === 'object') {
+        const snap = parsed.fullSiteSnapshot;
+        if (Array.isArray(snap.carsDatabase) && snap.carsDatabase.length > 0) {
+            localStorage.setItem('user_cars_database_v2', JSON.stringify(snap.carsDatabase));
+            localStorage.setItem('cars_backup_array', JSON.stringify(snap.carsDatabase));
+            if (typeof carsData !== 'undefined' && Array.isArray(carsData)) {
+                carsData.length = 0;
+                snap.carsDatabase.forEach(c => carsData.push(c));
+            }
+            importedKeysCount++;
+        }
+        if (snap.carsModifications && typeof snap.carsModifications === 'object') {
+            localStorage.setItem('cars_modifications_data', JSON.stringify(snap.carsModifications));
+            importedKeysCount++;
+        }
+        if (Array.isArray(snap.periodsList) && snap.periodsList.length > 0) {
+            localStorage.setItem('app_saved_periods_list', JSON.stringify(snap.periodsList));
+            importedKeysCount++;
+        }
+        if (snap.carCardsAndRoutesByPeriod && typeof snap.carCardsAndRoutesByPeriod === 'object') {
+            Object.entries(snap.carCardsAndRoutesByPeriod).forEach(([k, v]) => {
+                localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
+                importedKeysCount++;
+            });
+        }
+        if (snap.carHistoryByPeriod && typeof snap.carHistoryByPeriod === 'object') {
+            Object.entries(snap.carHistoryByPeriod).forEach(([k, v]) => {
+                localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
+                importedKeysCount++;
+            });
+        }
+        if (snap.reports10DaysByPeriod && typeof snap.reports10DaysByPeriod === 'object') {
+            Object.entries(snap.reports10DaysByPeriod).forEach(([k, v]) => {
+                localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
+                importedKeysCount++;
+            });
+        }
+        if (snap.carFoldersDocuments && typeof snap.carFoldersDocuments === 'object') {
+            Object.entries(snap.carFoldersDocuments).forEach(([k, v]) => {
+                localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
+                importedKeysCount++;
+            });
+        }
+        if (snap.equipmentDatabase && typeof snap.equipmentDatabase === 'object') {
+            const eq = snap.equipmentDatabase;
+            if (Array.isArray(eq.generators)) localStorage.setItem('generators_custom_data', JSON.stringify(eq.generators));
+            if (Array.isArray(eq.webasto)) localStorage.setItem('webasto_custom_data', JSON.stringify(eq.webasto));
+            if (Array.isArray(eq.heaters)) localStorage.setItem('heaters_custom_data', JSON.stringify(eq.heaters));
+            if (Array.isArray(eq.chainsaws)) localStorage.setItem('chainsaws_custom_data', JSON.stringify(eq.chainsaws));
+            if (Array.isArray(eq.equipmentPeriods)) localStorage.setItem('eq_saved_periods_list', JSON.stringify(eq.equipmentPeriods));
+        }
+        if (snap.aggregatesCalculatorState) {
+            localStorage.setItem('aggregates_calc_saved_state', JSON.stringify(snap.aggregatesCalculatorState));
+        }
+        if (snap.documentsA4 && typeof snap.documentsA4 === 'object') {
+            if (Array.isArray(snap.documentsA4.savedDocuments)) {
+                localStorage.setItem('saved_documents_v2', JSON.stringify(snap.documentsA4.savedDocuments));
+            }
+            if (snap.documentsA4.fragmentTemplates && typeof snap.documentsA4.fragmentTemplates === 'object') {
+                localStorage.setItem('doc_fragment_templates_v1', JSON.stringify(snap.documentsA4.fragmentTemplates));
+            }
+            if (snap.documentsA4.marginsMmState) {
+                localStorage.setItem('doc_margins_mm_state_v1', JSON.stringify(snap.documentsA4.marginsMmState));
+            }
+            if (Array.isArray(snap.documentsA4.marginsMmTemplates)) {
+                localStorage.setItem('doc_margins_mm_templates_v1', JSON.stringify(snap.documentsA4.marginsMmTemplates));
+            }
+        }
+    }
+
     const storageMap = parsed.localStorageData || parsed.localStorage || parsed.storage || (parsed.data && typeof parsed.data === 'object' && !Array.isArray(parsed.data) ? parsed.data : null);
 
     if (storageMap && typeof storageMap === 'object' && !Array.isArray(storageMap)) {
@@ -406,13 +800,29 @@ function applyParsedJsonToStorage(parsed) {
             const val = storageMap[key];
             if (val === undefined || val === null) return;
             const serialized = (typeof val === 'string') ? val : JSON.stringify(val);
-            localStorage.setItem(key, serialized);
-            importedKeysCount++;
+            try {
+                localStorage.setItem(key, serialized);
+                importedKeysCount++;
+            } catch (err) {
+                if (key === 'saved_documents_v2' && Array.isArray(val)) {
+                    try {
+                        const slim = val.map(d => ({ ...d, fileDataUrl: '' }));
+                        localStorage.setItem(key, JSON.stringify(slim));
+                        importedKeysCount++;
+                    } catch (e2) {}
+                }
+            }
         });
+
+        const restoredCars = storageMap['user_cars_database_v2'] || storageMap['cars_backup_array'];
+        if (Array.isArray(restoredCars) && restoredCars.length > 0 && typeof carsData !== 'undefined' && Array.isArray(carsData)) {
+            carsData.length = 0;
+            restoredCars.forEach(c => carsData.push(c));
+        }
+
         return importedKeysCount;
     }
 
-    // 2. Якщо це масив документів або автомобілів
     if (Array.isArray(parsed)) {
         if (parsed.length > 0 && parsed[0] && (parsed[0].layout || parsed[0].originalFormat || String(parsed[0].id || '').startsWith('doc_'))) {
             localStorage.setItem('saved_documents_v2', JSON.stringify(parsed));
@@ -424,27 +834,28 @@ function applyParsedJsonToStorage(parsed) {
                 parsed.forEach(c => carsData.push(c));
                 if (typeof saveCarsModificationsToStorage === 'function') saveCarsModificationsToStorage();
             }
+            localStorage.setItem('user_cars_database_v2', JSON.stringify(parsed));
             localStorage.setItem('cars_backup_array', JSON.stringify(parsed));
             return 1;
         }
         return 0;
     }
 
-    // 3. Якщо це об'єкт шаблонів фрагментів документів
     if (parsed.leftHeader && parsed.rightHeader && parsed.docTitle) {
         localStorage.setItem('doc_fragment_templates_v1', JSON.stringify(parsed));
         return 1;
     }
 
-    // 4. Прямий дамп ключів localStorage
-    const metaSkipKeys = new Set(['app', 'version', 'exportDate', 'exportDateLocale']);
+    const metaSkipKeys = new Set(['app', 'version', 'exportDate', 'exportDateLocale', 'summary', 'fullSiteSnapshot', 'indexedDBFiles', 'sessionStorageData']);
     Object.keys(parsed).forEach(key => {
         if (metaSkipKeys.has(key)) return;
         const val = parsed[key];
         if (val === undefined || val === null) return;
         const serialized = (typeof val === 'string') ? val : JSON.stringify(val);
-        localStorage.setItem(key, serialized);
-        importedKeysCount++;
+        try {
+            localStorage.setItem(key, serialized);
+            importedKeysCount++;
+        } catch (e) {}
     });
 
     return importedKeysCount;
@@ -452,16 +863,43 @@ function applyParsedJsonToStorage(parsed) {
 
 function refreshAllModulesAfterImport() {
     try {
+        if (typeof window.reloadCarsFromStorage === 'function') window.reloadCarsFromStorage();
         if (typeof loadCarsModifications === 'function') loadCarsModifications();
+
+        const savedActiveCar = localStorage.getItem('last_active_car_id');
+        if (savedActiveCar && typeof carsData !== 'undefined' && Array.isArray(carsData)) {
+            const exists = carsData.some(c => Number(c.id) === Number(savedActiveCar));
+            if (exists) window.currentCarId = Number(savedActiveCar);
+        }
+
+        const savedActivePeriod = localStorage.getItem('last_active_car_period');
+        if (savedActivePeriod && typeof activeCarPeriod !== 'undefined') {
+            activeCarPeriod = savedActivePeriod;
+        }
+
+        const savedRepPeriod = localStorage.getItem('last_active_report_period');
+        if (savedRepPeriod && typeof activeReportPeriod !== 'undefined') {
+            activeReportPeriod = savedRepPeriod;
+        }
+
         if (typeof initCardPeriodsSelect === 'function') initCardPeriodsSelect();
-        if (typeof loadCarDataForActivePeriod === 'function') loadCarDataForActivePeriod();
+        if (typeof populatePeriodDropdown === 'function') populatePeriodDropdown(typeof activeReportPeriod !== 'undefined' ? activeReportPeriod : undefined);
+        if (typeof loadCarCard === 'function' && typeof currentCarId !== 'undefined' && currentCarId) {
+            loadCarCard(currentCarId);
+        } else if (typeof loadCarDataForActivePeriod === 'function') {
+            loadCarDataForActivePeriod();
+        }
         if (typeof populateCarSelector === 'function') populateCarSelector();
         if (typeof renderCarsTable === 'function') renderCarsTable();
         if (typeof renderReportTable === 'function') renderReportTable();
         if (typeof renderSubdivisionsView === 'function') renderSubdivisionsView();
         if (typeof renderGeneratorsView === 'function') renderGeneratorsView();
+        if (typeof renderWebastoView === 'function' && typeof currentEquipmentTabName !== 'undefined' && currentEquipmentTabName === 'webasto') renderWebastoView();
+        if (typeof renderHeatersView === 'function' && typeof currentEquipmentTabName !== 'undefined' && currentEquipmentTabName === 'heaters') renderHeatersView();
+        if (typeof renderChainsawsView === 'function' && typeof currentEquipmentTabName !== 'undefined' && currentEquipmentTabName === 'chainsaws') renderChainsawsView();
         if (typeof renderAggregatesCalcView === 'function') renderAggregatesCalcView();
         if (typeof renderDestroyedEquipmentView === 'function') renderDestroyedEquipmentView();
+        if (typeof renderCarDetailsData === 'function' && window.activeReportCarId) renderCarDetailsData();
         if (typeof renderDocumentsMainView === 'function') renderDocumentsMainView();
         if (typeof refreshAllFragmentTemplateWidgets === 'function') refreshAllFragmentTemplateWidgets();
         if (typeof renderDeveloperPanel === 'function') renderDeveloperPanel();
@@ -488,7 +926,7 @@ window.handleImportBackupFiles = async function(event) {
             });
 
             const parsed = JSON.parse(text);
-            const count = applyParsedJsonToStorage(parsed);
+            const count = await applyParsedJsonToStorage(parsed);
             if (count > 0) {
                 totalKeysRestored += count;
                 importedFileNames.push(file.name);
@@ -504,10 +942,10 @@ window.handleImportBackupFiles = async function(event) {
     event.target.value = '';
 
     if (importedFileNames.length > 0) {
-        addSecurityLog('success', 'Імпорт бекапу бази (JSON)', `Файли: ${importedFileNames.join(', ')} (відновлено розділів: ${totalKeysRestored})`);
+        addSecurityLog('success', 'Імпорт повного бекапу бази (JSON)', `Файли: ${importedFileNames.join(', ')} (відновлено розділів: ${totalKeysRestored})`);
         refreshAllModulesAfterImport();
         showDevNotification(
-            `✅ Успішно імпортовано (${importedFileNames.join(', ')})! Відновлено записів/розділів: ${totalKeysRestored}.`,
+            `✅ Успішно імпортовано повний бекап (${importedFileNames.join(', ')})!<br>Відновлено записів та розділів: <b>${totalKeysRestored}</b>.`,
             '#27ae60'
         );
     } else {
