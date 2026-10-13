@@ -1,0 +1,8 @@
+{
+  "name": "Облік палива та конструктор документів А4",
+  "description": "Система обліку палива, транспортних засобів, агрегатів та конструктор документів А4 зі збереженням шаблонів фрагментів.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
