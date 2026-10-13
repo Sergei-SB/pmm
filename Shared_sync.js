@@ -105,7 +105,7 @@
     };
 
     function schedulePushChanges() {
-        updateSyncStatusBadge('', '#f39c12');
+        updateSyncStatusBadge('Збереження...', '#f39c12');
         if (syncTimer) clearTimeout(syncTimer);
         syncTimer = setTimeout(() => {
             flushPendingChangesToServer();
@@ -145,7 +145,7 @@
             }
         } catch (err) {
             console.warn('Помилка синхронізації з сервером:', err);
-            updateSyncStatusBadge('', '#e67e22');
+            updateSyncStatusBadge('Локальний режим', '#e67e22');
         }
     }
 
