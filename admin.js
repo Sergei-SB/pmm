@@ -222,6 +222,22 @@ function updateRoleUI() {
         reportNavBtn.style.display = isModOrHigher ? "inline-block" : "none";
     }
 
+    // Вкладки "Звіт по підрозділах", "Облік обладнання", "Знищена техніка" — доступні ТІЛЬКИ для Розробника та Адміна!
+    const subdivisionsNavBtn = document.getElementById("nav-btn-subdivisions");
+    if (subdivisionsNavBtn) {
+        subdivisionsNavBtn.style.display = isAdminOrHigher ? "inline-block" : "none";
+    }
+
+    const equipmentNavBtn = document.getElementById("nav-btn-equipment");
+    if (equipmentNavBtn) {
+        equipmentNavBtn.style.display = isAdminOrHigher ? "inline-block" : "none";
+    }
+
+    const destroyedNavBtn = document.getElementById("nav-btn-destroyed");
+    if (destroyedNavBtn) {
+        destroyedNavBtn.style.display = isAdminOrHigher ? "inline-block" : "none";
+    }
+
     // 2. Вкладка "Панель розробника"
     const devPanelBtn = document.getElementById("nav-btn-dev-panel");
     if (devPanelBtn) {
@@ -230,7 +246,23 @@ function updateRoleUI() {
 
     const reportView = document.getElementById("report-view");
     if (reportView && reportView.style.display !== "none" && !isModOrHigher) {
-        if (typeof switchTab === "function") switchTab("cars");
+        if (typeof switchView === "function") switchView("base");
+        else if (typeof switchTab === "function") switchTab("cars");
+    }
+
+    const subdivisionsView = document.getElementById("subdivisions-view");
+    if (subdivisionsView && (subdivisionsView.classList.contains("active") || subdivisionsView.style.display !== "none") && !isAdminOrHigher) {
+        if (typeof switchView === "function") switchView("base");
+    }
+
+    const equipmentView = document.getElementById("generators-view");
+    if (equipmentView && (equipmentView.classList.contains("active") || equipmentView.style.display !== "none") && !isAdminOrHigher) {
+        if (typeof switchView === "function") switchView("base");
+    }
+
+    const destroyedView = document.getElementById("destroyed-view");
+    if (destroyedView && (destroyedView.classList.contains("active") || destroyedView.style.display !== "none") && !isAdminOrHigher) {
+        if (typeof switchView === "function") switchView("base");
     }
 
     const devPanelView = document.getElementById("developer-panel-view");

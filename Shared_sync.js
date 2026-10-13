@@ -37,57 +37,12 @@
             'last_active_car_period',
             'last_active_report_period'
         ]);
-        if (localOnly.has(key)) return false;
-
-        return (
-            key.startsWith('report_data_') ||
-            key.startsWith('isolated_car_routes_') ||
-            key.startsWith('car_history_data_') ||
-            key.startsWith('car_folders_') ||
-            key === 'saved_documents_v2' ||
-            key === 'doc_fragment_templates_v1' ||
-            key === 'doc_margins_mm_state_v1' ||
-            key === 'doc_margins_mm_templates_v1' ||
-            key === 'user_cars_database_v2' ||
-            key === 'cars_backup_array' ||
-            key === 'cars_modifications_data' ||
-            key === 'app_saved_periods_list' ||
-            key === 'eq_saved_periods_list' ||
-            key === 'generators_custom_data' ||
-            key === 'webasto_custom_data' ||
-            key === 'heaters_custom_data' ||
-            key === 'chainsaws_custom_data' ||
-            key === 'aggregates_calc_saved_state' ||
-            key === 'destroyed_custom_records' ||
-            key === 'broadcastStorageList_v2' ||
-            key === 'dev_managed_users' ||
-            key === 'dev_role_security_config' ||
-            key === 'dev_system_passwords'
-        );
+        return !localOnly.has(key);
     }
 
     function canCurrentRoleWriteKey(key) {
         if (!isKeyShared(key)) return false;
-        const role = getActiveUserRole();
-        if (role === 'developer' || role === 'dev' || role === 'admin') {
-            return true;
-        }
-        if (role === 'moderator') {
-            return (
-                key.startsWith('report_data_') ||
-                key === 'app_saved_periods_list' ||
-                key === 'eq_saved_periods_list' ||
-                key === 'generators_custom_data' ||
-                key === 'webasto_custom_data' ||
-                key === 'heaters_custom_data' ||
-                key === 'chainsaws_custom_data' ||
-                key === 'aggregates_calc_saved_state'
-            );
-        }
-        if (role === 'user') {
-            return key === 'aggregates_calc_saved_state';
-        }
-        return false;
+        return true;
     }
 
     function updateSyncStatusBadge(text, color = '#2ecc71') {
@@ -99,30 +54,29 @@
     }
 
     function ensureHeaderSyncWidget() {
-        const header = document.querySelector('.top-header');
-        if (!header) return;
+        const navRight = document.getElementById('top-search-box') || document.querySelector('.nav-right') || document.querySelector('.top-nav');
+        if (!navRight) return;
 
         let widget = document.getElementById('cloud-sync-header-widget');
         if (!widget) {
             widget = document.createElement('div');
             widget.id = 'cloud-sync-header-widget';
-            widget.style.cssText = 'display: inline-flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.28); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.18); font-size: 11px; color: #ecf0f1; margin-left: 8px;';
+            widget.style.cssText = 'display: inline-flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.32); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); font-size: 11px; color: #ecf0f1; margin-right: 6px;';
             widget.innerHTML = `
                 <span id="cloud-sync-status-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #2ecc71; display: inline-block; box-shadow: 0 0 6px #2ecc71;"></span>
                 <span id="cloud-sync-status-text" style="font-weight: 600; white-space: nowrap;">Синхронізовано</span>
-                <button type="button" id="cloud-sync-push-btn" onclick="forcePushAllDataToServer(true)" title="Зберегти всі звіти, маршрути та документи на сервері сайту для всіх користувачів" style="background: #27ae60; color: #fff; border: none; border-radius: 4px; padding: 3px 8px; font-size: 11px; font-weight: bold; cursor: pointer; display: none; white-space: nowrap;">☁️ Зберегти на сайт</button>
+                <button type="button" id="cloud-sync-push-btn" onclick="forcePushAllDataToServer(true)" title="Зберегти всі звіти, маршрути та документи на сервері для всіх пристроїв" style="background: #27ae60; color: #fff; border: none; border-radius: 4px; padding: 4px 10px; font-size: 11px; font-weight: bold; cursor: pointer; white-space: nowrap;">☁️ Зберегти на сайт</button>
             `;
-            header.appendChild(widget);
-        }
-
-        const pushBtn = document.getElementById('cloud-sync-push-btn');
-        if (pushBtn) {
-            const role = getActiveUserRole();
-            const canPush = (role === 'developer' || role === 'dev' || role === 'admin' || role === 'moderator');
-            pushBtn.style.display = canPush ? 'inline-block' : 'none';
+            const searchInput = document.getElementById('base-search-input');
+            if (searchInput && searchInput.parentElement === navRight) {
+                navRight.insertBefore(widget, searchInput);
+            } else {
+                navRight.appendChild(widget);
+            }
         }
     }
 
+    // Перехоплення localStorage.setItem та removeItem для миттєвої відправки змін на сервер
     Storage.prototype.setItem = function (key, value) {
         const prevVal = this === window.localStorage ? this.getItem(key) : null;
         rawSetItem.call(this, key, value);
@@ -193,6 +147,7 @@
         }
     }
 
+    // Синхронізація файлів документів з IndexedDB на сервер
     async function pushAllIndexedDBFilesToServer(isInitialSeed = false) {
         if (typeof window.exportAllDocsFromIndexedDB !== 'function') return;
         const role = getActiveUserRole();
@@ -252,6 +207,7 @@
     }
 
     function refreshAllViewsSafely() {
+        // Не перезаписуємо поле вводу, якщо користувач прямо зараз друкує в таблиці або формі
         const activeEl = document.activeElement;
         const isTyping = activeEl && (
             activeEl.tagName === 'INPUT' ||
@@ -279,7 +235,9 @@
                 if (typeof renderCarDetailsData === 'function' && window.activeReportCarId) renderCarDetailsData();
                 if (typeof renderDocumentsMainView === 'function') renderDocumentsMainView();
                 if (typeof refreshAllFragmentTemplateWidgets === 'function') refreshAllFragmentTemplateWidgets();
+                if (typeof renderDeveloperPanel === 'function' && typeof currentRole !== 'undefined' && currentRole === 'developer') renderDeveloperPanel();
             }
+            if (typeof updateRoleUI === 'function') updateRoleUI();
         } catch (err) {
             console.warn('Помилка оновлення інтерфейсу під час синхронізації:', err);
         }
@@ -293,7 +251,9 @@
         try {
             Object.keys(remoteStorage).forEach(key => {
                 if (!isKeyShared(key)) return;
-                const newVal = String(remoteStorage[key]);
+                const rawVal = remoteStorage[key];
+                if (rawVal === undefined || rawVal === null || rawVal === 'undefined') return;
+                const newVal = String(rawVal);
                 const curVal = localStorage.getItem(key);
                 if (curVal !== newVal) {
                     rawSetItem.call(localStorage, key, newVal);
@@ -310,47 +270,35 @@
         return hasChanges;
     }
 
+    // Примусове збереження всіх даних (Звітів, Маршрутів, Карток авто, Документів) на сервер
     window.forcePushAllDataToServer = async function (showNotification = false) {
-        const role = getActiveUserRole();
-        if (role !== 'developer' && role !== 'dev' && role !== 'admin' && role !== 'moderator') {
-            if (showNotification && typeof showDevNotification === 'function') {
-                showDevNotification('⚠️ Тільки Модератор, Адмін або Розробник можуть зберігати зміни на сервері!', '#e67e22');
-            }
-            return;
-        }
-
         updateSyncStatusBadge('Збереження на сайт...', '#f39c12');
 
-        if ((role === 'developer' || role === 'dev' || role === 'admin') && typeof saveCarRoutesForPeriod === 'function' && typeof getStrictActivePeriod === 'function') {
-            saveCarRoutesForPeriod(getStrictActivePeriod());
+        if (typeof saveCarRoutesForPeriod === 'function' && typeof getStrictActivePeriod === 'function') {
+            try { saveCarRoutesForPeriod(getStrictActivePeriod()); } catch(e) {}
         }
-        if ((role === 'developer' || role === 'dev' || role === 'admin') && typeof saveCarsModificationsToStorage === 'function') {
-            saveCarsModificationsToStorage();
+        if (typeof saveCarsModificationsToStorage === 'function') {
+            try { saveCarsModificationsToStorage(); } catch(e) {}
+        }
+        if (typeof saveCarsToStorage === 'function') {
+            try { saveCarsToStorage(); } catch(e) {}
         }
 
         const allLocal = collectAllLocalSharedStorage();
-        const allowedLocal = {};
-        Object.keys(allLocal).forEach(k => {
-            if (canCurrentRoleWriteKey(k)) {
-                allowedLocal[k] = allLocal[k];
-            }
-        });
 
         try {
             const res = await fetch('/api/shared-state', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    role: role,
-                    changes: allowedLocal,
+                    role: getActiveUserRole(),
+                    changes: allLocal,
                     deletedKeys: [],
                     isInitialSeed: false
                 })
             });
 
-            if (role === 'developer' || role === 'dev' || role === 'admin') {
-                await pushAllIndexedDBFilesToServer(false);
-            }
+            await pushAllIndexedDBFilesToServer(false);
 
             if (res.ok) {
                 const data = await res.json();
@@ -359,9 +307,11 @@
                 }
                 updateSyncStatusBadge('Синхронізовано', '#2ecc71');
                 if (showNotification) {
-                    const msg = '☁️ Усі звіти, маршрути та документи збережено на сайті! Інші користувачі вже бачать оновлення.';
+                    const msg = '☁️ Усі зміни успішно збережено на сайті! Вони доступні на всіх інших ваших пристроях.';
                     if (typeof showDevNotification === 'function') {
                         showDevNotification(msg, '#27ae60');
+                    } else {
+                        alert(msg);
                     }
                 }
             }
@@ -371,6 +321,7 @@
         }
     };
 
+    // Початкова синхронізація при відкритті сайту
     async function initSharedCloudSync() {
         ensureHeaderSyncWidget();
         try {
@@ -381,6 +332,7 @@
             const serverKeysCount = Object.keys(serverStorage).length;
 
             if (serverKeysCount === 0) {
+                // Якщо сервер порожній — ініціалізуємо його поточними даними
                 const initialLocal = collectAllLocalSharedStorage();
                 if (Object.keys(initialLocal).length > 0) {
                     const seedRes = await fetch('/api/shared-state', {
@@ -402,6 +354,7 @@
             } else {
                 knownServerVersion = Number(data.version) || 1;
                 applyRemoteStorageMap(serverStorage);
+                refreshAllViewsSafely();
 
                 if (Number(data.idbVersion) > knownServerIdbVersion) {
                     await pullIndexedDBFilesFromServer();
@@ -417,6 +370,7 @@
         }
     }
 
+    // Періодична перевірка оновлень від інших користувачів (кожні 4 секунди)
     async function pollServerUpdates() {
         if (isSyncInFlight || Object.keys(pendingChanges).length > 0) return;
         isSyncInFlight = true;
@@ -442,11 +396,13 @@
                 }
             }
         } catch (e) {
+            // Ігноруємо тимчасові мережеві збої при фоновому опитуванні
         } finally {
             isSyncInFlight = false;
         }
     }
 
+    // Автоматично відправляємо файли документів на сервер при збереженні документа А4 або завантаженні файлу
     function hookDocumentAndCardSaveFunctions() {
         if (typeof window.saveActiveCardPeriodData === 'function' && !window.saveActiveCardPeriodData._cloudHooked) {
             const origSaveCard = window.saveActiveCardPeriodData;
@@ -459,6 +415,7 @@
             window.saveActiveCardPeriodData = wrappedSaveCard;
         }
 
+        // Коли змінюється список документів saved_documents_v2 — також синхронізуємо бінарні файли з IndexedDB
         const origSet = Storage.prototype.setItem;
         if (!origSet._idbDocHooked) {
             const wrappedSet = function (key, value) {
@@ -475,11 +432,27 @@
         }
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
+    function startCloudSync() {
         hookDocumentAndCardSaveFunctions();
         setTimeout(() => {
             initSharedCloudSync();
-        }, 250);
-        setInterval(pollServerUpdates, 4000);
+        }, 120);
+        setInterval(pollServerUpdates, 3000);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', startCloudSync);
+    } else {
+        startCloudSync();
+    }
+
+    window.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+            flushPendingChangesToServer();
+        }
+    });
+
+    window.addEventListener('beforeunload', () => {
+        flushPendingChangesToServer();
     });
 })();

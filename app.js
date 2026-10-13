@@ -394,6 +394,13 @@ function switchView(viewName) {
     } else if (viewName === 'car-details') {
         document.getElementById('car-details-view').classList.add('active');
         if (topSearchBox) topSearchBox.style.display = 'none';
+    } else if (viewName === 'dev-panel' || viewName === 'developer-panel' || viewName === 'dev-panel-view') {
+        const devSec = document.getElementById('dev-panel-view') || document.getElementById('developer-panel-view');
+        if (devSec) devSec.classList.add('active');
+        if (topSearchBox) topSearchBox.style.display = 'none';
+        if (typeof renderDeveloperPanel === 'function') {
+            renderDeveloperPanel();
+        }
     }
 }
 

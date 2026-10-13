@@ -118,6 +118,7 @@ window.selectRole = function(role) {
 
     if (window.isDeveloperLoggedIn) {
         currentRole = role;
+        try { localStorage.setItem('currentRole', currentRole); } catch(e) {}
         addSecurityLog('info', `Швидкий перехід Розробника`, `Перехід у кабінет: ${getRoleDisplayName(role)}`);
         updateRoleUI();
         return;
@@ -136,6 +137,7 @@ window.selectRole = function(role) {
 
     if (role === "user") {
         currentRole = "user";
+        try { localStorage.setItem('currentRole', 'user'); } catch(e) {}
         updateRoleUI();
         return;
     }
@@ -145,6 +147,7 @@ window.selectRole = function(role) {
             if (pwd === null) return;
             if (pwd === passwords.moderator || checkCustomUserPassword('moderator', pwd)) {
                 currentRole = "moderator";
+                try { localStorage.setItem('currentRole', 'moderator'); } catch(e) {}
                 addSecurityLog('success', 'Успішний вхід: Модератор', 'Авторизація пройдена');
                 updateRoleUI();
             } else {
@@ -157,6 +160,7 @@ window.selectRole = function(role) {
             if (pwd === null) return;
             if (pwd === passwords.admin || checkCustomUserPassword('admin', pwd)) {
                 currentRole = "admin";
+                try { localStorage.setItem('currentRole', 'admin'); } catch(e) {}
                 addSecurityLog('success', 'Успішний вхід: Адмін', 'Авторизація пройдена');
                 updateRoleUI();
             } else {
@@ -170,6 +174,10 @@ window.selectRole = function(role) {
             if (pwd === passwords.developer) {
                 currentRole = "developer";
                 window.isDeveloperLoggedIn = true;
+                try {
+                    localStorage.setItem('currentRole', 'developer');
+                    localStorage.setItem('isDeveloperLoggedIn', 'true');
+                } catch(e) {}
                 addSecurityLog('success', 'Успішний вхід: Розробник (Супер-доступ)', 'Активовано вільний перехід між кабінетами');
                 updateRoleUI();
             } else {
@@ -183,6 +191,10 @@ window.selectRole = function(role) {
 window.logoutDeveloperSession = function() {
     window.isDeveloperLoggedIn = false;
     currentRole = "user";
+    try {
+        localStorage.setItem('currentRole', 'user');
+        localStorage.setItem('isDeveloperLoggedIn', 'false');
+    } catch(e) {}
     addSecurityLog('info', 'Вихід із режиму Розробника', 'Сесію супер-доступу завершено');
     updateRoleUI();
 };
@@ -208,17 +220,21 @@ window.applyCarsReportColumnRoleStyle = function(isAdminOrHigher) {
                 visibility: visible !important;
                 opacity: 1 !important;
             }
+            #card-save-btn {
+                display: inline-flex !important;
+            }
         `;
     } else {
         styleEl.textContent = `
             #cars-table thead tr th:last-child,
             #cars-table tbody tr td:last-child,
             #cars-table .cars-report-col,
-            #cars-report-col-th {
+            #cars-report-col-th,
+            #card-save-btn {
                 display: none !important;
             }
-        `;   
-
+        `;
+    }
 };
 
 window.updateRoleUI = function() {
@@ -270,38 +286,65 @@ window.updateRoleUI = function() {
         devBadge.style.display = 'none';
     }
 
-    const allNavBtns = document.querySelectorAll('.top-nav button, .nav-links button, header .nav-btn');
-    allNavBtns.forEach(btn => {
-        const txt = (btn.innerText || '').trim();
-        const id = btn.id || '';
+    const baseNavBtn = document.getElementById("nav-btn-base");
+    if (baseNavBtn) baseNavBtn.style.display = "inline-block";
 
-        if (id.startsWith('role-btn-') || id === 'dev-super-badge') return;
-        if (!btn.classList.contains('nav-btn') && !btn.closest('.nav-links') && txt.length <= 3) return;
+    const cardNavBtn = document.getElementById("nav-btn-card");
+    if (cardNavBtn) cardNavBtn.style.display = "inline-block";
 
-        const isAllowedForUser = (
-            txt.includes('База (Реєстр)') ||
-            txt.includes('Картка авто та Маршрути') ||
-            txt.includes('Розрахунок агрегатів')
-        );
+    const aggNavBtn = document.getElementById("nav-btn-aggregates-calc");
+    if (aggNavBtn) aggNavBtn.style.display = "inline-block";
 
-        const isAllowedForModerator = (
-            isAllowedForUser ||
-            id === 'nav-btn-report' ||
-            txt.includes('Звіт (10 днів)')
-        );
+    // 1. Вкладка "Звіт (10 днів)" — бачать Модератор, Адмін, Розробник
+    const reportNavBtn = document.getElementById("nav-btn-report");
+    if (reportNavBtn) {
+        reportNavBtn.style.display = isModOrHigher ? "inline-block" : "none";
+    }
 
-        if (id === 'nav-btn-dev-panel' || txt.includes('Панель розробника')) {
-            btn.style.display = isDev ? 'inline-block' : 'none';
-        } else if (id === 'nav-btn-documents' || txt.includes('Документи')) {
-            btn.style.display = isAdminOrHigher ? 'inline-block' : 'none';
-        } else if (role === 'user') {
-            btn.style.display = isAllowedForUser ? 'inline-block' : 'none';
-        } else if (role === 'moderator') {
-            btn.style.display = isAllowedForModerator ? 'inline-block' : 'none';
-        } else {
-            btn.style.display = 'inline-block';
-        }
-    });
+    // 2. Вкладки "Звіт по підрозділах", "Облік обладнання", "Знищена техніка", "Документи" — бачать ТІЛЬКИ Адмін та Розробник!
+    const subNavBtn = document.getElementById("nav-btn-subdivisions");
+    if (subNavBtn) subNavBtn.style.display = isAdminOrHigher ? "inline-block" : "none";
+
+    const eqNavBtn = document.getElementById("nav-btn-equipment");
+    if (eqNavBtn) eqNavBtn.style.display = isAdminOrHigher ? "inline-block" : "none";
+
+    const destNavBtn = document.getElementById("nav-btn-destroyed");
+    if (destNavBtn) destNavBtn.style.display = isAdminOrHigher ? "inline-block" : "none";
+
+    const docsNavBtn = document.getElementById("nav-btn-documents");
+    if (docsNavBtn) docsNavBtn.style.display = isAdminOrHigher ? "inline-flex" : "none";
+
+    // 3. Вкладка "Панель розробника" — бачить ТІЛЬКИ Розробник!
+    const devPanelBtn = document.getElementById("nav-btn-dev-panel");
+    if (devPanelBtn) {
+        devPanelBtn.style.display = isDev ? "inline-block" : "none";
+    }
+
+    // Перевірка активного вікна при перемиканні ролей (якщо роль не має доступу — повертаємо на базу)
+    const reportView = document.getElementById("report-view");
+    if (reportView && (reportView.classList.contains("active") || reportView.style.display !== "none") && !isModOrHigher) {
+        if (typeof switchView === "function") switchView("base");
+    }
+
+    const subView = document.getElementById("subdivisions-view");
+    if (subView && (subView.classList.contains("active") || subView.style.display !== "none") && !isAdminOrHigher) {
+        if (typeof switchView === "function") switchView("base");
+    }
+
+    const eqView = document.getElementById("generators-view");
+    if (eqView && (eqView.classList.contains("active") || eqView.style.display !== "none") && !isAdminOrHigher) {
+        if (typeof switchView === "function") switchView("base");
+    }
+
+    const destView = document.getElementById("destroyed-view");
+    if (destView && (destView.classList.contains("active") || destView.style.display !== "none") && !isAdminOrHigher) {
+        if (typeof switchView === "function") switchView("base");
+    }
+
+    const devPanelView = document.getElementById("dev-panel-view") || document.getElementById("developer-panel-view");
+    if (devPanelView && (devPanelView.classList.contains("active") || devPanelView.style.display !== "none") && !isDev) {
+        if (typeof switchView === "function") switchView("base");
+    }
 
     const addCarBtn = document.getElementById('add-car-btn');
     if (addCarBtn) {
@@ -360,7 +403,15 @@ window.updateRoleUI = function() {
 };
 
 function getDevPanelContainer() {
-    let el = document.getElementById('dev-panel-main-container') || document.getElementById('developer-panel-view') || document.getElementById('dev-panel-view');
+    let el = document.getElementById('dev-panel-main-container');
+    if (!el) {
+        const devSec = document.getElementById('dev-panel-view') || document.getElementById('developer-panel-view');
+        if (devSec) {
+            el = document.createElement('div');
+            el.id = 'dev-panel-main-container';
+            devSec.appendChild(el);
+        }
+    }
     return el;
 }
 
@@ -370,7 +421,7 @@ window.refreshDevPanelData = function() {
 };
 
 // =========================================================================
-// ЕКСПОРТ ТА ІМПОРТ ПОВНОГО БЕКАПУ БАЗИ ТА ВСІХ ЗМІН САЙТУ (JSON)
+// ЕКСПОРТ ТА ІМПОРТ БЕКАПУ БАЗИ (JSON)
 // =========================================================================
 
 function ensureDevPanelHeaderButtons() {
@@ -388,9 +439,6 @@ function ensureDevPanelHeaderButtons() {
 
     let actionsWrap = document.getElementById('dev-panel-header-actions');
     if (!actionsWrap) {
-        const oldBtns = Array.from(headerPanel.querySelectorAll('button'));
-        oldBtns.forEach(b => b.remove());
-
         actionsWrap = document.createElement('div');
         actionsWrap.id = 'dev-panel-header-actions';
         actionsWrap.style.cssText = 'display: flex; gap: 10px; align-items: center; flex-wrap: wrap;';
@@ -401,11 +449,19 @@ function ensureDevPanelHeaderButtons() {
         <button class="action-btn" id="btn-dev-refresh" onclick="refreshDevPanelData()" style="background-color: #2980b9; color: #fff; font-weight: bold; padding: 8px 14px; border-radius: 6px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
             🔄 Оновити дані
         </button>
+        <button class="action-btn" id="btn-dev-export" onclick="exportFullDatabaseBackup()" style="background-color: #27ae60; color: #fff; font-weight: bold; padding: 8px 14px; border-radius: 6px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+            📥 Скачати Бекап Бази
+        </button>
+        <button class="action-btn" id="btn-dev-import" onclick="triggerImportBackupFile()" style="background-color: #e67e22; color: #fff; font-weight: bold; padding: 8px 14px; border-radius: 6px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+            📤 Імпортувати Бекап (JSON)
+        </button>
         <input type="file" id="dev-backup-import-input" accept=".json,application/json" multiple style="display: none;" onchange="handleImportBackupFiles(event)">
     `;
 }
+
 function flushAllActiveSiteChangesToStorage() {
     try {
+        // 1. Зберігаємо відкриту детальну картку авто (car-details-view), якщо користувач редагував характеристики
         const detSec = document.getElementById('car-details-view');
         if (detSec && window.activeReportCarId && typeof carsData !== 'undefined' && Array.isArray(carsData)) {
             const detCar = carsData.find(c => Number(c.id) === Number(window.activeReportCarId));
@@ -430,6 +486,7 @@ function flushAllActiveSiteChangesToStorage() {
             }
         }
 
+        // 2. Зберігаємо всі автомобілі, їх номери та всі характеристики в localStorage
         if (typeof saveCarsModificationsToStorage === 'function') {
             saveCarsModificationsToStorage();
         }
@@ -441,6 +498,7 @@ function flushAllActiveSiteChangesToStorage() {
             localStorage.setItem('cars_backup_array', JSON.stringify(carsData));
         }
 
+        // 3. Зберігаємо поточну відкриту «Картку авто та Маршрути» (маршрути, заправки, одометри, залишки, AdBlue)
         if (typeof updateRouteTotals === 'function') {
             updateRouteTotals();
         }
@@ -452,6 +510,7 @@ function flushAllActiveSiteChangesToStorage() {
             localStorage.setItem('last_active_car_period', String(activePer));
         }
 
+        // 4. Зберігаємо всі введені комірки у вкладці «Звіт (10 днів)»
         const repInputs = document.querySelectorAll('#report-tbody input.report-cell-input');
         if (repInputs.length > 0) {
             const repPeriod = (typeof activeReportPeriod !== 'undefined' && activeReportPeriod)
@@ -474,6 +533,7 @@ function flushAllActiveSiteChangesToStorage() {
             localStorage.setItem('last_active_report_period', String(repPeriod));
         }
 
+        // 5. Зберігаємо стан калькулятора агрегатів та таблиць обладнання
         if (typeof window.saveAggregatesCalcStateToStorage === 'function') {
             window.saveAggregatesCalcStateToStorage();
         }
@@ -482,6 +542,7 @@ function flushAllActiveSiteChangesToStorage() {
         if (typeof getHeatersList === 'function') getHeatersList();
         if (typeof getChainsawsList === 'function') getChainsawsList();
 
+        // 6. Якщо відкритий конструктор документа А4 — синхронізуємо поточні блоки
         const docModal = document.getElementById('doc-editor-modal');
         if (docModal && typeof syncAllRichBlocksToState === 'function') {
             try { syncAllRichBlocksToState(); } catch (e) {}
@@ -493,8 +554,10 @@ function flushAllActiveSiteChangesToStorage() {
 
 window.exportFullDatabaseBackup = async function() {
     try {
+        // Спочатку примусово зберігаємо всі поточні зміни на всіх вкладках сайту
         flushAllActiveSiteChangesToStorage();
 
+        // Отримуємо бінарні файли документів із IndexedDB (DocumentsFilesDB_v1)
         let idbFiles = [];
         if (typeof window.exportAllDocsFromIndexedDB === 'function') {
             try {
@@ -504,6 +567,7 @@ window.exportFullDatabaseBackup = async function() {
             }
         }
 
+        // Збираємо абсолютно всі ключі з localStorage
         const allStorage = {};
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
@@ -516,6 +580,7 @@ window.exportFullDatabaseBackup = async function() {
             }
         }
 
+        // Збираємо sessionStorage (якщо є)
         const allSessionStorage = {};
         try {
             for (let i = 0; i < sessionStorage.length; i++) {
@@ -530,6 +595,7 @@ window.exportFullDatabaseBackup = async function() {
             }
         } catch (e) {}
 
+        // Якщо в IndexedDB є файли документів, вбудовуємо їх також у масив saved_documents_v2 для 100% автономності
         if (Array.isArray(idbFiles) && idbFiles.length > 0 && Array.isArray(allStorage['saved_documents_v2'])) {
             const idbMap = {};
             idbFiles.forEach(item => {
@@ -549,6 +615,7 @@ window.exportFullDatabaseBackup = async function() {
             });
         }
 
+        // Формуємо структурований зріз усіх розділів сайту для повної прозорості та надійності
         const carRoutesByPeriod = {};
         const carHistoryByPeriod = {};
         const reports10DaysByPeriod = {};
@@ -672,12 +739,14 @@ async function applyParsedJsonToStorage(parsed) {
     if (!parsed || typeof parsed !== 'object') return 0;
     let importedKeysCount = 0;
 
+    // 0. Відновлення бінарних файлів документів у IndexedDB (якщо присутні)
     if (Array.isArray(parsed.indexedDBFiles) && parsed.indexedDBFiles.length > 0 && typeof window.restoreAllDocsToIndexedDB === 'function') {
         try {
             await window.restoreAllDocsToIndexedDB(parsed.indexedDBFiles);
         } catch (e) {}
     }
 
+    // Якщо в документах А4 є вбудовані fileDataUrl — також записуємо їх у IndexedDB
     const docsCandidate = parsed.fullSiteSnapshot?.documentsA4?.savedDocuments
         || parsed.localStorageData?.saved_documents_v2
         || (Array.isArray(parsed) && parsed[0] && (parsed[0].layout || String(parsed[0].id || '').startsWith('doc_')) ? parsed : null);
@@ -696,6 +765,7 @@ async function applyParsedJsonToStorage(parsed) {
         }
     }
 
+    // Відновлення sessionStorage (якщо є)
     if (parsed.sessionStorageData && typeof parsed.sessionStorageData === 'object') {
         Object.keys(parsed.sessionStorageData).forEach(k => {
             try {
@@ -707,6 +777,7 @@ async function applyParsedJsonToStorage(parsed) {
         });
     }
 
+    // 1. Якщо є структурований fullSiteSnapshot — відновлюємо всі його секції у localStorage
     if (parsed.fullSiteSnapshot && typeof parsed.fullSiteSnapshot === 'object') {
         const snap = parsed.fullSiteSnapshot;
         if (Array.isArray(snap.carsDatabase) && snap.carsDatabase.length > 0) {
@@ -777,6 +848,7 @@ async function applyParsedJsonToStorage(parsed) {
         }
     }
 
+    // 2. Якщо це стандартний файл бекапу з полем localStorageData / localStorage / storage / data
     const storageMap = parsed.localStorageData || parsed.localStorage || parsed.storage || (parsed.data && typeof parsed.data === 'object' && !Array.isArray(parsed.data) ? parsed.data : null);
 
     if (storageMap && typeof storageMap === 'object' && !Array.isArray(storageMap)) {
@@ -788,6 +860,7 @@ async function applyParsedJsonToStorage(parsed) {
                 localStorage.setItem(key, serialized);
                 importedKeysCount++;
             } catch (err) {
+                // Якщо документ занадто великий для localStorage (бо містить base64 файл), зберігаємо полегшену копію в localStorage, а повний файл вже у IndexedDB
                 if (key === 'saved_documents_v2' && Array.isArray(val)) {
                     try {
                         const slim = val.map(d => ({ ...d, fileDataUrl: '' }));
@@ -798,6 +871,7 @@ async function applyParsedJsonToStorage(parsed) {
             }
         });
 
+        // Синхронізуємо carsData у пам'яті з відновленими даними
         const restoredCars = storageMap['user_cars_database_v2'] || storageMap['cars_backup_array'];
         if (Array.isArray(restoredCars) && restoredCars.length > 0 && typeof carsData !== 'undefined' && Array.isArray(carsData)) {
             carsData.length = 0;
@@ -807,6 +881,7 @@ async function applyParsedJsonToStorage(parsed) {
         return importedKeysCount;
     }
 
+    // 3. Якщо це масив документів або автомобілів
     if (Array.isArray(parsed)) {
         if (parsed.length > 0 && parsed[0] && (parsed[0].layout || parsed[0].originalFormat || String(parsed[0].id || '').startsWith('doc_'))) {
             localStorage.setItem('saved_documents_v2', JSON.stringify(parsed));
@@ -825,11 +900,13 @@ async function applyParsedJsonToStorage(parsed) {
         return 0;
     }
 
+    // 4. Якщо це об'єкт шаблонів фрагментів документів (leftHeader, rightHeader, docTitle, bodyText, signers)
     if (parsed.leftHeader && parsed.rightHeader && parsed.docTitle) {
         localStorage.setItem('doc_fragment_templates_v1', JSON.stringify(parsed));
         return 1;
     }
 
+    // 5. Якщо це прямий дамп ключів localStorage
     const metaSkipKeys = new Set(['app', 'version', 'exportDate', 'exportDateLocale', 'summary', 'fullSiteSnapshot', 'indexedDBFiles', 'sessionStorageData']);
     Object.keys(parsed).forEach(key => {
         if (metaSkipKeys.has(key)) return;
@@ -983,11 +1060,13 @@ function getManagedUsers() {
     ];
     try {
         const stored = localStorage.getItem('dev_managed_users');
-        if (!stored) {
+        if (!stored || stored === 'undefined' || stored === 'null') {
             localStorage.setItem('dev_managed_users', JSON.stringify(defaultUsers));
             return defaultUsers;
         }
-        return JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        return defaultUsers;
     } catch (e) {
         return defaultUsers;
     }
@@ -1137,20 +1216,41 @@ window.clearAllSecurityLogs = function() {
 // =========================================================================
 
 window.renderDeveloperPanel = function() {
-    ensureDevPanelHeaderButtons();
+    try {
+        ensureDevPanelHeaderButtons();
 
-    const container = getDevPanelContainer();
-    if (!container) return;
+        const container = getDevPanelContainer();
+        if (!container) return;
 
-    const passwords = getSystemPasswords();
-    const secCfg = getRoleSecurityConfig();
-    const users = getManagedUsers();
-    const bannedCount = users.filter(u => u.status === 'banned').length;
-    const logs = JSON.parse(localStorage.getItem('dev_security_logs') || '[]');
-    const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData))
-        ? carsData.filter(c => !(typeof isItemDestroyed === 'function' && isItemDestroyed(c.note)))
-        : [];
-    const storageStats = getStorageStats();
+        const passwords = getSystemPasswords();
+        const secCfg = getRoleSecurityConfig();
+        let users = [];
+        try {
+            users = getManagedUsers();
+            if (!Array.isArray(users)) users = [];
+        } catch(e) {
+            users = [];
+        }
+        const bannedCount = users.filter(u => u && u.status === 'banned').length;
+
+        let logs = [];
+        try {
+            const rawLogs = localStorage.getItem('dev_security_logs');
+            if (rawLogs && rawLogs !== 'undefined' && rawLogs !== 'null') {
+                const parsedLogs = JSON.parse(rawLogs);
+                if (Array.isArray(parsedLogs)) logs = parsedLogs;
+            }
+        } catch (e) {
+            logs = [];
+        }
+
+        const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData))
+            ? carsData.filter(c => c && !(typeof isItemDestroyed === 'function' && isItemDestroyed(c.note)))
+            : [];
+        let storageStats = { kb: '0.0', periodsCount: 1, keysCount: 0 };
+        try {
+            storageStats = getStorageStats();
+        } catch(e) {}
 
     let roleTime = { user: 476, moderator: 30, admin: 355, developer: 11726 };
     try {
@@ -1404,15 +1504,37 @@ window.renderDeveloperPanel = function() {
                 💾 База даних та Бекап
             </button>
         </div>
-
         ${subTabContentHtml}
     `;
+    } catch (err) {
+        console.error('Помилка відмальовки панелі розробника:', err);
+        const container = getDevPanelContainer();
+        if (container) {
+            container.innerHTML = `
+                <div style="background: #fff; padding: 20px; border-radius: 8px; border: 1px solid #e74c3c; color: #c0392b;">
+                    <h4>⚠️ Помилка завантаження Панелі розробника</h4>
+                    <p style="font-size: 13px;">${err && err.message ? err.message : String(err)}</p>
+                    <button onclick="refreshDevPanelData()" class="action-btn" style="background:#2980b9; margin-top:10px;">🔄 Спробувати оновити</button>
+                </div>
+            `;
+        }
+    }
 };
 
-document.addEventListener("DOMContentLoaded", () => {
-    setTimeout(() => {
-        ensureDevPanelHeaderButtons();
+window.renderDevPanelView = window.renderDeveloperPanel;
+
+function initDevPanel() {
+    ensureDevPanelHeaderButtons();
+    if (typeof updateRoleUI === 'function') {
         updateRoleUI();
+    }
+    if (typeof currentRole !== 'undefined' && currentRole === 'developer') {
         renderDeveloperPanel();
-    }, 150);
-});
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener("DOMContentLoaded", () => setTimeout(initDevPanel, 80));
+} else {
+    setTimeout(initDevPanel, 80);
+}
