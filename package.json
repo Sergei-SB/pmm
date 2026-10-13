@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-  "start": "npx tsx server.ts",
-  "dev": "tsx server.ts",
-  "build": "vite build"
+    "start": "node --import tsx/esm server.ts",
+    "dev": "tsx server.ts",
+    "build": "vite build"
 },
   "dependencies": {
     "express": "^4.21.2",
