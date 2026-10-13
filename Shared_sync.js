@@ -5,6 +5,8 @@
 // =========================================================================
 
 (function () {
+    const SERVER_URL = 'https://pmm-server.onrender.com';
+
     let knownServerVersion = 0;
     let knownServerIdbVersion = 0;
     let isApplyingRemoteState = false;
@@ -124,7 +126,7 @@
         pendingDeletedKeys.clear();
 
         try {
-            const res = await fetch('/api/shared-state', {
+            const res = await fetch(`${SERVER_URL}/api/shared-state`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -157,7 +159,7 @@
             const files = await window.exportAllDocsFromIndexedDB();
             if (!Array.isArray(files) || files.length === 0) return;
 
-            const res = await fetch('/api/shared-idb', {
+            const res = await fetch(`${SERVER_URL}/api/shared-idb`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -180,7 +182,7 @@
     async function pullIndexedDBFilesFromServer() {
         if (typeof window.restoreAllDocsToIndexedDB !== 'function') return;
         try {
-            const res = await fetch('/api/shared-idb');
+            const res = await fetch(`${SERVER_URL}/api/shared-idb`);
             if (!res.ok) return;
             const data = await res.json();
             if (data && Array.isArray(data.files) && data.files.length > 0) {
@@ -207,7 +209,6 @@
     }
 
     function refreshAllViewsSafely() {
-        // Не перезаписуємо поле вводу, якщо користувач прямо зараз друкує в таблиці або формі
         const activeEl = document.activeElement;
         const isTyping = activeEl && (
             activeEl.tagName === 'INPUT' ||
@@ -270,7 +271,7 @@
         return hasChanges;
     }
 
-    // Примусове збереження всіх даних (Звітів, Маршрутів, Карток авто, Документів) на сервер
+    // Примусове збереження всіх даних на сервер
     window.forcePushAllDataToServer = async function (showNotification = false) {
         updateSyncStatusBadge('Збереження на сайт...', '#f39c12');
 
@@ -287,7 +288,7 @@
         const allLocal = collectAllLocalSharedStorage();
 
         try {
-            const res = await fetch('/api/shared-state', {
+            const res = await fetch(`${SERVER_URL}/api/shared-state`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -325,17 +326,16 @@
     async function initSharedCloudSync() {
         ensureHeaderSyncWidget();
         try {
-            const res = await fetch('/api/shared-state');
+            const res = await fetch(`${SERVER_URL}/api/shared-state`);
             if (!res.ok) return;
             const data = await res.json();
             const serverStorage = (data && data.storage) ? data.storage : {};
             const serverKeysCount = Object.keys(serverStorage).length;
 
             if (serverKeysCount === 0) {
-                // Якщо сервер порожній — ініціалізуємо його поточними даними
                 const initialLocal = collectAllLocalSharedStorage();
                 if (Object.keys(initialLocal).length > 0) {
-                    const seedRes = await fetch('/api/shared-state', {
+                    const seedRes = await fetch(`${SERVER_URL}/api/shared-state`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -370,18 +370,18 @@
         }
     }
 
-    // Періодична перевірка оновлень від інших користувачів (кожні 4 секунди)
+    // Періодична перевірка оновлень від інших користувачів
     async function pollServerUpdates() {
         if (isSyncInFlight || Object.keys(pendingChanges).length > 0) return;
         isSyncInFlight = true;
         try {
             ensureHeaderSyncWidget();
-            const res = await fetch('/api/shared-version');
+            const res = await fetch(`${SERVER_URL}/api/shared-version`);
             if (!res.ok) return;
             const info = await res.json();
 
             if (Number(info.version) > knownServerVersion) {
-                const stateRes = await fetch('/api/shared-state');
+                const stateRes = await fetch(`${SERVER_URL}/api/shared-state`);
                 if (stateRes.ok) {
                     const stateData = await stateRes.json();
                     knownServerVersion = Number(stateData.version) || knownServerVersion;
@@ -402,7 +402,6 @@
         }
     }
 
-    // Автоматично відправляємо файли документів на сервер при збереженні документа А4 або завантаженні файлу
     function hookDocumentAndCardSaveFunctions() {
         if (typeof window.saveActiveCardPeriodData === 'function' && !window.saveActiveCardPeriodData._cloudHooked) {
             const origSaveCard = window.saveActiveCardPeriodData;
@@ -415,7 +414,6 @@
             window.saveActiveCardPeriodData = wrappedSaveCard;
         }
 
-        // Коли змінюється список документів saved_documents_v2 — також синхронізуємо бінарні файли з IndexedDB
         const origSet = Storage.prototype.setItem;
         if (!origSet._idbDocHooked) {
             const wrappedSet = function (key, value) {
