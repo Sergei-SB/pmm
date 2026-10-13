@@ -2,6 +2,11 @@
 // ФІНАЛЬНИЙ РОБОЧИЙ КОД app2.js 
 // (СТАРТ З 01.10-10.10, АВТОМАТИЧНА ГЕНЕРАЦІЯ ПЕРІОДІВ ТА ПЕРЕНОС ЗАЛИШКІВ)
 // ==========================================
+// Версія: оригінал + одна безпечна правка — обгортка навколо
+// loadCarDataForActivePeriod, яка гарантовано повертає isRestoringState у false
+// (інакше після будь-якої помилки авто-збереження мовчки вимикається).
+// Логіка розрахунків і формул не змінена.
+// ==========================================
 
 let activeCarPeriod = getDefaultPeriodByCurrentDate();
 let isRestoringState = false;
@@ -409,6 +414,17 @@ function loadCarDataForActivePeriod() {
 
     isRestoringState = false;
 }
+
+// Обгортка: гарантує повернення isRestoringState у false навіть при помилці
+// (інакше авто-збереження мовчки перестає працювати до перезавантаження).
+const _loadCarDataForActivePeriodOriginal = loadCarDataForActivePeriod;
+loadCarDataForActivePeriod = function () {
+    try {
+        return _loadCarDataForActivePeriodOriginal.apply(this, arguments);
+    } finally {
+        isRestoringState = false;
+    }
+};
 
 function saveCarRoutesForPeriod(periodToSave, carIdToSave, isManualSave = false) {
     if (isRestoringState) return;

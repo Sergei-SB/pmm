@@ -3,9 +3,10 @@
 // =========================================================================
 // Що виправлено проти попередньої версії:
 //  1. Дані з сервера завантажуються ДО першого рендера застосунку
-//     (обробники DOMContentLoaded відкладаються, запобіжник 3 с)
+//     (обробники DOMContentLoaded, зареєстровані після цього файлу, відкладаються,
+//     запобіжник 3 с)
 //  2. Надсилаються лише ЗМІНЕНІ ключі, з базовою ревізією (baseRev) —
-//     застарілий ПК більше не перезаписує новіші дані на сервері
+//     застарілий ПК не перезаписує новіші дані на сервері
 //  3. Черга невідправленого живе в localStorage і повторюється з backoff
 //  4. Видалення передаються як tombstones (deleted: true)
 //  5. Сторінка перемальовується і під час набору тексту — з відновленням
@@ -16,6 +17,9 @@
 //  8. Маркери версій обладнання (*_data_version) і dev_role_time_stats
 //     більше не синхронізуються
 //  9. window.syncDebug() показує стан кожного ключа
+//
+// ВАЖЛИВО: цей файл чіпає localStorage, тому вмикайте його останнім,
+// після підтвердження, що застосунок працює як раніше.
 // =========================================================================
 
 (function () {
@@ -455,8 +459,12 @@
                 return res.json();
             })
             .then(function (data) {
-                var changed = applyRemoteKeys(data.keys || {}, awaitingFirstPull);
+                // Сумісність зі старим сервером: він повертає { version, storage },
+                // новий — { revision, keys }.
+                var incomingKeys = data.keys || data.storage || {};
+                var changed = applyRemoteKeys(incomingKeys, awaitingFirstPull);
                 if (typeof data.revision === 'number') setLastRev(data.revision);
+                else if (typeof data.version === 'number') { /* старий сервер: ревізій немає */ }
                 awaitingFirstPull = false;
                 saveMeta();
                 savePending();

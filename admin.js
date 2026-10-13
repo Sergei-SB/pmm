@@ -1,3 +1,14 @@
+// ==========================================
+// РОЛІ ТА ПРАВА ДОСТУПУ (admin.js)
+// ==========================================
+// Версія: оригінал + 2 безпечні правки:
+//   1) кнопка «+ Додати автомобіль» знаходиться за id="add-car-btn" і
+//      показується лише якщо функція tryAddCarRow справді існує;
+//   2) мертвий виклик switchTab() замінено на switchView('base') —
+//      такої функції в проєкті немає, тому повернення на «Базу» не працювало.
+// Перевірки ролей і паролів не змінені.
+// ==========================================
+
 let currentRole = "user";
 let isDeveloperLoggedIn = false;
 
@@ -247,7 +258,6 @@ function updateRoleUI() {
     const reportView = document.getElementById("report-view");
     if (reportView && reportView.style.display !== "none" && !isModOrHigher) {
         if (typeof switchView === "function") switchView("base");
-        else if (typeof switchTab === "function") switchTab("cars");
     }
 
     const subdivisionsView = document.getElementById("subdivisions-view");
@@ -265,15 +275,17 @@ function updateRoleUI() {
         if (typeof switchView === "function") switchView("base");
     }
 
-    const devPanelView = document.getElementById("developer-panel-view");
-    if (devPanelView && devPanelView.style.display !== "none" && !isDev) {
-        if (typeof switchTab === "function") switchTab("cars");
+    const devPanelView = document.getElementById("dev-panel-view") || document.getElementById("developer-panel-view");
+    if (devPanelView && devPanelView.classList.contains("active") && !isDev) {
+        if (typeof switchView === "function") switchView("base");
     }
 
     // 3. Кнопки на сторінці "База (Реєстр)"
-    const addCarBtn = document.querySelector('#cars-view .action-bar .btn-green');
+    const addCarBtn = document.getElementById('add-car-btn') ||
+        document.querySelector('#base-view .action-bar .btn-green') ||
+        document.querySelector('#cars-view .action-bar .btn-green');
     if (addCarBtn) {
-        addCarBtn.style.display = isAdminOrHigher ? "inline-block" : "none";
+        addCarBtn.style.display = (isAdminOrHigher && typeof window.tryAddCarRow === 'function') ? "inline-block" : "none";
     }
 
     const deleteActionHeader = document.getElementById("delete-action-header");

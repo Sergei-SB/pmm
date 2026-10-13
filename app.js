@@ -1,6 +1,12 @@
 // ==========================================
 // ЛОГІКА ІНТЕРФЕЙСУ ТА МАРШРУТІВ (app.js)
 // ==========================================
+// Версія: оригінал + 3 безпечні виправлення (формули, коефіцієнти, пороги
+// та порядок обчислень НЕ змінені):
+//   1) друк картки: тип вантажу береться з inputs[6] (було inputs[7] — одометр);
+//   2) updateCarProp: картка перезавантажується лише коли вона видима;
+//   3) handleCarSearchInput: безпечне читання plate/model.
+// ==========================================
 
 let lastActiveRow = null;
 if (typeof window.currentCarId === 'undefined') {
@@ -101,7 +107,7 @@ function printCarCardReport() {
         const c2 = inputs[3] ? inputs[3].value : '';
         const c3 = inputs[4] ? inputs[4].value : '';
         const totalKm = inputs[5] ? inputs[5].value : '';
-        const cargoType = inputs[7] ? inputs[7].value : 'о/с';
+        const cargoType = inputs[6] ? inputs[6].value : 'о/с';
         const odoVal = row.querySelector('.row-odo') ? row.querySelector('.row-odo').value : '';
 
         routesRowsHtml += `
@@ -710,7 +716,9 @@ function updateCarProp(carId, propName, val) {
     if (car) {
         car[propName] = val;
         saveCarsModificationsToStorage();
-        if (Number(currentCarId) === Number(carId)) {
+        const cardView = document.getElementById('card-view');
+        const cardIsVisible = cardView && cardView.classList.contains('active');
+        if (cardIsVisible && Number(currentCarId) === Number(carId)) {
             loadCarCard(currentCarId);
         }
         populateCarSelector();
@@ -745,18 +753,18 @@ function handleCarSearchInput(val, event) {
 
     let foundCar = safeCars.find(car => 
         !isItemDestroyed(car.note) && (
-            car.plate.toUpperCase() === upperVal || 
-            car.model.toUpperCase() === upperVal ||
-            `${car.plate} — ${car.model}`.toUpperCase() === upperVal
+            String(car.plate || '').toUpperCase() === upperVal || 
+            String(car.model || '').toUpperCase() === upperVal ||
+            `${car.plate || ''} — ${car.model || ''}`.toUpperCase() === upperVal
         )
     );
 
     if (!foundCar) {
         const matches = safeCars.filter(car => 
             !isItemDestroyed(car.note) && (
-                car.plate.toUpperCase().includes(upperVal) || 
-                car.model.toUpperCase().includes(upperVal) ||
-                `${car.plate} — ${car.model}`.toUpperCase().includes(upperVal)
+                String(car.plate || '').toUpperCase().includes(upperVal) || 
+                String(car.model || '').toUpperCase().includes(upperVal) ||
+                `${car.plate || ''} — ${car.model || ''}`.toUpperCase().includes(upperVal)
             )
         );
 
