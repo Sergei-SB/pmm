@@ -8,14 +8,22 @@ window.activeReportCarId = null;
 function resolveCarCategoryKey(car) {
     if (!car) return 'passenger';
     const cat = String(car.category || '').toLowerCase().trim();
-    const validKeys = ['passenger', 'truck', 'suv', 'minibus', 'adblue', 'miles', 'hq', 'special', 'motorcycle', 'quad'];
+    if (cat === 'adblue' || cat === 'truck_adblue') return 'adblue';
+
+    // Для вантажних автомобілів: якщо є AdBlue -> adblue, якщо немає -> truck
+    const isTruckLike = (cat === 'truck' || String(car.vehicleType || '').toLowerCase().includes('вантаж'));
+    if (isTruckLike) {
+        return car.hasAdBlue ? 'adblue' : 'truck';
+    }
+
+    const validKeys = ['passenger', 'truck', 'adblue', 'suv', 'minibus', 'miles', 'hq', 'special', 'motorcycle', 'quad'];
     if (validKeys.includes(cat)) {
         return cat;
     }
 
     // Якщо car.category порожнє або українською — визначаємо за властивостями авто
     if (car.isMiles) return 'miles';
-    if (car.hasAdBlue && (!car.vehicleType || !String(car.vehicleType).toLowerCase().includes('вантаж'))) return 'adblue';
+    if (car.hasAdBlue) return 'adblue';
 
     const vType = String(car.vehicleType || '').toLowerCase().trim();
     if (vType.includes('вантаж')) return 'truck';
@@ -24,14 +32,14 @@ function resolveCarCategoryKey(car) {
     return 'passenger';
 }
 
-// Заповнення списків категорій (якщо ще не заповнені)
+// Заповнення списків категорій (якщо ще не заповнені або застарілі)
 function ensureCategoryDropdownsPopulated() {
     const categoriesMap = (typeof VEHICLE_CATEGORIES !== 'undefined') ? VEHICLE_CATEGORIES : {
         PASSENGER: "Легкові автомобілі",
         TRUCK: "Вантажні автомобілі",
+        ADBLUE: "Вантажні автомобілі з AdBlue",
         SUV: "Позашляховики",
         MINIBUS: "Мікроавтобуси",
-        ADBLUE: "Автомобілі з AdBlue",
         MILES: "Автомобілі з милями",
         HQ: "Штабні автомобілі",
         SPECIAL: "Спецтехніка",
@@ -41,12 +49,18 @@ function ensureCategoryDropdownsPopulated() {
 
     ['det-input-category', 'card-input-category'].forEach(selectId => {
         const selectEl = document.getElementById(selectId);
-        if (selectEl && selectEl.options.length === 0) {
-            for (let key in categoriesMap) {
-                let opt = document.createElement('option');
-                opt.value = key.toLowerCase();
-                opt.textContent = categoriesMap[key];
-                selectEl.appendChild(opt);
+        if (selectEl) {
+            const hasNewText = Array.from(selectEl.options).some(o => o.textContent === "Вантажні автомобілі з AdBlue");
+            if (selectEl.options.length === 0 || !hasNewText) {
+                const currentVal = selectEl.value;
+                selectEl.innerHTML = '';
+                for (let key in categoriesMap) {
+                    let opt = document.createElement('option');
+                    opt.value = key.toLowerCase();
+                    opt.textContent = categoriesMap[key];
+                    selectEl.appendChild(opt);
+                }
+                if (currentVal) selectEl.value = currentVal;
             }
         }
     });
@@ -111,6 +125,9 @@ function renderCarDetailsData() {
     const subSpan = document.getElementById('detail-car-sub');
     if (subSpan) subSpan.textContent = car.subdivision || '—';
 
+    const fuelSpan = document.getElementById('detail-car-fuel');
+    if (fuelSpan) fuelSpan.textContent = car.fuelType || car.fuel || 'ДП';
+
     const fieldsMap = {
         'vin': car.vin,
         'year': car.year,
@@ -123,7 +140,8 @@ function renderCarDetailsData() {
         'engine': car.engineVolume !== undefined ? car.engineVolume : car.engine,
         'kw': car.kw,
         'engineNo': car.engineNo,
-        'consumption': car.consumption
+        'consumption': car.consumption,
+        'fuelType': car.fuelType || car.fuel || 'ДП'
     };
 
     for (let key in fieldsMap) {
@@ -158,6 +176,18 @@ window.updateCarPropertyFromDetails = function(prop, val) {
         if (subSpan) subSpan.textContent = val || '—';
     }
     else if (prop === 'driver') car.driver = val;
+    else if (prop === 'fuelType') {
+        car.fuelType = val;
+        car.fuel = val;
+        const fuelSpan = document.getElementById('detail-car-fuel');
+        if (fuelSpan) fuelSpan.textContent = val || '—';
+        const detFuelInput = document.getElementById('det-input-fuelType');
+        if (detFuelInput && detFuelInput !== document.activeElement) detFuelInput.value = val;
+        const cardFuelInput = document.getElementById('card-input-fuel-type');
+        if (cardFuelInput) cardFuelInput.value = val;
+        const specFuel = document.getElementById('spec-fuel-type');
+        if (specFuel) specFuel.textContent = val || '—';
+    }
     else if (prop === 'vin') car.vin = val;
     else if (prop === 'year') car.year = parseInt(val, 10) || val;
     else if (prop === 'transmission') car.transmission = val;
@@ -170,6 +200,31 @@ window.updateCarPropertyFromDetails = function(prop, val) {
     else if (prop === 'kw') car.kw = parseFloat(val) || val;
     else if (prop === 'engineNo') car.engineNo = val;
     else if (prop === 'consumption') car.consumption = parseFloat(val) || val;
+
+    if (typeof saveCarsToStorage === 'function') saveCarsToStorage();
+    if (typeof saveCarsModificationsToStorage === 'function') saveCarsModificationsToStorage();
+    if (typeof renderCarsTable === 'function') renderCarsTable();
+};
+
+window.updateCardFuelType = function(val) {
+    let car = getActiveReportCar();
+    if (!car && typeof currentCarId !== 'undefined' && currentCarId) {
+        const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
+        car = sourceCars.find(c => Number(c.id) === Number(currentCarId));
+    }
+    if (!car) return;
+
+    car.fuelType = val;
+    car.fuel = val;
+
+    const specFuel = document.getElementById('spec-fuel-type');
+    if (specFuel) specFuel.textContent = val || '—';
+
+    const detFuelInput = document.getElementById('det-input-fuelType');
+    if (detFuelInput) detFuelInput.value = val;
+
+    const detFuelSpan = document.getElementById('detail-car-fuel');
+    if (detFuelSpan) detFuelSpan.textContent = val || '—';
 
     if (typeof saveCarsToStorage === 'function') saveCarsToStorage();
     if (typeof saveCarsModificationsToStorage === 'function') saveCarsModificationsToStorage();
@@ -231,6 +286,7 @@ function renderCarPeriodsAndStats(car) {
     let totalReceivedFuel = 0;
     let totalSpentFuel = 0;
     let totalReceivedAdBlue = 0;
+    let latestLeftFuel = 0;
     let reportsCount = 0;
 
     let periods = [];
@@ -240,42 +296,167 @@ function renderCarPeriodsAndStats(car) {
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
             if (key && key.startsWith('report_data_')) {
-                periods.push(key.replace('report_data_', ''));
+                const p = key.replace('report_data_', '');
+                if (!periods.includes(p)) periods.push(p);
             }
         }
     }
+
+    // Також підтягуємо періоди, для яких збережені маршрути цього автомобіля
+    for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('isolated_car_routes_') && k.endsWith('_' + car.id)) {
+            const p = k.replace('isolated_car_routes_', '').replace('_' + car.id, '');
+            if (p && !periods.includes(p)) {
+                periods.push(p);
+            }
+        }
+    }
+
+    if (typeof sortPeriodsArray === 'function') {
+        periods = sortPeriodsArray(periods);
+    }
+
+    const evalNum = function(val) {
+        if (val === undefined || val === null || val === '') return 0;
+        if (typeof evaluateExpression === 'function') {
+            return evaluateExpression(val) || 0;
+        }
+        return parseFloat(val) || 0;
+    };
 
     let periodsHtml = '';
 
     periods.forEach(period => {
         try {
-            const storedRep = localStorage.getItem('report_data_' + period);
             let rowData = null;
+            let cardObj = null;
 
+            const storedRep = localStorage.getItem('report_data_' + period);
             if (storedRep) {
                 const repObj = JSON.parse(storedRep);
                 if (repObj && repObj[car.id]) {
                     rowData = repObj[car.id];
                 }
             }
-            
-            if (rowData) {
+
+            const storedCard = localStorage.getItem(`isolated_car_routes_${period}_${car.id}`);
+            if (storedCard) {
+                try {
+                    cardObj = JSON.parse(storedCard);
+                } catch(e) {}
+            }
+
+            if (rowData || (cardObj && (cardObj.rows?.length > 0 || cardObj.topFields))) {
                 reportsCount++;
-                const prevOdo = parseFloat(rowData.prevOdo) || 0;
-                const currOdo = parseFloat(rowData.odo) || 0;
-                const driven = (currOdo > prevOdo) ? (currOdo - prevOdo) : 0;
+
+                // Одометри та пройдений кілометраж
+                let prevOdo = '';
+                let currOdo = '';
+
+                if (rowData && rowData.prevOdo !== undefined && rowData.prevOdo !== '') {
+                    prevOdo = rowData.prevOdo;
+                } else if (cardObj && cardObj.topFields && cardObj.topFields.odo1 !== undefined && cardObj.topFields.odo1 !== '') {
+                    prevOdo = cardObj.topFields.odo1;
+                }
+
+                if (rowData && rowData.odo !== undefined && rowData.odo !== '') {
+                    currOdo = rowData.odo;
+                } else if (cardObj && cardObj.topFields && cardObj.topFields.odo2 !== undefined && cardObj.topFields.odo2 !== '') {
+                    currOdo = cardObj.topFields.odo2;
+                }
+
+                const prevOdoNum = parseFloat(prevOdo) || 0;
+                const currOdoNum = parseFloat(currOdo) || 0;
+                let driven = (currOdoNum > prevOdoNum) ? (currOdoNum - prevOdoNum) : 0;
+
+                // Якщо одометр не заповнений, але є рядки маршрутів
+                if (driven === 0 && cardObj && Array.isArray(cardObj.rows) && cardObj.rows.length > 0) {
+                    let rKm = 0;
+                    cardObj.rows.forEach(r => {
+                        if (r.inputs && r.inputs[5]) rKm += parseFloat(r.inputs[5]) || 0;
+                    });
+                    if (rKm > 0) driven = rKm;
+                }
                 totalMileage += driven;
 
-                const refFuel = parseFloat(rowData.refuelFuel) || 0;
+                // Отримано палива
+                let refFuel = 0;
+                if (rowData && rowData.refuelFuel !== undefined && rowData.refuelFuel !== '') {
+                    refFuel = evalNum(rowData.refuelFuel);
+                } else if (cardObj && cardObj.topFields && cardObj.topFields.fuelReceived !== undefined && cardObj.topFields.fuelReceived !== '') {
+                    refFuel = evalNum(cardObj.topFields.fuelReceived);
+                }
                 totalReceivedFuel += refFuel;
 
-                const prevF = parseFloat(rowData.prevFuel) || 0;
-                const leftF = parseFloat(rowData.leftFuel) || 0;
-                const spentF = (prevF + refFuel - leftF) > 0 ? (prevF + refFuel - leftF) : 0;
-                totalSpentFuel += spentF;
+                // Витрачено палива (визначається точно: з розрахунку маршрутів, збереженого fuelSpent, або з балансу палива)
+                let periodSpent = 0;
 
-                const refAdBlue = parseFloat(rowData.refuelAdBlue) || 0;
+                // 1. Пряме значення з картки авто (topFields.fuelSpent)
+                if (cardObj && cardObj.topFields && cardObj.topFields.fuelSpent !== undefined && cardObj.topFields.fuelSpent !== '') {
+                    const spVal = evalNum(cardObj.topFields.fuelSpent);
+                    if (spVal > 0) periodSpent = spVal;
+                }
+
+                // 2. Розрахунок за формулами маршрутів для цього періоду
+                if (!periodSpent && cardObj && Array.isArray(cardObj.rows) && cardObj.rows.length > 0 && typeof calculateRouteFuel === 'function') {
+                    const cRes = calculateRouteFuel(cardObj.rows, car.consumption, car.formulas, car.isMiles);
+                    if (cRes && cRes.totalFuel > 0) {
+                        periodSpent = cRes.totalFuel;
+                    }
+                }
+
+                // 3. Значення spentFuel із report_data
+                if (!periodSpent && rowData && rowData.spentFuel !== undefined && rowData.spentFuel !== '') {
+                    const spVal = evalNum(rowData.spentFuel);
+                    if (spVal > 0) periodSpent = spVal;
+                }
+
+                // 4. Фізичний баланс: На початку + Отримано - Залишок
+                if (!periodSpent) {
+                    const pFuel = evalNum(rowData?.prevFuel || cardObj?.topFields?.fuelStart);
+                    const lFuel = evalNum(rowData?.leftFuel || cardObj?.topFields?.savedFuelLeft);
+                    if ((pFuel > 0 || refFuel > 0) && lFuel >= 0 && (pFuel + refFuel > lFuel)) {
+                        periodSpent = (pFuel + refFuel) - lFuel;
+                    }
+                }
+
+                // 5. Розрахунок за базовою нормою від пройденого кілометражу
+                if (!periodSpent && driven > 0 && car.consumption > 0) {
+                    periodSpent = (driven * parseFloat(car.consumption)) / 100;
+                }
+
+                totalSpentFuel += periodSpent;
+
+                // Залишок палива на кінець періоду (визначається з report_data, картки або балансу)
+                let periodLeftFuel = null;
+                if (rowData && rowData.leftFuel !== undefined && rowData.leftFuel !== '') {
+                    periodLeftFuel = evalNum(rowData.leftFuel);
+                } else if (cardObj && cardObj.topFields && cardObj.topFields.savedFuelLeft !== undefined && cardObj.topFields.savedFuelLeft !== '') {
+                    periodLeftFuel = evalNum(cardObj.topFields.savedFuelLeft);
+                } else {
+                    const pFuel = evalNum(rowData?.prevFuel || cardObj?.topFields?.fuelStart);
+                    if (pFuel > 0 || refFuel > 0) {
+                        periodLeftFuel = (pFuel + refFuel) - periodSpent;
+                        if (periodLeftFuel < 0) periodLeftFuel = 0;
+                    }
+                }
+                if (periodLeftFuel !== null) {
+                    latestLeftFuel = periodLeftFuel;
+                }
+
+                // AdBlue
+                let refAdBlue = 0;
+                if (rowData && rowData.refuelAdBlue !== undefined && rowData.refuelAdBlue !== '') {
+                    refAdBlue = evalNum(rowData.refuelAdBlue);
+                } else if (cardObj && cardObj.topFields && cardObj.topFields.adblueReceived !== undefined && cardObj.topFields.adblueReceived !== '') {
+                    refAdBlue = evalNum(cardObj.topFields.adblueReceived);
+                }
                 totalReceivedAdBlue += refAdBlue;
+
+                const oilVal = (rowData && rowData.refuelOil) || '';
+                const washerVal = (rowData && rowData.refuelWasher) || '';
+                const noteVal = (rowData && rowData.note) || (cardObj && cardObj.topFields && cardObj.topFields.note) || '—';
 
                 periodsHtml += `
                     <tr>
@@ -283,12 +464,13 @@ function renderCarPeriodsAndStats(car) {
                         <td>${prevOdo || '—'}</td>
                         <td>${currOdo || '—'}</td>
                         <td><strong>${driven > 0 ? driven + ' км' : '0 км'}</strong></td>
-                        <td style="color: #27ae60;">${refFuel ? refFuel + ' л' : '0'}</td>
-                        <td style="color: #c0392b;">${spentF > 0 ? spentF.toFixed(1) + ' л' : (rowData.leftFuel || '—')}</td>
-                        <td>${refAdBlue ? refAdBlue + ' л' : '0'}</td>
-                        <td>${rowData.refuelOil || '—'}</td>
-                        <td>${rowData.refuelWasher || '—'}</td>
-                        <td>${rowData.note || '—'}</td>
+                        <td style="color: #27ae60;">${refFuel > 0 ? refFuel + ' л' : '0'}</td>
+                        <td style="color: #c0392b; font-weight: bold;">${periodSpent > 0 ? periodSpent.toFixed(1) + ' л' : '0 л'}</td>
+                        <td style="color: #2980b9; font-weight: bold;">${periodLeftFuel !== null ? periodLeftFuel.toFixed(1) + ' л' : '—'}</td>
+                        <td>${refAdBlue > 0 ? refAdBlue + ' л' : '0'}</td>
+                        <td>${oilVal || '—'}</td>
+                        <td>${washerVal || '—'}</td>
+                        <td>${noteVal || '—'}</td>
                     </tr>
                 `;
             }
@@ -296,7 +478,7 @@ function renderCarPeriodsAndStats(car) {
     });
 
     if (periodsHtml === '') {
-        periodsHtml = `<tr><td colspan="10" style="text-align: center; color: #7f8c8d; font-style: italic; padding: 15px;">Немає збережених звітів по цьому автомобілю в періодах</td></tr>`;
+        periodsHtml = `<tr><td colspan="11" style="text-align: center; color: #7f8c8d; font-style: italic; padding: 15px;">Немає збережених звітів по цьому автомобілю в періодах</td></tr>`;
     }
 
     periodsTbody.innerHTML = periodsHtml;
@@ -304,12 +486,14 @@ function renderCarPeriodsAndStats(car) {
     const elMileage = document.getElementById('det-total-mileage');
     const elFuel = document.getElementById('det-total-fuel');
     const elSpent = document.getElementById('det-total-spent-fuel');
+    const elLeftFuel = document.getElementById('det-current-left-fuel');
     const elAdblue = document.getElementById('det-total-adblue');
     const elCount = document.getElementById('det-reports-count');
 
     if (elMileage) elMileage.textContent = totalMileage + ' км';
     if (elFuel) elFuel.textContent = totalReceivedFuel.toFixed(1) + ' л';
     if (elSpent) elSpent.textContent = totalSpentFuel.toFixed(1) + ' л';
+    if (elLeftFuel) elLeftFuel.textContent = latestLeftFuel.toFixed(1) + ' л';
     if (elAdblue) elAdblue.textContent = totalReceivedAdBlue.toFixed(1) + ' л';
     if (elCount) elCount.textContent = reportsCount;
 }

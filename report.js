@@ -560,7 +560,8 @@ function saveCurrentReportSilently() {
                 docNo: row.querySelector('.report-cell-input[data-field="docNo"]')?.value || '',
                 leftFuel: row.querySelector('.report-cell-input[data-field="leftFuel"]')?.value || '',
                 leftAdBlue: row.querySelector('.report-cell-input[data-field="leftAdBlue"]')?.value || '',
-                odo: row.querySelector('.report-cell-input[data-field="odo"]')?.value || ''
+                odo: row.querySelector('.report-cell-input[data-field="odo"]')?.value || '',
+                spentFuel: reportData[carId]?.spentFuel || ''
             };
         }
     });
@@ -864,6 +865,15 @@ function renderReportTable() {
             }
             if ((carData.prevOdo === '' || carData.prevOdo == null) && autoPrevOdo !== '') {
                 carData.prevOdo = autoPrevOdo;
+            }
+            if ((carData.leftFuel === '' || carData.leftFuel == null) && currCardTop?.savedFuelLeft) {
+                carData.leftFuel = currCardTop.savedFuelLeft;
+            }
+            if ((carData.leftAdBlue === '' || carData.leftAdBlue == null) && currCardTop?.savedAdblueLeft) {
+                carData.leftAdBlue = currCardTop.savedAdblueLeft;
+            }
+            if ((carData.odo === '' || carData.odo == null) && currCardTop?.odo2) {
+                carData.odo = currCardTop.odo2;
             }
         }
 
@@ -1924,6 +1934,7 @@ function transferDataToReport() {
     const startOdo = document.getElementById('odo-1')?.value || '';
     const fuelReceived = document.getElementById('fuel-received')?.value || '';
     const adblueReceived = document.getElementById('adblue-received')?.value || '';
+    const fuelSpent = document.getElementById('fuel-spent')?.textContent?.trim() || '';
     const fuelLeft = document.getElementById('fuel-left')?.textContent?.trim() || '';
     const adblueLeft = document.getElementById('adblue-left')?.textContent?.trim() || '';
     const finalOdo = document.getElementById('odo-2')?.value || startOdo || '';
@@ -1944,7 +1955,8 @@ function transferDataToReport() {
             docNo: '',
             leftFuel: '',
             leftAdBlue: '',
-            odo: ''
+            odo: '',
+            spentFuel: ''
         };
     } else {
         if (fuelStart !== '') savedReportData[targetCarId].prevFuel = fuelStart;
@@ -1953,6 +1965,9 @@ function transferDataToReport() {
     }
 
     savedReportData[targetCarId].refuelFuel = fuelReceived;
+    if (fuelSpent !== '') {
+        savedReportData[targetCarId].spentFuel = fuelSpent;
+    }
     if (adblueReceived !== '') {
         savedReportData[targetCarId].refuelAdBlue = adblueReceived;
     }

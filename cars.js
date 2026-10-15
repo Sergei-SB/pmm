@@ -5,9 +5,9 @@
 const VEHICLE_CATEGORIES = {
     PASSENGER: "Легкові автомобілі",
     TRUCK: "Вантажні автомобілі",
+    ADBLUE: "Вантажні автомобілі з AdBlue",
     SUV: "Позашляховики",
     MINIBUS: "Мікроавтобуси",
-    ADBLUE: "Автомобілі з AdBlue",
     MILES: "Автомобілі з милями",
     HQ: "Штабні автомобілі",
     SPECIAL: "Спецтехніка",
@@ -462,7 +462,9 @@ function renderCarsTable(filterQuery = '') {
             <td>${car.model}</td>
             <td>${car.subdivision || '—'}</td>
             <td>${car.consumption} л</td>
-            <td>${car.fuelType}</td>
+            <td class="inactive-fuel-cell" style="text-align: center; font-weight: bold; background-color: #f4f6f7; color: #5f6368; cursor: not-allowed; user-select: none;" title="Паливо не редагується в базі (редагується у Звіті на автомобіль)">
+                <span style="display: inline-block; padding: 2px 8px; border-radius: 3px; background: #e8eaed; border: 1px solid #dadce0; color: #3c4043; font-size: 11px; cursor: not-allowed; pointer-events: none;">${car.fuelType || '—'}</span>
+            </td>
             <td><input type="text" class="table-cell-input" value="${car.note}" oninput="updateCarProp(${car.id}, 'note', this.value)"></td>
             <td>${car.vin}</td>
             <td>${car.year}</td>
@@ -483,6 +485,10 @@ function renderCarsTable(filterQuery = '') {
 }
 
 function updateCarField(carId, field, val) {
+    if (field === 'fuelType' || field === 'fuel') {
+        console.warn('Паливо не редагується в Базі (Реєстр). Редагуйте через Звіт на автомобіль.');
+        return;
+    }
     const car = carsData.find(c => Number(c.id) === Number(carId));
     if (car) {
         car[field] = val;
@@ -520,7 +526,7 @@ if (typeof window.openCarCard !== 'function' || true) {
 
 if (typeof window.openCarDetails !== 'function') {
     window.openCarDetails = function(carId) {
-        const car = carsData.find(c => Number.c.id === Number(carId));
+        const car = carsData.find(c => Number(c.id) === Number(carId));
         if (!car) return;
 
         window.currentCarId = car.id;

@@ -352,9 +352,15 @@ function loadCarDataForActivePeriod() {
             if (repStored) {
                 const repData = JSON.parse(repStored);
                 if (repData && repData[currentCarId]) {
-                    if (!prevEndOdo && repData[currentCarId].odo) prevEndOdo = repData[currentCarId].odo;
-                    if (!prevLeftFuel && repData[currentCarId].leftFuel) prevLeftFuel = repData[currentCarId].leftFuel;
-                    if (!prevLeftAdblue && repData[currentCarId].leftAdBlue) prevLeftAdblue = repData[currentCarId].leftAdBlue;
+                    if (repData[currentCarId].leftFuel !== undefined && repData[currentCarId].leftFuel !== '') {
+                        prevLeftFuel = repData[currentCarId].leftFuel;
+                    }
+                    if (repData[currentCarId].odo !== undefined && repData[currentCarId].odo !== '') {
+                        prevEndOdo = repData[currentCarId].odo;
+                    }
+                    if (repData[currentCarId].leftAdBlue !== undefined && repData[currentCarId].leftAdBlue !== '') {
+                        prevLeftAdblue = repData[currentCarId].leftAdBlue;
+                    }
                 }
             }
         } catch (e) {}
@@ -459,11 +465,13 @@ function saveCarRoutesForPeriod(periodToSave, carIdToSave, isManualSave = false)
     }
 
     const savedFuelLeftVal = document.getElementById('fuel-left')?.textContent?.trim() || '';
+    const savedFuelSpentVal = document.getElementById('fuel-spent')?.textContent?.trim() || '';
     const savedAdblueLeftVal = document.getElementById('adblue-left')?.textContent?.trim() || '';
 
     const topFields = {
         fuelStart: document.getElementById('fuel-start')?.value || '',
         fuelReceived: document.getElementById('fuel-received')?.value || '',
+        fuelSpent: savedFuelSpentVal,
         odo1: odo1Val,
         odo2: odo2Val,
         savedFuelLeft: savedFuelLeftVal,

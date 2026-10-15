@@ -30,10 +30,12 @@ let openTemplateManagerDrawer = {
 const VALID_VEHICLE_CATEGORIES = [
     'Легкові автомобілі',
     'Вантажні автомобілі',
+    'Вантажні автомобілі з AdBlue',
     'Позашляховики',
     'Мікроавтобуси',
     'Автомобілі з AdBlue',
     'Автомобілі з милями',
+    'Штабні автомобілі',
     'Спецтехніка',
     'Мотоцикли',
     'Квадроцикли'
@@ -1229,7 +1231,7 @@ function sanitizeCategoriesAndFormulasInStorage() {
                                         modified = true;
                                     }
                                     const catName = String(el.category || el.name || el.title || '').trim();
-                                    if (catName === 'Вантажні автомобілі' || (catName === 'Вантажний' && el.category !== 'Автомобілі з AdBlue')) {
+                                    if (catName === 'Вантажні автомобілі' || (catName === 'Вантажний' && el.category !== 'Автомобілі з AdBlue' && el.category !== 'Вантажні автомобілі з AdBlue')) {
                                         if (el.hasAdBlue === true) { el.hasAdBlue = false; modified = true; }
                                         if (el.useAdBlue === true) { el.useAdBlue = false; modified = true; }
                                         if (el.adBlue === true) { el.adBlue = false; modified = true; }
@@ -1334,7 +1336,7 @@ function syncCategorySelectsAndAdBlueDOM() {
     });
 
     if (activeCardCategory) {
-        const isExplicitAdBlueCategory = activeCardCategory === 'Автомобілі з AdBlue';
+        const isExplicitAdBlueCategory = activeCardCategory === 'Автомобілі з AdBlue' || activeCardCategory === 'Вантажні автомобілі з AdBlue';
 
         // Відновлюємо всі випадково приховані рядки таблиць у звітах та підрозділах
         document.querySelectorAll('tr[data-hidden-by-ad-blue-fix="true"], thead tr').forEach(tr => {

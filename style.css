@@ -606,6 +606,28 @@ input[type=number] {
     z-index: 5;
 }
 
+/* Неактивний стовпчик "Паливо" в Базі (Реєстрі) */
+#cars-table th.inactive-fuel-col-th,
+#cars-table.compact-base-table th:nth-child(7) {
+    background-color: #1a252f !important;
+    color: #95a5a6 !important;
+    cursor: not-allowed !important;
+    user-select: none;
+}
+
+#cars-table td.inactive-fuel-cell,
+#cars-table.compact-base-table td:nth-child(7) {
+    background-color: #f4f6f7 !important;
+    color: #5f6368 !important;
+    cursor: not-allowed !important;
+    user-select: none;
+}
+
+#cars-table td.inactive-fuel-cell:hover,
+#cars-table.compact-base-table td:nth-child(7):hover {
+    background-color: #eaeded !important;
+}
+
 /* ==========================================
    АДАПТАЦІЯ ПІД ПЛАНШЕТИ ТА НОУТБУКИ (до 1250px)
    ========================================== */

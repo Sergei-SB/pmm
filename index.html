@@ -181,7 +181,7 @@
                                 </select>
                             </th>
                             <th>Витрата</th>
-                            <th>Паливо</th>
+                            <th class="inactive-fuel-col-th" style="background-color: #1e2b37; color: #a0aec0; cursor: not-allowed;" title="Паливо не редагується в базі (редагується у Звіті на автомобіль)">Паливо 🔒</th>
                             <th>Примітка</th>
                             <th>Він код</th>
                             <th>Рік</th>
@@ -239,8 +239,8 @@
                                     <tr><th colspan="2">Паливо</th></tr>
                                     <tr><td>На початку</td><td><input type="text" id="fuel-start" value=""></td></tr>
                                     <tr><td id="fuel-received-label">Отримано ДП</td><td><input type="text" id="fuel-received" value=""></td></tr>
-                                    <tr><td>Залишок</td><td><span id="fuel-left">0.0</span></td></tr>
-                                    <tr><td>Витрачено</td><td><span id="fuel-spent">0.0</span></td></tr>
+                                    <tr><td>Витрачено</td><td><span id="fuel-spent">0.00</span></td></tr>
+                                    <tr><td>Залишок</td><td><span id="fuel-left">0.00</span></td></tr>
                                 </table>
                             </div>
                             <div class="fuel-panel adblue-single-col" id="adblue-panel-box" style="display: none;">
@@ -312,7 +312,7 @@
                             <td><select class="table-cell-input" id="card-input-category" onchange="updateCardCarCategory(this.value)"></select></td>
                         </tr>
                         <tr><td>Підрозділ, рота</td><td id="spec-subdivision">—</td></tr>
-                        <tr><td>Тип пального</td><td id="spec-fuel-type">—</td></tr>
+                        <tr><td>Тип пального</td><td><input type="text" class="table-cell-input" id="card-input-fuel-type" list="fuel-types-list" oninput="if(typeof updateCardFuelType==='function')updateCardFuelType(this.value)" placeholder="Тип пального" style="width: 100%; box-sizing: border-box; font-size: 12px; padding: 2px 4px;"></td></tr>
                         <tr><td>Примітка</td><td id="spec-note">—</td></tr>
                         <tr><td>Він код</td><td id="spec-vin">—</td></tr>
                         <tr><td>Рік випуску</td><td id="spec-year">—</td></tr>
@@ -396,31 +396,35 @@
                 <div>
                     <button class="action-btn" onclick="saveCarDetailsToBasePath()" style="background-color: #27ae60; font-weight: bold; padding: 8px 18px; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">💾 Зберегти зміни в базу</button>
                 </div>
-                <div class="car-summary-badge-box">
-                    <span>Підрозділ: <strong id="detail-car-sub">—</strong></span> | 
-                    Підрозділ: <input type="text" id="det-input-subdivision" oninput="updateCarPropertyFromDetails('subdivision', this.value)" style="padding: 2px 5px; border-radius: 3px; border: 1px solid #bdc3c7; font-size: 13px; width: 110px;"> | Водій: <input type="text" id="det-input-driver" oninput="updateCarPropertyFromDetails('driver', this.value)" style="padding: 2px 5px; border-radius: 3px; border: 1px solid #bdc3c7; font-size: 13px; width: 140px;">
+                <div class="car-summary-badge-box" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <span>Підрозділ: <input type="text" id="det-input-subdivision" oninput="updateCarPropertyFromDetails('subdivision', this.value)" style="padding: 3px 6px; border-radius: 3px; border: 1px solid #bdc3c7; font-size: 13px; width: 110px; font-weight: bold;"></span> | 
+                    <span>Водій: <input type="text" id="det-input-driver" oninput="updateCarPropertyFromDetails('driver', this.value)" style="padding: 3px 6px; border-radius: 3px; border: 1px solid #bdc3c7; font-size: 13px; width: 140px; font-weight: bold;"></span>
                 </div>
             </div>
 
             <div class="details-workspace" style="display: flex; flex-direction: column; gap: 20px;">
                 <div class="details-stats-row" style="display: flex; gap: 15px; flex-wrap: wrap;">
-                    <div class="stat-card" style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px; flex: 1; min-width: 170px; text-align: center;">
+                    <div class="stat-card" style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px; flex: 1; min-width: 160px; text-align: center;">
                         <h4 style="color: #7f8c8d; margin-bottom: 5px;">Загальний пробіг</h4>
                         <strong id="det-total-mileage" style="font-size: 20px; color: #2c3e50;">0 км</strong>
                     </div>
-                    <div class="stat-card" style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px; flex: 1; min-width: 170px; text-align: center;">
+                    <div class="stat-card" style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px; flex: 1; min-width: 160px; text-align: center;">
                         <h4 style="color: #7f8c8d; margin-bottom: 5px;">Отримано палива</h4>
                         <strong id="det-total-fuel" style="font-size: 20px; color: #27ae60;">0 л</strong>
                     </div>
-                    <div class="stat-card" style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px; flex: 1; min-width: 170px; text-align: center;">
+                    <div class="stat-card" style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px; flex: 1; min-width: 160px; text-align: center;">
                         <h4 style="color: #7f8c8d; margin-bottom: 5px;">Витрачено палива</h4>
                         <strong id="det-total-spent-fuel" style="font-size: 20px; color: #c0392b;">0 л</strong>
                     </div>
-                    <div class="stat-card" style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px; flex: 1; min-width: 170px; text-align: center;">
-                        <h4 style="color: #7f8c8d; margin-bottom: 5px;">Отримано AdBlue</h4>
-                        <strong id="det-total-adblue" style="font-size: 20px; color: #2980b9;">0 л</strong>
+                    <div class="stat-card" style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px; flex: 1; min-width: 160px; text-align: center;">
+                        <h4 style="color: #7f8c8d; margin-bottom: 5px;">Залишок палива</h4>
+                        <strong id="det-current-left-fuel" style="font-size: 20px; color: #2980b9;">0 л</strong>
                     </div>
-                    <div class="stat-card" style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px; flex: 1; min-width: 170px; text-align: center;">
+                    <div class="stat-card" style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px; flex: 1; min-width: 160px; text-align: center;">
+                        <h4 style="color: #7f8c8d; margin-bottom: 5px;">Отримано AdBlue</h4>
+                        <strong id="det-total-adblue" style="font-size: 20px; color: #16a085;">0 л</strong>
+                    </div>
+                    <div class="stat-card" style="background: white; border: 1px solid #bdc3c7; padding: 15px; border-radius: 5px; flex: 1; min-width: 160px; text-align: center;">
                         <h4 style="color: #7f8c8d; margin-bottom: 5px;">Звітів у базі</h4>
                         <strong id="det-reports-count" style="font-size: 20px; color: #8e44ad;">0</strong>
                     </div>
@@ -431,7 +435,7 @@
                     <div class="table-container" style="max-height: 250px;">
                         <table>
                             <thead>
-                                <tr><th>Період</th><th>Початковий одометр</th><th>Кінцевий одометр</th><th>Пройдено</th><th>Заправка палива</th><th>Витрачено палива</th><th>Заправка AdBlue</th><th>Мастило</th><th>Омивач</th><th>Примітка</th></tr>
+                                <tr><th>Період</th><th>Початковий одометр</th><th>Кінцевий одометр</th><th>Пройдено</th><th>Заправка палива</th><th>Витрачено палива</th><th>Залишок палива</th><th>Заправка AdBlue</th><th>Мастило</th><th>Омивач</th><th>Примітка</th></tr>
                             </thead>
                             <tbody id="det-periods-tbody"></tbody>
                         </table>
@@ -445,6 +449,30 @@
                             <tr>
                                 <td>Категорія</td>
                                 <td><select class="table-cell-input" id="det-input-category" onchange="updateCarCategoryFromDetails(this.value)"></select></td>
+                            </tr>
+                            <tr>
+                                <td>Марка пального</td>
+                                <td>
+                                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                                        <input type="text" class="table-cell-input" id="det-input-fuelType" list="fuel-types-list" oninput="updateCarPropertyFromDetails('fuelType', this.value)" placeholder="Напр: ДП або АБ" style="width: 100%; box-sizing: border-box; font-size: 13px; font-weight: bold; padding: 3px 6px;">
+                                        <datalist id="fuel-types-list">
+                                            <option value="ДП">Дизельне пальне (ДП)</option>
+                                            <option value="АБ">Автомобільний бензин (АБ)</option>
+                                            <option value="ДП / AdBlue">ДП / AdBlue</option>
+                                            <option value="АБ / AdBlue">АБ / AdBlue</option>
+                                            <option value="Бензин">Бензин</option>
+                                            <option value="А-95">Бензин А-95</option>
+                                            <option value="А-92">Бензин А-92</option>
+                                            <option value="Газ">Газ</option>
+                                        </datalist>
+                                        <div style="display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px;">
+                                            <button type="button" class="fuel-select-pill" onclick="updateCarPropertyFromDetails('fuelType', 'ДП')" style="padding: 2px 7px; font-size: 11px; font-weight: bold; border: 1px solid #27ae60; border-radius: 3px; background: #e8f8f5; cursor: pointer; color: #27ae60;">ДП</button>
+                                            <button type="button" class="fuel-select-pill" onclick="updateCarPropertyFromDetails('fuelType', 'АБ')" style="padding: 2px 7px; font-size: 11px; font-weight: bold; border: 1px solid #2980b9; border-radius: 3px; background: #ebf5fb; cursor: pointer; color: #2980b9;">АБ</button>
+                                            <button type="button" class="fuel-select-pill" onclick="updateCarPropertyFromDetails('fuelType', 'ДП / AdBlue')" style="padding: 2px 7px; font-size: 11px; border: 1px solid #bdc3c7; border-radius: 3px; background: #fff; cursor: pointer; color: #333;">ДП / AdBlue</button>
+                                            <button type="button" class="fuel-select-pill" onclick="updateCarPropertyFromDetails('fuelType', 'АБ / AdBlue')" style="padding: 2px 7px; font-size: 11px; border: 1px solid #bdc3c7; border-radius: 3px; background: #fff; cursor: pointer; color: #333;">АБ / AdBlue</button>
+                                        </div>
+                                    </div>
+                                </td>
                             </tr>
                             <tr><td>Він код</td><td><input type="text" class="table-cell-input" id="det-input-vin" oninput="updateCarPropertyFromDetails('vin', this.value)"></td></tr>
                             <tr><td>Рік випуску</td><td><input type="text" class="table-cell-input" id="det-input-year" oninput="updateCarPropertyFromDetails('year', this.value)"></td></tr>

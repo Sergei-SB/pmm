@@ -90,7 +90,7 @@ function executeAddCarWithCategory(categoryKey, vehicleTypeStr, categoryDisplayN
         assignedFormulas = [8];
     }
 
-    const hasAdBlueFlag = (upperKey === 'ADBLUE' || upperKey === 'TRUCK' || upperKey === 'SPECIAL');
+    const hasAdBlueFlag = (upperKey === 'ADBLUE');
 
     const newCar = {
         id: newId,
@@ -201,8 +201,17 @@ function applyCategoryChangesToCar(car, newCategoryKey) {
 
     car.formulas = assignedFormulas;
     car.vehicleType = vehicleTypeUA;
-    car.hasAdBlue = (upperKey === 'ADBLUE' || upperKey === 'TRUCK' || upperKey === 'SPECIAL');
+    car.hasAdBlue = (upperKey === 'ADBLUE');
     car.isMiles = (upperKey === 'MILES');
+
+    // Оновлюємо відображення панелі AdBlue, якщо це авто зараз відкрите в Картці
+    if (typeof currentCarId !== 'undefined' && Number(currentCarId) === Number(car.id)) {
+        const abBox = document.getElementById('adblue-panel-box');
+        if (abBox) abBox.style.display = car.hasAdBlue ? 'block' : 'none';
+        if (typeof updateRouteTotals === 'function') {
+            try { updateRouteTotals(); } catch (e) {}
+        }
+    }
 
     if (typeof saveCarsToStorage === 'function') {
         saveCarsToStorage();

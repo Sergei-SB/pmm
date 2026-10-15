@@ -500,6 +500,8 @@ function isCarTruck(car) {
     
     return (
         cat === "truck" || 
+        cat === "adblue" ||
+        cat === "truck_adblue" ||
         cat === "minibus" || 
         cat === "special" ||
         model.includes("transporter") ||
@@ -520,7 +522,7 @@ function getCarGroup(car) {
     
     if (vType === 'мотоцикл' || cat === 'motorcycle') return 'мотоцикл';
     if (vType === 'квадроцикл' || cat === 'quad') return 'квадроцикл';
-    if (vType === 'вантажний' || cat === 'truck') return 'вантажний';
+    if (vType === 'вантажний' || cat === 'truck' || cat === 'adblue' || cat === 'truck_adblue') return 'вантажний';
     if (vType === 'легковий' || cat === 'passenger') return 'легковий';
     if (isCarTruck(car)) return 'вантажний';
     return 'легковий';
@@ -686,7 +688,9 @@ function renderCarsTable(filterQuery = '') {
             <td>${car.model || ''}</td>
             <td>${car.subdivision || '—'}</td>
             <td>${car.consumption || 0} л</td>
-            <td>${car.fuelType || ''}</td>
+            <td class="inactive-fuel-cell" style="text-align: center; font-weight: bold; background-color: #f4f6f7; color: #5f6368; cursor: not-allowed; user-select: none;" title="Паливо не редагується в базі (редагується у Звіті на автомобіль)">
+                <span style="display: inline-block; padding: 2px 8px; border-radius: 3px; background: #e8eaed; border: 1px solid #dadce0; color: #3c4043; font-size: 11px; cursor: not-allowed; pointer-events: none;">${car.fuelType || '—'}</span>
+            </td>
             <td><input type="text" class="table-cell-input" value="${car.note || ''}" oninput="updateCarProp(${car.id}, 'note', this.value)"></td>
             <td>${car.vin || ''}</td>
             <td>${car.year || ''}</td>
@@ -711,6 +715,10 @@ function renderCarsTable(filterQuery = '') {
 }
 
 function updateCarProp(carId, propName, val) {
+    if (propName === 'fuelType' || propName === 'fuel') {
+        console.warn('Паливо не редагується в Базі (Реєстр). Редагуйте через Звіт на автомобіль.');
+        return;
+    }
     const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
     const car = safeCars.find(c => Number(c.id) === Number(carId));
     if (car) {
@@ -805,8 +813,10 @@ function loadCarCard(carId) {
         searchInput.value = "";
     }
 
-    document.getElementById('spec-subdivision').textContent = car.subdivision;
-    document.getElementById('spec-fuel-type').textContent = car.fuelType;
+    const specFuel = document.getElementById('spec-fuel-type');
+    if (specFuel) specFuel.textContent = car.fuelType || 'ДП';
+    const cardFuelInput = document.getElementById('card-input-fuel-type');
+    if (cardFuelInput) cardFuelInput.value = car.fuelType || 'ДП';
     document.getElementById('spec-note').textContent = car.note;
     document.getElementById('spec-vin').textContent = car.vin;
     document.getElementById('spec-year').textContent = car.year;
@@ -1171,10 +1181,10 @@ function updateRouteTotals() {
     let fuelLeft = fuelReceived + fuelStart - fuelSpent;
 
     const fuelSpentEl = document.getElementById('fuel-spent');
-    if (fuelSpentEl) fuelSpentEl.textContent = fmt(fuelSpent, 1);
+    if (fuelSpentEl) fuelSpentEl.textContent = fmt(fuelSpent, 2);
 
     const fuelLeftEl = document.getElementById('fuel-left');
-    if (fuelLeftEl) fuelLeftEl.textContent = fmt(fuelLeft, 1);
+    if (fuelLeftEl) fuelLeftEl.textContent = fmt(fuelLeft, 2);
 
     if (car && car.hasAdBlue) {
         let adblueStart = evaluateExpression(document.getElementById('adblue-start')?.value);
