@@ -206,8 +206,8 @@ function loadCarHistoryDataIntoModal() {
                     <tr><th colspan="2" style="background: #2e7d32; color: white; padding: 5px;">Паливо</th></tr>
                     <tr><td>На початку:</td><td><input type="text" class="hist-input" data-field="fuelStart" value="${periodData.fuelStart || ''}" style="width: 100%; text-align: center;"></td></tr>
                     <tr><td>Отримано:</td><td><input type="text" class="hist-input" data-field="fuelReceived" value="${periodData.fuelReceived || ''}" style="width: 100%; text-align: center;"></td></tr>
-                    <tr><td>Залишок:</td><td><strong id="hist-fuel-left">0.0</strong> л</td></tr>
                     <tr><td>Витрачено:</td><td><strong id="hist-fuel-spent">0.0</strong> л</td></tr>
+                    <tr><td>Залишок:</td><td><strong id="hist-fuel-left">0.0</strong> л</td></tr>
                 </table>
             </div>
 
@@ -216,8 +216,8 @@ function loadCarHistoryDataIntoModal() {
                     <tr><th colspan="2" style="background: #2980b9; color: white; padding: 5px;">AdBlue</th></tr>
                     <tr><td>На початку:</td><td><input type="text" class="hist-input" data-field="adblueStart" value="${periodData.adblueStart || ''}" style="width: 100%; text-align: center;"></td></tr>
                     <tr><td>Отримано:</td><td><input type="text" class="hist-input" data-field="adblueReceived" value="${periodData.adblueReceived || ''}" style="width: 100%; text-align: center;"></td></tr>
-                    <tr><td>Залишок:</td><td><strong id="hist-adblue-left">0.0</strong> л</td></tr>
                     <tr><td>Витрачено:</td><td><strong id="hist-adblue-spent">0.0</strong> л</td></tr>
+                    <tr><td>Залишок:</td><td><strong id="hist-adblue-left">0.0</strong> л</td></tr>
                 </table>
             </div>
 
