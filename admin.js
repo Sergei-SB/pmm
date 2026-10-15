@@ -10,7 +10,13 @@
 // ==========================================
 
 let currentRole = "user";
-let isDeveloperLoggedIn = false;
+try {
+    const savedRole = localStorage.getItem('app_current_role');
+    if (savedRole && ["user", "moderator", "admin", "developer"].includes(savedRole)) {
+        currentRole = savedRole;
+    }
+} catch(e) {}
+let isDeveloperLoggedIn = (currentRole === "developer");
 
 // --- ДОПОМІЖНІ ФУНКЦІЇ ЗВ'ЯЗКУ З ПАНЕЛЛЮ РОЗРОБНИКА ---
 function getSystemPasswords() {
@@ -80,6 +86,7 @@ function selectRole(role) {
     // Якщо Розробник вже авторизований у цій сесії — пускаємо у будь-який кабінет без пароля
     if (isDeveloperLoggedIn) {
         currentRole = role;
+        try { localStorage.setItem('app_current_role', currentRole); } catch(e) {}
         addSecurityLog('info', `Швидкий перехід Розробника`, `Перехід у кабінет: ${getRoleDisplayName(role)}`);
         updateRoleUI();
         return;
@@ -103,6 +110,7 @@ function selectRole(role) {
 
     if (role === "user") {
         currentRole = "user";
+        try { localStorage.setItem('app_current_role', 'user'); } catch(e) {}
         updateRoleUI();
         return;
     }
@@ -113,6 +121,7 @@ function selectRole(role) {
             // Перевіряємо або загальний пароль Модератора, або індивідуальний пароль користувача з роллю moderator
             if (pwd === passwords.moderator || checkCustomUserPassword('moderator', pwd)) {
                 currentRole = "moderator";
+                try { localStorage.setItem('app_current_role', 'moderator'); } catch(e) {}
                 addSecurityLog('success', 'Успішний вхід: Модератор', 'Авторизація пройдена');
                 updateRoleUI();
             } else {
@@ -125,6 +134,7 @@ function selectRole(role) {
             if (pwd === null) return;
             if (pwd === passwords.admin || checkCustomUserPassword('admin', pwd)) {
                 currentRole = "admin";
+                try { localStorage.setItem('app_current_role', 'admin'); } catch(e) {}
                 addSecurityLog('success', 'Успішний вхід: Адмін', 'Авторизація пройдена');
                 updateRoleUI();
             } else {
@@ -138,6 +148,7 @@ function selectRole(role) {
             if (pwd === passwords.developer) {
                 currentRole = "developer";
                 isDeveloperLoggedIn = true;
+                try { localStorage.setItem('app_current_role', 'developer'); } catch(e) {}
                 addSecurityLog('success', 'Успішний вхід: Розробник (Супер-доступ)', 'Активовано вільний перехід між кабінетами');
                 updateRoleUI();
             } else {
@@ -176,6 +187,7 @@ function getRoleDisplayName(role) {
 function logoutDeveloperSession() {
     isDeveloperLoggedIn = false;
     currentRole = "user";
+    try { localStorage.setItem('app_current_role', 'user'); } catch(e) {}
     addSecurityLog('info', 'Вихід із режиму Розробника', 'Сесію супер-доступу завершено');
     updateRoleUI();
 }
@@ -244,6 +256,11 @@ function updateRoleUI() {
         equipmentNavBtn.style.display = isAdminOrHigher ? "inline-block" : "none";
     }
 
+    const eqReportNavBtn = document.getElementById("nav-btn-equipment-report");
+    if (eqReportNavBtn) {
+        eqReportNavBtn.style.display = isModOrHigher ? "inline-block" : "none";
+    }
+
     const destroyedNavBtn = document.getElementById("nav-btn-destroyed");
     if (destroyedNavBtn) {
         destroyedNavBtn.style.display = isAdminOrHigher ? "inline-block" : "none";
@@ -267,6 +284,11 @@ function updateRoleUI() {
 
     const equipmentView = document.getElementById("generators-view");
     if (equipmentView && (equipmentView.classList.contains("active") || equipmentView.style.display !== "none") && !isAdminOrHigher) {
+        if (typeof switchView === "function") switchView("base");
+    }
+
+    const eqReportView = document.getElementById("equipment-report-view");
+    if (eqReportView && (eqReportView.classList.contains("active") || eqReportView.style.display !== "none") && !isModOrHigher) {
         if (typeof switchView === "function") switchView("base");
     }
 

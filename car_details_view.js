@@ -174,6 +174,10 @@ window.updateCarPropertyFromDetails = function(prop, val) {
         car.subdivision = val;
         const subSpan = document.getElementById('detail-car-sub');
         if (subSpan) subSpan.textContent = val || '—';
+        if (typeof currentCarId !== 'undefined' && Number(currentCarId) === Number(car.id)) {
+            const specSub = document.getElementById('spec-subdivision');
+            if (specSub) specSub.textContent = val || '—';
+        }
     }
     else if (prop === 'driver') car.driver = val;
     else if (prop === 'fuelType') {
@@ -250,6 +254,12 @@ window.updateCarCategoryFromDetails = function(newCategoryKey) {
     if (typeof currentCarId !== 'undefined' && Number(currentCarId) === Number(car.id)) {
         const cardCatSelect = document.getElementById('card-input-category');
         if (cardCatSelect) cardCatSelect.value = car.category;
+        const specCat = document.getElementById('spec-category');
+        if (specCat) {
+            specCat.textContent = (typeof window.getCarCategoryDisplayName === 'function')
+                ? window.getCarCategoryDisplayName(car)
+                : car.category;
+        }
     }
 };
 

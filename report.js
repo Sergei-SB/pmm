@@ -549,6 +549,7 @@ function saveCurrentReportSilently() {
         if (carIdInput) {
             const carId = carIdInput.getAttribute('data-car');
             reportData[carId] = {
+                fuelType: row.querySelector('.report-cell-input[data-field="fuelType"]')?.value || '',
                 prevFuel: row.querySelector('.report-cell-input[data-field="prevFuel"]')?.value || '',
                 prevAdBlue: row.querySelector('.report-cell-input[data-field="prevAdBlue"]')?.value || '',
                 prevOdo: row.querySelector('.report-cell-input[data-field="prevOdo"]')?.value || '',
@@ -801,6 +802,10 @@ function renderReportTable() {
         const tr = document.createElement('tr');
         tr.setAttribute('data-fuel-type', (car.fuelType || '').toUpperCase());
         let carData = savedReportData[car.id];
+        if (carData && carData.fuelType) {
+            car.fuelType = carData.fuelType;
+        }
+        tr.setAttribute('data-fuel-type', (car.fuelType || '').toUpperCase());
 
         let autoPrevFuel = '';
         let autoPrevAdBlue = '';
@@ -855,6 +860,7 @@ function renderReportTable() {
             }
 
             carData = {
+                fuelType: car.fuelType || '',
                 prevFuel: autoPrevFuel !== '' ? autoPrevFuel : (currCardTop?.fuelStart || ''),
                 prevAdBlue: autoPrevAdBlue !== '' ? autoPrevAdBlue : (currCardTop?.adblueStart || ''),
                 prevOdo: autoPrevOdo !== '' ? autoPrevOdo : (currCardTop?.odo1 || ''),
@@ -911,7 +917,9 @@ function renderReportTable() {
             <td>${index + 1}</td>
             <td><strong>${car.plate}</strong></td>
             <td>${car.subdivision}</td>
-            <td class="rep-row-fuel-type">${car.fuelType}</td>
+            <td class="rep-row-fuel-type" style="padding: 2px;">
+                <input type="text" class="report-cell-input rep-fuel-type-input" data-car="${car.id}" data-field="fuelType" value="${car.fuelType || ''}" list="fuel-types-list" oninput="updateCarFuelTypeFromReport(${car.id}, this.value)" style="width: 100%; text-align: center; font-weight: bold; padding: 2px; border: 1px solid #bdc3c7; border-radius: 2px; font-size: 11px;">
+            </td>
             <td style="text-align: left; padding-left: 10px;">${car.model}</td>
             <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="prevFuel" value="${carData.prevFuel}"></td>
             <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="prevAdBlue" value="${carData.prevAdBlue}" ${noAdblueAttr}></td>
@@ -935,6 +943,30 @@ function renderReportTable() {
     }
 }
 
+function updateCarFuelTypeFromReport(carId, val) {
+    const newVal = String(val || '').trim();
+    const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
+    const car = sourceCars.find(c => Number(c.id) === Number(carId));
+    if (car) {
+        car.fuelType = newVal;
+        try {
+            localStorage.setItem('cars_custom_data', JSON.stringify(sourceCars));
+        } catch(e) {}
+    }
+    const row = document.querySelector(`.report-cell-input[data-car="${carId}"][data-field="fuelType"]`)?.closest('tr');
+    if (row) {
+        row.setAttribute('data-fuel-type', newVal.toUpperCase());
+    }
+    saveCurrentReportSilently();
+    updateReportTotals();
+    if (typeof renderSubdivisionsView === 'function') {
+        const subView = document.getElementById('subdivisions-view');
+        if (subView && subView.classList.contains('active')) {
+            renderSubdivisionsView();
+        }
+    }
+}
+
 function updateReportTotals() {
     let tfoot = document.querySelector('#report-table tfoot');
     const table = document.getElementById('report-table');
@@ -952,8 +984,8 @@ function updateReportTotals() {
     let dpEndF = 0, abEndF = 0, sumEndAd = 0;
 
     document.querySelectorAll('#report-tbody tr').forEach(row => {
-        const fCell = row.querySelector('.rep-row-fuel-type');
-        const fType = fCell ? fCell.textContent.trim().toUpperCase() : '';
+        const fInput = row.querySelector('.report-cell-input[data-field="fuelType"]');
+        const fType = fInput ? fInput.value.trim().toUpperCase() : (row.querySelector('.rep-row-fuel-type')?.textContent.trim().toUpperCase() || '');
 
         const startF = evaluateExpression(row.querySelector('.report-cell-input[data-field="prevFuel"]')?.value);
         const refF = evaluateExpression(row.querySelector('.report-cell-input[data-field="refuelFuel"]')?.value);
@@ -1113,8 +1145,8 @@ function showSubdivisionDetails(subName) {
     let stats30 = calculateSubStatsDetailed(subName, monthPeriods);
     let statsAll = calculateSubStatsDetailed(subName, periods);
 
-    let carsListHtml = subCars.length > 0 ? subCars.map(c => '<li style="margin-bottom: 4px;"><strong>' + c.plate + '</strong> — ' + c.model + ' (<span style="color: #555;">паливо: ' + c.fuelType + '</span>)</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає автомобілів</li>';
-    let eqListHtml = eqItems.length > 0 ? eqItems.map(i => '<li style="margin-bottom: 4px;"><span style="background: #e8f8f5; padding: 1px 4px; border-radius: 3px; font-size: 11px; color: #16a085; font-weight: bold;">' + i.category + '</span> <strong>' + i.model + '</strong> (<span style="color: #555;">паливо: ' + i.fuelType + '</span>)</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає обладнання</li>';
+    let carsListHtml = subCars.length > 0 ? subCars.map(c => '<li style="margin-bottom: 4px;"><strong>' + c.plate + '</strong> — ' + c.model + ' (<span style="color: #27ae60; font-weight: bold;">паливо: ' + (c.fuelType || 'ДП') + '</span>)</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає автомобілів</li>';
+    let eqListHtml = eqItems.length > 0 ? eqItems.map(i => '<li style="margin-bottom: 4px;"><span style="background: #e8f8f5; padding: 1px 4px; border-radius: 3px; font-size: 11px; color: #16a085; font-weight: bold;">' + i.category + '</span> <strong>' + i.model + '</strong> (<span style="color: #27ae60; font-weight: bold;">паливо: ' + (i.fuelType || (i.category === 'Бензопила' ? 'АБ' : 'ДП')) + '</span>)</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає обладнання</li>';
     let periodsOptionsHtml = periods.map(p => '<option value="' + p + '" ' + (p === currentCustomPeriod ? 'selected' : '') + '>' + p + '</option>').join('');
 
     let html = `
@@ -1272,8 +1304,8 @@ function showNoSubdivisionDetails() {
     let stats30 = calculateNoSubStatsDetailed(monthPeriods);
     let statsAll = calculateNoSubStatsDetailed(periods);
 
-    let carsListHtml = subCars.length > 0 ? subCars.map(c => '<li style="margin-bottom: 4px;"><strong>' + c.plate + '</strong> — ' + c.model + ' (<span style="color: #555;">паливо: ' + c.fuelType + '</span>)</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає не задіяних автомобілів</li>';
-    let eqListHtml = eqItems.length > 0 ? eqItems.map(i => '<li style="margin-bottom: 4px;"><span style="background: #e8f8f5; padding: 1px 4px; border-radius: 3px; font-size: 11px; color: #16a085; font-weight: bold;">' + i.category + '</span> <strong>' + i.model + '</strong> (<span style="color: #555;">паливо: ' + i.fuelType + '</span>)</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає не задіяного обладнання</li>';
+    let carsListHtml = subCars.length > 0 ? subCars.map(c => '<li style="margin-bottom: 4px;"><strong>' + c.plate + '</strong> — ' + c.model + ' (<span style="color: #27ae60; font-weight: bold;">паливо: ' + (c.fuelType || 'ДП') + '</span>)</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає не задіяних автомобілів</li>';
+    let eqListHtml = eqItems.length > 0 ? eqItems.map(i => '<li style="margin-bottom: 4px;"><span style="background: #e8f8f5; padding: 1px 4px; border-radius: 3px; font-size: 11px; color: #16a085; font-weight: bold;">' + i.category + '</span> <strong>' + i.model + '</strong> (<span style="color: #27ae60; font-weight: bold;">паливо: ' + (i.fuelType || (i.category === 'Бензопила' ? 'АБ' : 'ДП')) + '</span>)</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає не задіяного обладнання</li>';
     let periodsOptionsHtml = periods.map(p => '<option value="' + p + '" ' + (p === currentCustomPeriod ? 'selected' : '') + '>' + p + '</option>').join('');
 
     let html = `
@@ -1430,8 +1462,8 @@ function showPolkDetails() {
     let stats30 = calculatePolkStatsDetailed(monthPeriods);
     let statsAll = calculatePolkStatsDetailed(periods);
 
-    let polkCarsHtml = activePolkCars.length > 0 ? activePolkCars.map(c => '<li style="margin-bottom: 4px;"><strong>' + c.plate + '</strong> — ' + c.model + ' (<span style="color: #2980b9; font-weight: bold;">' + (c.subdivision || 'Без підрозділу') + '</span>, паливо: ' + c.fuelType + ')</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає техніки</li>';
-    let polkEqHtml = allEqItems.length > 0 ? allEqItems.map(i => '<li style="margin-bottom: 4px;"><span style="background: #e8f8f5; padding: 1px 4px; border-radius: 3px; font-size: 11px; color: #16a085; font-weight: bold;">' + i.category + '</span> <strong>' + i.model + '</strong> (<span style="color: #2980b9; font-weight: bold;">' + (i.subdivision || 'Без підрозділу') + '</span>, паливо: ' + i.fuelType + ')</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає обладнання</li>';
+    let polkCarsHtml = activePolkCars.length > 0 ? activePolkCars.map(c => '<li style="margin-bottom: 4px;"><strong>' + c.plate + '</strong> — ' + c.model + ' (<span style="color: #2980b9; font-weight: bold;">' + (c.subdivision || 'Без підрозділу') + '</span>, <span style="color: #27ae60; font-weight: bold;">паливо: ' + (c.fuelType || 'ДП') + '</span>)</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає техніки</li>';
+    let polkEqHtml = allEqItems.length > 0 ? allEqItems.map(i => '<li style="margin-bottom: 4px;"><span style="background: #e8f8f5; padding: 1px 4px; border-radius: 3px; font-size: 11px; color: #16a085; font-weight: bold;">' + i.category + '</span> <strong>' + i.model + '</strong> (<span style="color: #2980b9; font-weight: bold;">' + (i.subdivision || 'Без підрозділу') + '</span>, <span style="color: #27ae60; font-weight: bold;">паливо: ' + (i.fuelType || (i.category === 'Бензопила' ? 'АБ' : 'ДП')) + '</span>)</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає обладнання</li>';
     let periodsOptionsHtml = periods.map(p => '<option value="' + p + '" ' + (p === currentCustomPeriod ? 'selected' : '') + '>' + p + '</option>').join('');
 
     let html = `
@@ -1626,7 +1658,7 @@ function calculateSubStatsDetailed(subName, periodList) {
 
             if (carRec) {
                 const refFuel = evaluateExpression(carRec.refuelFuel);
-                const fType = (car.fuelType || '').toUpperCase();
+                const fType = (carRec.fuelType || car.fuelType || '').toUpperCase();
                 if (fType.includes('ДП')) {
                     carsStat.dpFuel += refFuel;
                 } else {
@@ -1730,7 +1762,7 @@ function calculateNoSubStatsDetailed(periodList) {
 
             if (carRec) {
                 const refFuel = evaluateExpression(carRec.refuelFuel);
-                const fType = (car.fuelType || '').toUpperCase();
+                const fType = (carRec.fuelType || car.fuelType || '').toUpperCase();
                 if (fType.includes('ДП')) {
                     carsStat.dpFuel += refFuel;
                 } else {
@@ -1834,7 +1866,7 @@ function calculatePolkStatsDetailed(periodList) {
 
             if (carRec) {
                 const refFuel = evaluateExpression(carRec.refuelFuel);
-                const fType = (car.fuelType || '').toUpperCase();
+                const fType = (carRec.fuelType || car.fuelType || '').toUpperCase();
                 if (fType.includes('ДП')) {
                     carsStat.dpFuel += refFuel;
                 } else {

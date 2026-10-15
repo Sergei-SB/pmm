@@ -2,26 +2,55 @@
 // ЗВІТ ПО ОБЛАДНАННЮ (equipment_report.js)
 // ==========================================
 
+let activeEquipmentReportPeriod = "";
+
 document.addEventListener("DOMContentLoaded", () => {
-    initEqReportPeriodDropdown();
-    renderEquipmentReportView();
+    setTimeout(() => {
+        initEqReportPeriodDropdown();
+        renderEquipmentReportView();
+    }, 120);
 });
 
 function getSavedEquipmentPeriodsList() {
-    let periods = ["01.10-10.10"];
+    let periods = [];
+    if (typeof getSavedPeriodsList === 'function') {
+        try {
+            periods = [...getSavedPeriodsList()];
+        } catch(e) {}
+    } else if (typeof getSortedPeriods === 'function') {
+        try {
+            periods = [...getSortedPeriods()];
+        } catch(e) {}
+    }
+    if (!periods || periods.length === 0) {
+        periods = ["01.10-10.10"];
+    }
+
     try {
-        const stored = localStorage.getItem('eq_saved_periods_list');
+        const stored = localStorage.getItem('app_saved_periods_list');
         if (stored) {
-            const customList = JSON.parse(stored);
-            customList.forEach(p => { if (!periods.includes(p)) periods.push(p); });
+            const list = JSON.parse(stored);
+            if (Array.isArray(list)) {
+                list.forEach(p => { if (p && !periods.includes(p)) periods.push(p); });
+            }
         }
     } catch(e) {}
-    
+
+    try {
+        const eqStored = localStorage.getItem('eq_saved_periods_list');
+        if (eqStored) {
+            const list = JSON.parse(eqStored);
+            if (Array.isArray(list)) {
+                list.forEach(p => { if (p && !periods.includes(p)) periods.push(p); });
+            }
+        }
+    } catch(e) {}
+
     for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (key && key.startsWith('equipment_report_data_')) {
             const p = key.replace('equipment_report_data_', '');
-            if (!periods.includes(p)) periods.push(p);
+            if (p && !periods.includes(p)) periods.push(p);
         }
     }
     return periods;
@@ -31,30 +60,233 @@ function initEqReportPeriodDropdown() {
     const select = document.getElementById('eq-report-period-select');
     if (!select) return;
     const periods = getSavedEquipmentPeriodsList();
-    let html = '';
-    periods.forEach(p => { html += `<option value="${p}">${p}</option>`; });
-    html += `<option value="custom">Власний період...</option>`;
-    select.innerHTML = html;
     
-    const customInput = document.getElementById('eq-report-custom-period');
-    const currentVal = customInput ? customInput.value : periods[0];
-    if (periods.includes(currentVal)) {
-        select.value = currentVal;
-    } else {
-        select.value = 'custom';
+    if (!activeEquipmentReportPeriod) {
+        activeEquipmentReportPeriod = (typeof activeReportPeriod !== 'undefined' && activeReportPeriod)
+            ? activeReportPeriod
+            : (periods[periods.length - 1] || "01.10-10.10");
     }
+
+    let html = '';
+    periods.forEach(p => {
+        html += `<option value="${p}" ${p === activeEquipmentReportPeriod ? 'selected' : ''}>${p}</option>`;
+    });
+    select.innerHTML = html;
+    if (periods.includes(activeEquipmentReportPeriod)) {
+        select.value = activeEquipmentReportPeriod;
+    }
+
+    const customInput = document.getElementById('eq-report-custom-period');
+    if (customInput) {
+        customInput.value = activeEquipmentReportPeriod;
+    }
+
+    updateEquipmentReportHeaders();
+}
+
+function updateEquipmentReportHeaders() {
+    const periodInput = document.getElementById('eq-report-custom-period');
+    const periodStr = periodInput ? periodInput.value.trim() : (activeEquipmentReportPeriod || "01.10-10.10");
+    let parts = periodStr.split('-');
+    let startDate = parts[0] ? parts[0].trim() : "01.10";
+    let endDate = parts[1] ? parts[1].trim() : startDate;
+
+    let monthNum = 10;
+    if (startDate.includes('.')) {
+        monthNum = parseInt(startDate.split('.')[1], 10) || 10;
+    } else if (endDate.includes('.')) {
+        monthNum = parseInt(endDate.split('.')[1], 10) || 10;
+    }
+    const mm = String(monthNum).padStart(2, '0');
+
+    // Кількість днів у місяці (31, 30, 28/29)
+    const curYear = (typeof currentYear !== 'undefined' && currentYear) ? currentYear : (new Date().getFullYear());
+    const daysInMonth = new Date(curYear, monthNum, 0).getDate() || 31;
+
+    const p1Label = `1-10.${mm}`;
+    const p2Label = `11-20.${mm}`;
+    const p3Label = `21-${daysInMonth}.${mm}`;
+
+    // Розраховуємо початок наступного періоду
+    let nextStartDate = "";
+    if (typeof getNextTenDayPeriod === 'function') {
+        const nextP = getNextTenDayPeriod(periodStr);
+        if (nextP && nextP.includes('-')) {
+            nextStartDate = nextP.split('-')[0].trim();
+        }
+    }
+    if (!nextStartDate) {
+        const startDay = parseInt(startDate.split('.')[0], 10) || 1;
+        if (startDay === 1) nextStartDate = `11.${mm}`;
+        else if (startDay === 11) nextStartDate = `21.${mm}`;
+        else {
+            const nextM = (monthNum % 12) + 1;
+            nextStartDate = `01.${String(nextM).padStart(2, '0')}`;
+        }
+    }
+
+    document.querySelectorAll('.eq-rep-start').forEach(el => el.textContent = startDate);
+    document.querySelectorAll('.eq-rep-end').forEach(el => el.textContent = endDate);
+    document.querySelectorAll('.eq-rep-next-start').forEach(el => el.textContent = nextStartDate);
+    document.querySelectorAll('.eq-rep-p1-label').forEach(el => el.textContent = p1Label);
+    document.querySelectorAll('.eq-rep-p2-label').forEach(el => el.textContent = p2Label);
+    document.querySelectorAll('.eq-rep-p3-label').forEach(el => el.textContent = p3Label);
+}
+
+function getPreviousEquipmentPeriodKey(currentPeriod) {
+    if (typeof getPrevPeriodKey === 'function') {
+        const p = getPrevPeriodKey(currentPeriod);
+        if (p) return p;
+    }
+    const periods = getSavedEquipmentPeriodsList();
+    const cleanCurrent = (currentPeriod || "").trim();
+    const idx = periods.indexOf(cleanCurrent);
+    if (idx > 0) return periods[idx - 1];
+
+    const parts = cleanCurrent.split('-');
+    const startDate = parts[0] ? parts[0].trim() : "";
+    if (startDate.includes('.')) {
+        const d = parseInt(startDate.split('.')[0], 10);
+        const m = parseInt(startDate.split('.')[1], 10);
+        const mm = String(m).padStart(2, '0');
+        if (d === 11) return `01.${mm}-10.${mm}`;
+        if (d === 21) return `11.${mm}-20.${mm}`;
+        if (d === 1) {
+            const prevM = m === 1 ? 12 : m - 1;
+            const prevMm = String(prevM).padStart(2, '0');
+            const prevDays = new Date(2024, prevM, 0).getDate();
+            return `21.${prevMm}-${prevDays}.${prevMm}`;
+        }
+    }
+    return null;
+}
+
+function propagateNextFuelToNextPeriod(periodStr, reportData) {
+    if (!periodStr || !reportData) return;
+    let nextPeriodKey = null;
+    if (typeof getNextTenDayPeriod === 'function') {
+        nextPeriodKey = getNextTenDayPeriod(periodStr);
+    }
+    if (!nextPeriodKey) {
+        const parts = periodStr.split('-');
+        const s = parts[0] ? parts[0].trim() : "";
+        if (s.includes('.')) {
+            const d = parseInt(s.split('.')[0], 10);
+            const m = parseInt(s.split('.')[1], 10);
+            const mm = String(m).padStart(2, '0');
+            if (d === 1) nextPeriodKey = `11.${mm}-20.${mm}`;
+            else if (d === 11) {
+                const daysInM = new Date(2024, m, 0).getDate();
+                nextPeriodKey = `21.${mm}-${daysInM}.${mm}`;
+            } else {
+                const nextM = (m % 12) + 1;
+                const nextMm = String(nextM).padStart(2, '0');
+                nextPeriodKey = `01.${nextMm}-10.${nextMm}`;
+            }
+        }
+    }
+    if (!nextPeriodKey) return;
+
+    try {
+        const nextKey = `equipment_report_data_${nextPeriodKey}`;
+        let nextData = {};
+        const stored = localStorage.getItem(nextKey);
+        if (stored) nextData = JSON.parse(stored);
+
+        let changed = false;
+        for (let uid in reportData) {
+            const nextVal = reportData[uid]?.nextFuel;
+            if (nextVal !== undefined && nextVal !== null && String(nextVal).trim() !== '') {
+                if (!nextData[uid]) {
+                    nextData[uid] = { prevFuel: '', prevOil: '', p1Fuel: '', p1Oil: '', p2Fuel: '', p2Oil: '', p3Fuel: '', p3Oil: '', nextFuel: '' };
+                }
+                nextData[uid].prevFuel = String(nextVal).trim();
+                nextData[uid]._autoCarried = true;
+                changed = true;
+            }
+        }
+        if (changed) {
+            localStorage.setItem(nextKey, JSON.stringify(nextData));
+        }
+    } catch(e) {}
+}
+
+function saveCurrentEquipmentReportSilently() {
+    const periodInput = document.getElementById('eq-report-custom-period');
+    const periodStr = periodInput ? periodInput.value.trim() : (activeEquipmentReportPeriod || "01.10-10.10");
+    if (!periodStr) return;
+
+    const rows = document.querySelectorAll('#equipment-report-tbody tr');
+    if (rows.length === 0) return;
+
+    const storageKey = `equipment_report_data_${periodStr}`;
+    let reportData = {};
+    try {
+        const stored = localStorage.getItem(storageKey);
+        if (stored) reportData = JSON.parse(stored);
+    } catch(e) {}
+
+    const inputs = document.querySelectorAll('.eq-rep-input');
+    inputs.forEach(input => {
+        const id = input.getAttribute('data-id');
+        const field = input.getAttribute('data-field');
+        const val = input.value;
+        if (id && field) {
+            if (!reportData[id]) {
+                reportData[id] = { prevFuel: '', prevOil: '', p1Fuel: '', p1Oil: '', p2Fuel: '', p2Oil: '', p3Fuel: '', p3Oil: '', nextFuel: '' };
+            }
+            reportData[id][field] = val;
+        }
+    });
+
+    localStorage.setItem(storageKey, JSON.stringify(reportData));
+    propagateNextFuelToNextPeriod(periodStr, reportData);
 }
 
 function changeEqReportPeriod(val) {
+    if (!val) return;
+    saveCurrentEquipmentReportSilently();
+    activeEquipmentReportPeriod = val;
     const customInput = document.getElementById('eq-report-custom-period');
-    if (val === 'custom') {
-        customInput.value = '';
-        customInput.focus();
-    } else {
-        customInput.value = val;
+    if (customInput) customInput.value = val;
+    updateEquipmentReportHeaders();
+    renderEquipmentReportView();
+}
+
+window.navigateEquipmentReportPeriod = function(direction) {
+    saveCurrentEquipmentReportSilently();
+
+    let periods = getSavedEquipmentPeriodsList();
+    const selectEl = document.getElementById('eq-report-period-select');
+    let current = (selectEl && selectEl.value) ? selectEl.value : activeEquipmentReportPeriod;
+    let idx = periods.indexOf(current);
+    if (idx === -1) idx = periods.length - 1;
+
+    let newIdx = idx + direction;
+
+    if (direction > 0 && newIdx >= periods.length) {
+        let nextPeriod = null;
+        if (typeof getNextTenDayPeriod === 'function') {
+            nextPeriod = getNextTenDayPeriod(periods[periods.length - 1]);
+        }
+        if (nextPeriod && !periods.includes(nextPeriod)) {
+            periods.push(nextPeriod);
+            localStorage.setItem('app_saved_periods_list', JSON.stringify(periods));
+            localStorage.setItem('eq_saved_periods_list', JSON.stringify(periods));
+        }
+        if (nextPeriod) {
+            newIdx = periods.indexOf(nextPeriod);
+        }
+    }
+
+    if (newIdx >= 0 && newIdx < periods.length) {
+        activeEquipmentReportPeriod = periods[newIdx];
+        const customInput = document.getElementById('eq-report-custom-period');
+        if (customInput) customInput.value = activeEquipmentReportPeriod;
+        initEqReportPeriodDropdown();
         renderEquipmentReportView();
     }
-}
+};
 
 function getAllEquipmentItemsUnified() {
     let allItems = [];
@@ -185,7 +417,8 @@ function renderEquipmentReportView() {
     if (!tbody) return;
 
     const periodInput = document.getElementById('eq-report-custom-period');
-    const periodStr = periodInput ? periodInput.value.trim() : "01.10-10.10";
+    const periodStr = periodInput ? periodInput.value.trim() : (activeEquipmentReportPeriod || "01.10-10.10");
+    updateEquipmentReportHeaders();
 
     const items = getAllEquipmentItemsUnified();
 
@@ -220,15 +453,37 @@ function renderEquipmentReportView() {
         if (stored) savedData = JSON.parse(stored);
     } catch(e) {}
 
+    // Читаємо дані попереднього періоду для автоматичного перенесення залишку палива
+    const prevPeriodKey = getPreviousEquipmentPeriodKey(periodStr);
+    let prevPeriodSavedData = {};
+    if (prevPeriodKey) {
+        try {
+            const prevStored = localStorage.getItem(`equipment_report_data_${prevPeriodKey}`);
+            if (prevStored) prevPeriodSavedData = JSON.parse(prevStored);
+        } catch(e) {}
+    }
+
     tbody.innerHTML = '';
 
     filteredItems.forEach((item, idx) => {
-        const itemData = savedData[item.uniqueId] || {
+        let itemData = savedData[item.uniqueId] || {
             prevFuel: '', prevOil: '',
             p1Fuel: '', p1Oil: '',
             p2Fuel: '', p2Oil: '',
-            p3Fuel: '', p3Oil: ''
+            p3Fuel: '', p3Oil: '',
+            nextFuel: ''
         };
+
+        // Перевіряємо залишок з попереднього періоду (nextFuel попереднього стає prevFuel поточного)
+        if (prevPeriodSavedData && prevPeriodSavedData[item.uniqueId]) {
+            const carriedFuel = prevPeriodSavedData[item.uniqueId].nextFuel;
+            if (carriedFuel !== undefined && carriedFuel !== null && String(carriedFuel).trim() !== '') {
+                if (itemData.prevFuel === '' || itemData.prevFuel === undefined || itemData._autoCarried) {
+                    itemData.prevFuel = String(carriedFuel).trim();
+                    itemData._autoCarried = true;
+                }
+            }
+        }
 
         const tr = document.createElement('tr');
         tr.setAttribute('data-fuel-type', (item.fuelType || '').toUpperCase());
@@ -238,7 +493,7 @@ function renderEquipmentReportView() {
             <td style="text-align: center;"><strong>${item.subdivision}</strong></td>
             <td><strong>${item.model}</strong></td>
             <td style="text-align: center;" class="eq-row-fuel-type">${item.fuelType}</td>
-            <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="prevFuel" value="${itemData.prevFuel || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;"></td>
+            <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="prevFuel" value="${itemData.prevFuel || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px; ${itemData._autoCarried ? 'background-color: #f0fdf4;' : ''}"></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="prevOil" value="${itemData.prevOil || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;"></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p1Fuel" value="${itemData.p1Fuel || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;"></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p1Oil" value="${itemData.p1Oil || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;"></td>
@@ -246,6 +501,7 @@ function renderEquipmentReportView() {
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p2Oil" value="${itemData.p2Oil || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;"></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p3Fuel" value="${itemData.p3Fuel || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;"></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p3Oil" value="${itemData.p3Oil || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;"></td>
+            <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="nextFuel" value="${itemData.nextFuel || ''}" style="width: 100%; text-align: center; border: 1px solid #27ae60; background: #f0fdf4; padding: 4px; font-weight: bold; color: #166534;" placeholder="0.0"></td>
         `;
         tbody.appendChild(tr);
     });
@@ -266,6 +522,7 @@ function updateEquipmentReportTotals() {
     let dpP1Fuel = 0, abP1Fuel = 0;
     let dpP2Fuel = 0, abP2Fuel = 0;
     let dpP3Fuel = 0, abP3Fuel = 0;
+    let dpNextFuel = 0, abNextFuel = 0;
 
     let sumPrevOilMap = {};
     let sumP1OilMap = {};
@@ -280,17 +537,20 @@ function updateEquipmentReportTotals() {
         const p1F = evaluateExpression(row.querySelector('.eq-rep-input[data-field="p1Fuel"]')?.value);
         const p2F = evaluateExpression(row.querySelector('.eq-rep-input[data-field="p2Fuel"]')?.value);
         const p3F = evaluateExpression(row.querySelector('.eq-rep-input[data-field="p3Fuel"]')?.value);
+        const nextF = evaluateExpression(row.querySelector('.eq-rep-input[data-field="nextFuel"]')?.value);
 
         if (fType.includes('ДП')) {
             dpPrevFuel += prevF;
             dpP1Fuel += p1F;
             dpP2Fuel += p2F;
             dpP3Fuel += p3F;
+            dpNextFuel += nextF;
         } else {
             abPrevFuel += prevF;
             abP1Fuel += p1F;
             abP2Fuel += p2F;
             abP3Fuel += p3F;
+            abNextFuel += nextF;
         }
 
         mergeFluidMaps(sumPrevOilMap, parseFluidEntries(row.querySelector('.eq-rep-input[data-field="prevOil"]')?.value));
@@ -324,6 +584,7 @@ function updateEquipmentReportTotals() {
             <td rowspan="2" style="text-align: center; vertical-align: middle; border-left: 1px solid #dcdcdc; border-right: 1px solid #dcdcdc; font-size: 11px;">${formatFluidBreakdown(sumP2OilMap)}</td>
             <td style="text-align: center; color: #27ae60; border-bottom: 1px solid #dcdcdc;">${dpP3Fuel !== 0 ? dpP3Fuel.toFixed(1) + ' л' : '0 л'}</td>
             <td rowspan="2" style="text-align: center; vertical-align: middle; border-left: 1px solid #dcdcdc; border-right: 1px solid #dcdcdc; font-size: 11px;">${formatFluidBreakdown(sumP3OilMap)}</td>
+            <td style="text-align: center; color: #27ae60; border-bottom: 1px solid #dcdcdc; font-weight: bold;">${dpNextFuel !== 0 ? dpNextFuel.toFixed(1) + ' л' : '0 л'}</td>
         </tr>
         <tr style="background-color: #eaeaea; font-weight: bold; border-bottom: 2px solid #bdc3c7;">
             <td colspan="5" style="text-align: right; padding-right: 10px; border-bottom: 2px solid #bdc3c7;">${footerLabel} (АБ)</td>
@@ -331,11 +592,13 @@ function updateEquipmentReportTotals() {
             <td style="text-align: center; color: #2980b9; border-bottom: 2px solid #bdc3c7;">${abP1Fuel !== 0 ? abP1Fuel.toFixed(1) + ' л' : '0 л'}</td>
             <td style="text-align: center; color: #2980b9; border-bottom: 2px solid #bdc3c7;">${abP2Fuel !== 0 ? abP2Fuel.toFixed(1) + ' л' : '0 л'}</td>
             <td style="text-align: center; color: #2980b9; border-bottom: 2px solid #bdc3c7;">${abP3Fuel !== 0 ? abP3Fuel.toFixed(1) + ' л' : '0 л'}</td>
+            <td style="text-align: center; color: #2980b9; border-bottom: 2px solid #bdc3c7; font-weight: bold;">${abNextFuel !== 0 ? abNextFuel.toFixed(1) + ' л' : '0 л'}</td>
         </tr>
         <tr style="background-color: #d5f5e3; font-weight: bold; border-top: 2px solid #27ae60; border-bottom: 2px solid #27ae60;">
             <td colspan="5" style="text-align: right; padding-right: 10px; color: #145a32;">ВСЬОГО ЗА ПЕРІУД:</td>
-            <td colspan="2" style="text-align: center; color: #27ae60;">ДП: ${totalDpPeriod.toFixed(1)} л | АБ: ${totalAbPeriod.toFixed(1)} л</td>
-            <td colspan="6" style="text-align: left; padding-left: 20px; color: #2c3e50;">ДП: <strong style="color: #27ae60;">${totalDpPeriod.toFixed(1)} л</strong> &nbsp;|&nbsp; АБ: <strong style="color: #2980b9;">${totalAbPeriod.toFixed(1)} л</strong> &nbsp;|&nbsp; Мастило: <strong style="color: #8e44ad;">${formatFluidBreakdown(totalOilPeriodMap)}</strong></td>
+            <td colspan="2" style="text-align: center; color: #27ae60;">Початковий: ДП ${dpPrevFuel.toFixed(1)} л | АБ ${abPrevFuel.toFixed(1)} л</td>
+            <td colspan="6" style="text-align: left; padding-left: 15px; color: #2c3e50;">Заправка: ДП <strong style="color: #27ae60;">${totalDpPeriod.toFixed(1)} л</strong> | АБ <strong style="color: #2980b9;">${totalAbPeriod.toFixed(1)} л</strong> | Мастило <strong style="color: #8e44ad;">${formatFluidBreakdown(totalOilPeriodMap)}</strong></td>
+            <td style="text-align: center; color: #145a32; font-weight: bold;">${(dpNextFuel + abNextFuel) > 0 ? (dpNextFuel + abNextFuel).toFixed(1) + ' л' : '0 л'}</td>
         </tr>
     `;
 }
@@ -361,17 +624,70 @@ function saveEquipmentReportData() {
         const val = input.value;
 
         if (!reportData[id]) {
-            reportData[id] = { prevFuel: '', prevOil: '', p1Fuel: '', p1Oil: '', p2Fuel: '', p2Oil: '', p3Fuel: '', p3Oil: '' };
+            reportData[id] = { prevFuel: '', prevOil: '', p1Fuel: '', p1Oil: '', p2Fuel: '', p2Oil: '', p3Fuel: '', p3Oil: '', nextFuel: '' };
         }
         reportData[id][field] = val;
     });
 
     localStorage.setItem(storageKey, JSON.stringify(reportData));
+    propagateNextFuelToNextPeriod(periodStr, reportData);
     alert(`Звіт по обладнанню за період "${periodStr}" успішно збережено!`);
 }
 
 function printEquipmentReport() {
-    window.print();
+    const table = document.getElementById('equipment-report-table');
+    if (!table) {
+        window.print();
+        return;
+    }
+    // Синхронізуємо атрибути value для коректного відображення у вікні друку
+    table.querySelectorAll('input').forEach(inp => inp.setAttribute('value', inp.value));
+
+    const periodInput = document.getElementById('eq-report-custom-period');
+    const periodStr = periodInput ? periodInput.value.trim() : "01.10-10.10";
+    const subFilterEl = document.getElementById('equipment-subdivision-filter');
+    const subVal = subFilterEl ? subFilterEl.value : 'all';
+    const subLabel = subVal !== 'all' ? ` (Підрозділ: ${subVal})` : '';
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        window.print();
+        return;
+    }
+    let html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>Звіт по обладнанню (${periodStr})</title>
+            <style>
+                body { font-family: Arial, sans-serif; font-size: 11px; color: #000; margin: 10px; }
+                h2 { text-align: center; margin-bottom: 12px; font-size: 14px; color: #2c3e50; }
+                table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 10px; }
+                th, td { border: 1px solid #333; padding: 4px 5px; text-align: center; }
+                th { background-color: #2e7d32 !important; color: white !important; font-size: 10px; }
+                td:nth-child(4) { text-align: left; }
+                input { border: none; text-align: center; width: 100%; font-size: 10px; background: transparent; }
+                tfoot tr { font-weight: bold; background: #eee; }
+                @media print {
+                    @page { size: landscape; margin: 6mm; }
+                    body { -webkit-print-color-adjust: exact; }
+                }
+            </style>
+        </head>
+        <body>
+            <h2>ДЕСЯТИДЕННИЙ ЗВІТ ПО ОБЛАДНАННЮ${subLabel} — Період: ${periodStr}</h2>
+            ${table.outerHTML}
+        </body>
+        </html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+    }, 250);
 }
 
 document.addEventListener('input', function(e) {
@@ -388,12 +704,13 @@ document.addEventListener('input', function(e) {
             const val = input.value;
 
             if (!reportData[id]) {
-                reportData[id] = { prevFuel: '', prevOil: '', p1Fuel: '', p1Oil: '', p2Fuel: '', p2Oil: '', p3Fuel: '', p3Oil: '' };
+                reportData[id] = { prevFuel: '', prevOil: '', p1Fuel: '', p1Oil: '', p2Fuel: '', p2Oil: '', p3Fuel: '', p3Oil: '', nextFuel: '' };
             }
             reportData[id][field] = val;
         });
 
         localStorage.setItem(storageKey, JSON.stringify(reportData));
+        propagateNextFuelToNextPeriod(periodStr, reportData);
         updateEquipmentReportTotals();
     }
 });

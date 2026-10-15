@@ -343,7 +343,8 @@ function switchView(viewName) {
 
     navButtons.forEach(btn => {
         const onclickAttr = btn.getAttribute('onclick') || '';
-        if (onclickAttr.includes(`switchView('${viewName}')`) || onclickAttr.includes(`switchView("${viewName}")`)) {
+        if (onclickAttr.includes(`switchView('${viewName}')`) || onclickAttr.includes(`switchView("${viewName}")`) ||
+            ((viewName === 'equipment-report-view' || viewName === 'equipment-report') && (btn.id === 'nav-btn-equipment-report' || onclickAttr.includes('equipment-report')))) {
             btn.classList.add('active');
         }
     });
@@ -384,8 +385,9 @@ function switchView(viewName) {
         if (typeof renderAggregatesCalcView === 'function') {
             renderAggregatesCalcView();
         }
-    } else if (viewName === 'equipment-report-view') {
-        document.getElementById('equipment-report-view').classList.add('active');
+    } else if (viewName === 'equipment-report-view' || viewName === 'equipment-report') {
+        const eqRepSec = document.getElementById('equipment-report-view');
+        if (eqRepSec) eqRepSec.classList.add('active');
         if (topSearchBox) topSearchBox.style.display = 'none';
         if (typeof renderEquipmentReportView === 'function') {
             renderEquipmentReportView();
@@ -424,6 +426,7 @@ function getAllEquipmentItemsUnified() {
                 category: 'Генератор',
                 model: item.model || item.name || 'Генератор #' + (index + 1),
                 subdivision: item.locationSubdivision || item.subdivision || '',
+                fuelType: item.fuelType || item.fuel || 'ДП',
                 note: item.note || '',
                 rawItem: item,
                 arrayType: 'generators'
@@ -442,6 +445,7 @@ function getAllEquipmentItemsUnified() {
                 category: 'Webasto',
                 model: item.model || item.name || 'Webasto #' + (index + 1),
                 subdivision: item.locationSubdivision || item.subdivision || '',
+                fuelType: item.fuelType || item.fuel || 'ДП',
                 note: item.note || '',
                 rawItem: item,
                 arrayType: 'webasto'
@@ -460,6 +464,7 @@ function getAllEquipmentItemsUnified() {
                 category: 'Теплова пушка',
                 model: item.model || item.name || 'Пушка #' + (index + 1),
                 subdivision: item.locationSubdivision || item.subdivision || '',
+                fuelType: item.fuelType || item.fuel || 'ДП',
                 note: item.note || '',
                 rawItem: item,
                 arrayType: 'heaters'
@@ -478,6 +483,7 @@ function getAllEquipmentItemsUnified() {
                 category: 'Бензопила',
                 model: item.model || item.name || 'Пила #' + (index + 1),
                 subdivision: item.locationSubdivision || item.subdivision || '',
+                fuelType: item.fuelType || item.fuel || 'АБ',
                 note: item.note || '',
                 rawItem: item,
                 arrayType: 'chainsaws'
@@ -688,9 +694,7 @@ function renderCarsTable(filterQuery = '') {
             <td>${car.model || ''}</td>
             <td>${car.subdivision || '—'}</td>
             <td>${car.consumption || 0} л</td>
-            <td class="inactive-fuel-cell" style="text-align: center; font-weight: bold; background-color: #f4f6f7; color: #5f6368; cursor: not-allowed; user-select: none;" title="Паливо не редагується в базі (редагується у Звіті на автомобіль)">
-                <span style="display: inline-block; padding: 2px 8px; border-radius: 3px; background: #e8eaed; border: 1px solid #dadce0; color: #3c4043; font-size: 11px; cursor: not-allowed; pointer-events: none;">${car.fuelType || '—'}</span>
-            </td>
+            <td>${car.fuelType || '—'}</td>
             <td><input type="text" class="table-cell-input" value="${car.note || ''}" oninput="updateCarProp(${car.id}, 'note', this.value)"></td>
             <td>${car.vin || ''}</td>
             <td>${car.year || ''}</td>
@@ -799,6 +803,34 @@ function openCarCard(carId) {
     loadCarCard(currentCarId);
 }
 
+function getCarCategoryDisplayName(car) {
+    if (!car) return '—';
+    if (typeof resolveCarCategoryKey === 'function') {
+        const key = resolveCarCategoryKey(car);
+        if (key && typeof VEHICLE_CATEGORIES !== 'undefined' && VEHICLE_CATEGORIES[key.toUpperCase()]) {
+            return VEHICLE_CATEGORIES[key.toUpperCase()];
+        }
+    }
+    const cat = String(car.category || '').toUpperCase();
+    if (typeof VEHICLE_CATEGORIES !== 'undefined' && VEHICLE_CATEGORIES[cat]) {
+        return VEHICLE_CATEGORIES[cat];
+    }
+    if (typeof VEHICLE_CATEGORIES !== 'undefined') {
+        for (let k in VEHICLE_CATEGORIES) {
+            if (k.toLowerCase() === String(car.category || '').toLowerCase()) {
+                return VEHICLE_CATEGORIES[k];
+            }
+        }
+    }
+    const vType = String(car.vehicleType || '').toLowerCase();
+    if (vType === 'легковий') return 'Легкові автомобілі';
+    if (vType === 'вантажний') return car.hasAdBlue ? 'Вантажні автомобілі з AdBlue' : 'Вантажні автомобілі';
+    if (vType === 'мотоцикл') return 'Мотоцикли';
+    if (vType === 'квадроцикл') return 'Квадроцикли';
+    return car.category || 'Легкові автомобілі';
+}
+window.getCarCategoryDisplayName = getCarCategoryDisplayName;
+
 function loadCarCard(carId) {
     currentCarId = carId;
     const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
@@ -813,6 +845,17 @@ function loadCarCard(carId) {
         searchInput.value = "";
     }
 
+    // Категорія (не активна ячейка)
+    const specCat = document.getElementById('spec-category');
+    if (specCat) specCat.textContent = getCarCategoryDisplayName(car);
+    const cardCatSelect = document.getElementById('card-input-category');
+    if (cardCatSelect) cardCatSelect.value = (typeof resolveCarCategoryKey === 'function') ? resolveCarCategoryKey(car) : (car.category || 'passenger');
+
+    // Підрозділ, рота (переноситься з База (Реєстр))
+    const specSub = document.getElementById('spec-subdivision');
+    if (specSub) specSub.textContent = car.subdivision || '—';
+
+    // Тип пального (не активна ячейка)
     const specFuel = document.getElementById('spec-fuel-type');
     if (specFuel) specFuel.textContent = car.fuelType || 'ДП';
     const cardFuelInput = document.getElementById('card-input-fuel-type');

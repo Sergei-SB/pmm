@@ -227,7 +227,7 @@ function applyCategoryChangesToCar(car, newCategoryKey) {
 document.addEventListener("DOMContentLoaded", () => {
     initCategorySelects();
 
-    // Автоматично синхронізуємо випадаючий список категорії у Картці авто при її відкритті
+    // Автоматично синхронізуємо дані Картки авто при її відкритті
     if (typeof window.loadCarCard === 'function' && !window._categoryCardSyncHooked) {
         window._categoryCardSyncHooked = true;
         const origLoadCard = window.loadCarCard;
@@ -236,10 +236,27 @@ document.addEventListener("DOMContentLoaded", () => {
             origLoadCard.apply(this, arguments);
             const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
             const car = sourceCars.find(c => Number(c.id) === Number(carId));
-            const cardCatSelect = document.getElementById('card-input-category');
-            if (car && cardCatSelect) {
+            if (car) {
                 const resolved = (typeof resolveCarCategoryKey === 'function') ? resolveCarCategoryKey(car) : (car.category || 'passenger');
-                cardCatSelect.value = resolved;
+                const cardCatSelect = document.getElementById('card-input-category');
+                if (cardCatSelect) cardCatSelect.value = resolved;
+
+                const specCat = document.getElementById('spec-category');
+                if (specCat) {
+                    specCat.textContent = (typeof window.getCarCategoryDisplayName === 'function')
+                        ? window.getCarCategoryDisplayName(car)
+                        : ((typeof VEHICLE_CATEGORIES !== 'undefined' && VEHICLE_CATEGORIES[resolved.toUpperCase()]) || car.category || 'Легкові автомобілі');
+                }
+
+                const specSub = document.getElementById('spec-subdivision');
+                if (specSub) {
+                    specSub.textContent = car.subdivision || '—';
+                }
+
+                const specFuel = document.getElementById('spec-fuel-type');
+                if (specFuel) {
+                    specFuel.textContent = car.fuelType || car.fuel || 'ДП';
+                }
             }
         };
     }

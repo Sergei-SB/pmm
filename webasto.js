@@ -93,6 +93,29 @@ function renderWebastoView() {
             parentBar.style.alignItems = 'center';
             parentBar.style.width = '100%';
 
+            // Кнопка скидання фільтрів
+            let resetBtn = document.getElementById('reset-web-filters-btn');
+            const hasFilters = (typeof hasAnyActiveExcelFilters === 'function' && hasAnyActiveExcelFilters('webasto')) || 
+                               webastoFilters.model || webastoFilters.subdivision || webastoFilters.responsiblePerson || webastoFilters.locationSubdivision;
+            
+            if (hasFilters) {
+                if (!resetBtn) {
+                    resetBtn = document.createElement('button');
+                    resetBtn.id = 'reset-web-filters-btn';
+                    resetBtn.className = 'action-btn';
+                    parentBar.insertBefore(resetBtn, addBtn);
+                }
+                resetBtn.style.cssText = 'background-color: #e67e22; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; margin-left: auto; margin-right: 10px; display: inline-flex; align-items: center; gap: 4px;';
+                resetBtn.innerHTML = '<span>🔄</span> Скинути фільтри';
+                resetBtn.onclick = () => {
+                    webastoFilters = { model: "", subdivision: "", responsiblePerson: "", locationSubdivision: "" };
+                    if (typeof clearAllExcelFiltersForCategory === 'function') clearAllExcelFiltersForCategory('webasto');
+                    renderWebastoView();
+                };
+            } else if (resetBtn) {
+                resetBtn.remove();
+            }
+
             let printBtn = document.getElementById('universal-print-btn');
             if (!printBtn) {
                 printBtn = document.createElement('button');
@@ -102,29 +125,105 @@ function renderWebastoView() {
             }
             printBtn.onclick = printCurrentEquipmentTable;
             printBtn.innerHTML = '<span style="font-size: 14px; margin-right: 6px; vertical-align: middle;">🖨️</span> Друк';
-            printBtn.style.cssText = 'background-color: #337ab7; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; white-space: nowrap; margin-left: auto; margin-right: 10px;';
+            printBtn.style.cssText = 'background-color: #337ab7; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; white-space: nowrap; margin-right: 10px;' + (!hasFilters ? ' margin-left: auto;' : '');
         }
     }
+
+    const efBtn = (colKey, title) => typeof renderExcelHeaderFilterButton === 'function' ? renderExcelHeaderFilterButton('webasto', colKey, title) : '';
 
     wrapper.innerHTML = `
         <table id="webasto-table" class="compact-base-table" style="width: 100%; border-collapse: collapse; background: white; font-size: 12px;">
             <thead>
                 <tr style="background-color: #2e7d32; color: white;">
                     <th style="padding: 6px 4px; width: 35px;">№</th>
-                    <th style="padding: 6px 4px; min-width: 190px;">Модель<br><input type="text" id="filter-web-model" placeholder="Фільтр..." value="${webastoFilters.model}" oninput="updateWebFilter('model', this.value)" style="width: 100%; font-size: 11px; padding: 2px; border-radius: 2px; border: 1px solid #1b5e20; box-sizing: border-box;"></th>
-                    <th style="padding: 6px 4px; width: 45px;">кВт</th>
-                    <th style="padding: 6px 4px; width: 50px;">Тип пал.</th>
-                    <th style="padding: 6px 4px; width: 55px;">Розхід літ./год.</th>
-                    <th style="padding: 6px 4px; width: 65px;">Норма мастил</th>
-                    <th style="padding: 6px 4px; width: 75px;">Макс з. на 5 діб</th>
-                    <th style="padding: 6px 4px; width: 75px;">Макс з. на 10 діб</th>
-                    <th style="padding: 6px 4px; width: 75px;">Макс з. на 30 діб</th>
-                    <th style="padding: 6px 4px; width: 65px;">Норма мотог.</th>
-                    <th style="padding: 6px 4px; min-width: 90px;">Підрозділ<br><input type="text" id="filter-web-sub" placeholder="Фільтр..." value="${webastoFilters.subdivision}" oninput="updateWebFilter('subdivision', this.value)" style="width: 100%; font-size: 11px; padding: 2px; border-radius: 2px; border: 1px solid #1b5e20; box-sizing: border-box;"></th>
-                    <th style="padding: 6px 4px; min-width: 130px;">Мат. Відп. Особа<br><input type="text" id="filter-web-resp" placeholder="Фільтр..." value="${webastoFilters.responsiblePerson}" oninput="updateWebFilter('responsiblePerson', this.value)" style="width: 100%; font-size: 11px; padding: 2px; border-radius: 2px; border: 1px solid #1b5e20; box-sizing: border-box;"></th>
-                    <th style="padding: 6px 4px; min-width: 100px;">Де знаходиться<br><input type="text" id="filter-web-loc" placeholder="Фільтр..." value="${webastoFilters.locationSubdivision}" oninput="updateWebFilter('locationSubdivision', this.value)" style="width: 100%; font-size: 11px; padding: 2px; border-radius: 2px; border: 1px solid #1b5e20; box-sizing: border-box;"></th>
-                    <th style="padding: 6px 4px; min-width: 120px;">Серійний номер</th>
-                    <th style="padding: 6px 4px; min-width: 80px;">Примітка</th>
+                    <th style="padding: 6px 4px; min-width: 190px;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                            <span>Модель</span>
+                            ${efBtn('model', 'Модель')}
+                        </div>
+                        <input type="text" id="filter-web-model" placeholder="Фільтр..." value="${webastoFilters.model}" oninput="updateWebFilter('model', this.value)" style="width: 100%; font-size: 11px; padding: 2px; border-radius: 2px; border: 1px solid #1b5e20; box-sizing: border-box; margin-top: 2px;">
+                    </th>
+                    <th style="padding: 6px 4px; width: 50px;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
+                            <span>кВт</span>
+                            ${efBtn('kw', 'Потужність (кВт)')}
+                        </div>
+                    </th>
+                    <th style="padding: 6px 4px; width: 55px;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
+                            <span>Тип пал.</span>
+                            ${efBtn('fuelType', 'Тип пального')}
+                        </div>
+                    </th>
+                    <th style="padding: 6px 4px; width: 60px;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
+                            <span>Розхід літ./год.</span>
+                            ${efBtn('consumption', 'Розхід')}
+                        </div>
+                    </th>
+                    <th style="padding: 6px 4px; width: 65px;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
+                            <span>Норма мастил</span>
+                            ${efBtn('oilNorm10Days', 'Норма мастил')}
+                        </div>
+                    </th>
+                    <th style="padding: 6px 4px; width: 75px;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
+                            <span>Макс 5 діб</span>
+                            ${efBtn('max5Days', 'Макс на 5 діб')}
+                        </div>
+                    </th>
+                    <th style="padding: 6px 4px; width: 75px;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
+                            <span>Макс 10 діб</span>
+                            ${efBtn('max10Days', 'Макс на 10 діб')}
+                        </div>
+                    </th>
+                    <th style="padding: 6px 4px; width: 75px;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
+                            <span>Макс 30 діб</span>
+                            ${efBtn('max30Days', 'Макс на 30 діб')}
+                        </div>
+                    </th>
+                    <th style="padding: 6px 4px; width: 65px;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
+                            <span>Норма мотог.</span>
+                            ${efBtn('motoHoursDay', 'Норма мотог.')}
+                        </div>
+                    </th>
+                    <th style="padding: 6px 4px; min-width: 90px;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                            <span>Підрозділ</span>
+                            ${efBtn('subdivision', 'Підрозділ')}
+                        </div>
+                        <input type="text" id="filter-web-sub" placeholder="Фільтр..." value="${webastoFilters.subdivision}" oninput="updateWebFilter('subdivision', this.value)" style="width: 100%; font-size: 11px; padding: 2px; border-radius: 2px; border: 1px solid #1b5e20; box-sizing: border-box; margin-top: 2px;">
+                    </th>
+                    <th style="padding: 6px 4px; min-width: 130px;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                            <span>Мат. Відп. Особа</span>
+                            ${efBtn('responsiblePerson', 'Відповідальна особа')}
+                        </div>
+                        <input type="text" id="filter-web-resp" placeholder="Фільтр..." value="${webastoFilters.responsiblePerson}" oninput="updateWebFilter('responsiblePerson', this.value)" style="width: 100%; font-size: 11px; padding: 2px; border-radius: 2px; border: 1px solid #1b5e20; box-sizing: border-box; margin-top: 2px;">
+                    </th>
+                    <th style="padding: 6px 4px; min-width: 100px;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                            <span>Де знаходиться</span>
+                            ${efBtn('locationSubdivision', 'Де знаходиться')}
+                        </div>
+                        <input type="text" id="filter-web-loc" placeholder="Фільтр..." value="${webastoFilters.locationSubdivision}" oninput="updateWebFilter('locationSubdivision', this.value)" style="width: 100%; font-size: 11px; padding: 2px; border-radius: 2px; border: 1px solid #1b5e20; box-sizing: border-box; margin-top: 2px;">
+                    </th>
+                    <th style="padding: 6px 4px; min-width: 120px;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
+                            <span>Серійний номер</span>
+                            ${efBtn('serialNumber', 'Серійний номер')}
+                        </div>
+                    </th>
+                    <th style="padding: 6px 4px; min-width: 80px;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
+                            <span>Примітка</span>
+                            ${efBtn('note', 'Примітка')}
+                        </div>
+                    </th>
                     <th style="padding: 6px 4px; width: 60px;">Дія</th>
                 </tr>
             </thead>
@@ -140,13 +239,22 @@ function renderWebastoView() {
     tbody.innerHTML = '';
 
     let list = getWebastoList();
+    if (typeof applyCategoryExcelSort === 'function') {
+        list = applyCategoryExcelSort(list, 'webasto');
+    }
+
     const filtered = list.filter(item => {
         if (/знищ/ui.test(String(item.note || item.comment || ''))) return false;
 
+        // Построковий текстовий пошук (швидкий)
         if (webastoFilters.model && !String(item.model || "").toLowerCase().includes(webastoFilters.model.toLowerCase())) return false;
         if (webastoFilters.subdivision && !String(item.subdivision || "").toLowerCase().includes(webastoFilters.subdivision.toLowerCase())) return false;
         if (webastoFilters.responsiblePerson && !String(item.responsiblePerson || "").toLowerCase().includes(webastoFilters.responsiblePerson.toLowerCase())) return false;
         if (webastoFilters.locationSubdivision && !String(item.locationSubdivision || "").toLowerCase().includes(webastoFilters.locationSubdivision.toLowerCase())) return false;
+
+        // Excel-фільтри (мультиселект чекбокси)
+        if (typeof itemMatchesExcelFilters === 'function' && !itemMatchesExcelFilters(item, 'webasto')) return false;
+
         return true;
     });
 

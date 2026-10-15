@@ -116,6 +116,7 @@
             <button class="nav-btn" id="nav-btn-report" onclick="switchView('report')" style="display: none;">Звіт (10 днів)</button>
             <button class="nav-btn" id="nav-btn-subdivisions" onclick="switchView('subdivisions')" style="display: none;">Звіт по підрозділах</button>
             <button class="nav-btn" id="nav-btn-equipment" onclick="switchView('generators')" style="display: none;">Облік обладнання</button>
+            <button class="nav-btn" id="nav-btn-equipment-report" onclick="switchView('equipment-report-view')" style="display: none;">Звіт по обладнанню</button>
             <button class="nav-btn" onclick="switchView('aggregates-calc')">Розрахунок агрегатів</button>
             <button class="nav-btn" id="nav-btn-destroyed" onclick="switchView('destroyed')" style="display: none;">Знищена техніка</button>
             <!-- Вкладка Конструктора документів та шаблонів (тільки для Розробника та Адміна) -->
@@ -181,7 +182,7 @@
                                 </select>
                             </th>
                             <th>Витрата</th>
-                            <th class="inactive-fuel-col-th" style="background-color: #1e2b37; color: #a0aec0; cursor: not-allowed;" title="Паливо не редагується в базі (редагується у Звіті на автомобіль)">Паливо 🔒</th>
+                            <th>Паливо</th>
                             <th>Примітка</th>
                             <th>Він код</th>
                             <th>Рік</th>
@@ -309,10 +310,22 @@
                     <table class="specs-table" style="width: 100%;">
                         <tr>
                             <td>Категорія</td>
-                            <td><select class="table-cell-input" id="card-input-category" onchange="updateCardCarCategory(this.value)"></select></td>
+                            <td id="spec-category">—</td>
                         </tr>
-                        <tr><td>Підрозділ, рота</td><td id="spec-subdivision">—</td></tr>
-                        <tr><td>Тип пального</td><td><input type="text" class="table-cell-input" id="card-input-fuel-type" list="fuel-types-list" oninput="if(typeof updateCardFuelType==='function')updateCardFuelType(this.value)" placeholder="Тип пального" style="width: 100%; box-sizing: border-box; font-size: 12px; padding: 2px 4px;"></td></tr>
+                        <tr>
+                            <td>Підрозділ, рота</td>
+                            <td id="spec-subdivision">—</td>
+                        </tr>
+                        <tr>
+                            <td>Тип пального</td>
+                            <td id="spec-fuel-type">—</td>
+                        </tr>
+                        <tr style="display: none;">
+                            <td colspan="2">
+                                <select id="card-input-category" style="display: none;"></select>
+                                <input type="hidden" id="card-input-fuel-type">
+                            </td>
+                        </tr>
                         <tr><td>Примітка</td><td id="spec-note">—</td></tr>
                         <tr><td>Він код</td><td id="spec-vin">—</td></tr>
                         <tr><td>Рік випуску</td><td id="spec-year">—</td></tr>
@@ -379,10 +392,69 @@
                     <button class="eq-tab-btn" id="tab-webasto" onclick="switchEquipmentTab('webasto')">Webasto</button>
                     <button class="eq-tab-btn" id="tab-heaters" onclick="switchEquipmentTab('heaters')">Теплові пушки</button>
                     <button class="eq-tab-btn" id="tab-chainsaws" onclick="switchEquipmentTab('chainsaws')">Бензо пили</button>
+                    <button class="eq-tab-btn" id="tab-equipment-report" onclick="switchView('equipment-report-view')" style="border-left: 2px solid #bdc3c7; margin-left: 4px; color: #2980b9; font-weight: bold;">📊 Звіт по обладнанню</button>
                 </div>
-                <button class="action-btn" style="background-color: #27ae60; font-weight: bold; padding: 6px 12px;" onclick="addCurrentEquipmentRow()">+ Додати позицію</button>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <button class="action-btn" id="btn-goto-equipment-report" onclick="switchView('equipment-report-view')" style="background-color: #2980b9; color: white; font-weight: bold; padding: 6px 14px; border-radius: 4px; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.15); cursor: pointer;">📊 Звіт по обладнанню</button>
+                    <button class="action-btn" style="background-color: #27ae60; font-weight: bold; padding: 6px 12px;" onclick="addCurrentEquipmentRow()">+ Додати позицію</button>
+                </div>
             </div>
             <div class="table-container" style="max-height: 78vh; overflow-y: auto;" id="equipment-table-wrapper"></div>
+        </section>
+
+        <!-- РОЗДІЛ: ЗВІТ ПО ОБЛАДНАННЮ -->
+        <section id="equipment-report-view" class="view-section">
+            <div class="card-header-panel" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 15px;">
+                <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                    <h2 style="margin: 0; color: #2c3e50;">Десятиденний звіт по обладнанню (Генератори, Webasto, Пушки, Пили)</h2>
+                    <button class="action-btn" onclick="switchView('generators')" style="background-color: #34495e; color: white; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; display: inline-flex; align-items: center; gap: 5px;">← До обліку обладнання</button>
+                </div>
+                <div class="report-controls" style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 6px; background: #ecf0f1; padding: 6px 10px; border-radius: 4px; border: 1px solid #bdc3c7;">
+                        <label style="font-weight: bold; font-size: 13px; color: #2c3e50;">Підрозділ:</label>
+                        <select id="equipment-subdivision-filter" onchange="renderEquipmentReportView()" style="font-size: 13px; padding: 4px 8px; border-radius: 3px; border: 1px solid #7f8c8d; background: white; cursor: pointer; font-weight: bold; color: #2c3e50;">
+                            <option value="all">Усі підрозділи</option>
+                        </select>
+                    </div>
+
+                    <div class="card-period-box" style="display: flex; align-items: center; gap: 10px; background: #ecf0f1; padding: 6px 12px; border-radius: 4px; border: 1px solid #bdc3c7;">
+                        <label style="font-weight: bold; font-size: 13px; color: #2c3e50;">Період:</label>
+                        <button id="eq-rep-nav-prev-btn" type="button" class="action-btn" onclick="navigateEquipmentReportPeriod(-1)" style="background: #34495e; padding: 4px 8px; font-size: 11px; color: white; border: none; border-radius: 3px; cursor: pointer;">◄</button>
+                        <select id="eq-report-period-select" onchange="changeEqReportPeriod(this.value)" style="padding: 4px 8px; font-size: 13px; border-radius: 3px; border: 1px solid #7f8c8d; background: white; cursor: pointer; font-weight: bold; color: #2c3e50;"></select>
+                        <button id="eq-rep-nav-next-btn" type="button" class="action-btn" onclick="navigateEquipmentReportPeriod(1)" style="background: #34495e; padding: 4px 8px; font-size: 11px; color: white; border: none; border-radius: 3px; cursor: pointer;">►</button>
+                    </div>
+                    <input type="hidden" id="eq-report-custom-period" value="01.10-10.10">
+
+                    <button class="action-btn" onclick="saveEquipmentReportData()" style="background-color: #27ae60; font-weight: bold; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">💾 Зберегти звіт</button>
+                    <button class="action-btn print-btn" onclick="printEquipmentReport()" style="background-color: #337ab7; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">
+                        <span style="font-size: 14px; vertical-align: middle;">🖨️</span> Друк звіту
+                    </button>
+                </div>
+            </div>
+            <div class="table-container" style="max-height: 78vh; overflow-y: auto;">
+                <table id="equipment-report-table" class="compact-report-table" style="width: 100%; border-collapse: collapse; background: white; font-size: 12px;">
+                    <thead>
+                        <tr style="background-color: #2e7d32; color: white;">
+                            <th style="padding: 6px 4px; width: 35px;">№</th>
+                            <th style="padding: 6px 4px; width: 95px;">Категорія</th>
+                            <th style="padding: 6px 4px; width: 100px;">Підрозділ</th>
+                            <th style="padding: 6px 4px; min-width: 180px;">Модель обладнання</th>
+                            <th style="padding: 6px 4px; width: 75px;">Тип пал.</th>
+                            <th style="padding: 6px 4px; width: 85px;">Залишок палива<br>на <span class="eq-rep-start">01.10</span></th>
+                            <th style="padding: 6px 4px; width: 85px;">Залишок мастила<br>на <span class="eq-rep-start">01.10</span></th>
+                            <th style="padding: 6px 4px; width: 85px;">Заправка <span class="eq-rep-p1-label">1-10.10</span><br>(паливо)</th>
+                            <th style="padding: 6px 4px; width: 85px;">Заправка <span class="eq-rep-p1-label">1-10.10</span><br>(мастило)</th>
+                            <th style="padding: 6px 4px; width: 85px;">Заправка <span class="eq-rep-p2-label">11-20.10</span><br>(паливо)</th>
+                            <th style="padding: 6px 4px; width: 85px;">Заправка <span class="eq-rep-p2-label">11-20.10</span><br>(мастило)</th>
+                            <th style="padding: 6px 4px; width: 85px;">Заправка <span class="eq-rep-p3-label">21-31.10</span><br>(паливо)</th>
+                            <th style="padding: 6px 4px; width: 85px;">Заправка <span class="eq-rep-p3-label">21-31.10</span><br>(мастило)</th>
+                            <th style="padding: 6px 4px; width: 95px;">Залишок палива на початок<br>наст. періоду (<span class="eq-rep-next-start">11.10</span>)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="equipment-report-tbody"></tbody>
+                    <tfoot></tfoot>
+                </table>
+            </div>
         </section>
 
         <!-- РОЗДІЛ 6: КАРТКА ТАХА / ДЕТАЛІ -->
@@ -538,6 +610,7 @@
     <script src="cars.js"></script>
     <script src="formulas.js"></script>
     <script src="report.js"></script>
+    <script src="excel_filter.js"></script>
     <script src="generators.js"></script>
     <script src="webasto.js"></script>
     <script src="heaters.js"></script>

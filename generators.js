@@ -3,7 +3,7 @@
 // ==========================================
 
 let defaultGeneratorsData = [
-    { id: 1, model: "Firman SDG 8500 CLE", kw: "6", fuelType: "ДП", consumption: "3.33", max5Days: "199.80", max10Days: "399.6", max30Days: "1198.8", motoHoursDay: "12", oilNorm10Days: "1.10", subdivision: "", responsiblePerson: "Беспалько М. О.", locationSubdivision: "", serialNumber: "SDG2012M2690", note: "" },
+    { id: 1, model: "Firman SDG 8500 CLE", kw: "6", fuelType: "ДП", consumption: "3.33", max5Days: "199.80", max10Days: "399.6", max30Days: "1198.8", motoHoursDay: "12", oilNorm10Days: "1.10", subdivision: "ВТО", responsiblePerson: "Беспалько М. О.", locationSubdivision: "ВТО", serialNumber: "SDG2012M2690", note: "" },
     { id: 2, model: "EnterSol ES208G", kw: "3", fuelType: "АБ", consumption: "0.35", max5Days: "21.00", max10Days: "42.0", max30Days: "126.0", motoHoursDay: "12", oilNorm10Days: "1.00", subdivision: "", responsiblePerson: "Беспалько М. О.", locationSubdivision: "", serialNumber: "M0-2210310018", note: "" },
     { id: 3, model: "GSEm 10000 SDE", kw: "11", fuelType: "ДП", consumption: "2.20", max5Days: "132.00", max10Days: "264.0", max30Days: "792.0", motoHoursDay: "12", oilNorm10Days: "1.60", subdivision: "", responsiblePerson: "Ковальов В.В.", locationSubdivision: "", serialNumber: "SC2022120045", note: "" },
     { id: 4, model: "Gucbir GJD10000S", kw: "8", fuelType: "ДП", consumption: "2.00", max5Days: "120.00", max10Days: "240.0", max30Days: "720.0", motoHoursDay: "12", oilNorm10Days: "2.00", subdivision: "", responsiblePerson: "Ковальов В.В.", locationSubdivision: "", serialNumber: "110022/203014", note: "" },
@@ -161,6 +161,29 @@ function renderGeneratorsView() {
             parentBar.style.alignItems = 'center';
             parentBar.style.width = '100%';
 
+            // Кнопка скидання фільтрів
+            let resetBtn = document.getElementById('reset-gen-filters-btn');
+            const hasFilters = (typeof hasAnyActiveExcelFilters === 'function' && hasAnyActiveExcelFilters('generators')) || 
+                               generatorsFilters.model || generatorsFilters.subdivision || generatorsFilters.responsiblePerson || generatorsFilters.locationSubdivision;
+            
+            if (hasFilters) {
+                if (!resetBtn) {
+                    resetBtn = document.createElement('button');
+                    resetBtn.id = 'reset-gen-filters-btn';
+                    resetBtn.className = 'action-btn';
+                    parentBar.insertBefore(resetBtn, addBtn);
+                }
+                resetBtn.style.cssText = 'background-color: #e67e22; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; margin-left: auto; margin-right: 10px; display: inline-flex; align-items: center; gap: 4px;';
+                resetBtn.innerHTML = '<span>🔄</span> Скинути фільтри';
+                resetBtn.onclick = () => {
+                    generatorsFilters = { model: "", subdivision: "", responsiblePerson: "", locationSubdivision: "" };
+                    if (typeof clearAllExcelFiltersForCategory === 'function') clearAllExcelFiltersForCategory('generators');
+                    renderGeneratorsView();
+                };
+            } else if (resetBtn) {
+                resetBtn.remove();
+            }
+
             let printBtn = document.getElementById('universal-print-btn');
             if (!printBtn) {
                 printBtn = document.createElement('button');
@@ -170,29 +193,105 @@ function renderGeneratorsView() {
             }
             printBtn.onclick = printCurrentEquipmentTable;
             printBtn.innerHTML = '<span style="font-size: 14px; margin-right: 6px; vertical-align: middle;">🖨️</span> Друк';
-            printBtn.style.cssText = 'background-color: #337ab7; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; white-space: nowrap; margin-left: auto; margin-right: 10px;';
+            printBtn.style.cssText = 'background-color: #337ab7; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; white-space: nowrap; margin-right: 10px;' + (!hasFilters ? ' margin-left: auto;' : '');
         }
     }
+
+    const efBtn = (colKey, title) => typeof renderExcelHeaderFilterButton === 'function' ? renderExcelHeaderFilterButton('generators', colKey, title) : '';
 
     wrapper.innerHTML = `
         <table id="generators-table" class="compact-base-table" style="width: 100%; border-collapse: collapse; background: white; font-size: 12px;">
             <thead>
                 <tr style="background-color: #2e7d32; color: white;">
                     <th style="padding: 6px 4px; width: 35px;">№</th>
-                    <th style="padding: 6px 4px; min-width: 190px;">Модель<br><input type="text" id="filter-gen-model" placeholder="Фільтр..." value="${generatorsFilters.model}" oninput="updateGenFilter('model', this.value)" style="width: 100%; font-size: 11px; padding: 2px; border-radius: 2px; border: 1px solid #1b5e20; box-sizing: border-box;"></th>
-                    <th style="padding: 6px 4px; width: 45px;">кВт</th>
-                    <th style="padding: 6px 4px; width: 50px;">Тип пал.</th>
-                    <th style="padding: 6px 4px; width: 55px;">Розхід літ./год.</th>
-                    <th style="padding: 6px 4px; width: 65px;">Норма мастил</th>
-                    <th style="padding: 6px 4px; width: 75px;">Макс з. на 5 діб</th>
-                    <th style="padding: 6px 4px; width: 75px;">Макс з. на 10 діб</th>
-                    <th style="padding: 6px 4px; width: 75px;">Макс з. на 30 діб</th>
-                    <th style="padding: 6px 4px; width: 65px;">Норма мотог.</th>
-                    <th style="padding: 6px 4px; min-width: 90px;">Підрозділ<br><input type="text" id="filter-gen-sub" placeholder="Фільтр..." value="${generatorsFilters.subdivision}" oninput="updateGenFilter('subdivision', this.value)" style="width: 100%; font-size: 11px; padding: 2px; border-radius: 2px; border: 1px solid #1b5e20; box-sizing: border-box;"></th>
-                    <th style="padding: 6px 4px; min-width: 130px;">Мат. Відп. Особа<br><input type="text" id="filter-gen-resp" placeholder="Фільтр..." value="${generatorsFilters.responsiblePerson}" oninput="updateGenFilter('responsiblePerson', this.value)" style="width: 100%; font-size: 11px; padding: 2px; border-radius: 2px; border: 1px solid #1b5e20; box-sizing: border-box;"></th>
-                    <th style="padding: 6px 4px; min-width: 100px;">Де знаходиться<br><input type="text" id="filter-gen-loc" placeholder="Фільтр..." value="${generatorsFilters.locationSubdivision}" oninput="updateGenFilter('locationSubdivision', this.value)" style="width: 100%; font-size: 11px; padding: 2px; border-radius: 2px; border: 1px solid #1b5e20; box-sizing: border-box;"></th>
-                    <th style="padding: 6px 4px; min-width: 120px;">Серійний номер</th>
-                    <th style="padding: 6px 4px; min-width: 80px;">Примітка</th>
+                    <th style="padding: 6px 4px; min-width: 190px;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                            <span>Модель</span>
+                            ${efBtn('model', 'Модель')}
+                        </div>
+                        <input type="text" id="filter-gen-model" placeholder="Фільтр..." value="${generatorsFilters.model}" oninput="updateGenFilter('model', this.value)" style="width: 100%; font-size: 11px; padding: 2px; border-radius: 2px; border: 1px solid #1b5e20; box-sizing: border-box; margin-top: 2px;">
+                    </th>
+                    <th style="padding: 6px 4px; width: 50px;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
+                            <span>кВт</span>
+                            ${efBtn('kw', 'Потужність (кВт)')}
+                        </div>
+                    </th>
+                    <th style="padding: 6px 4px; width: 55px;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
+                            <span>Тип пал.</span>
+                            ${efBtn('fuelType', 'Тип пального')}
+                        </div>
+                    </th>
+                    <th style="padding: 6px 4px; width: 60px;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
+                            <span>Розхід літ./год.</span>
+                            ${efBtn('consumption', 'Розхід')}
+                        </div>
+                    </th>
+                    <th style="padding: 6px 4px; width: 65px;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
+                            <span>Норма мастил</span>
+                            ${efBtn('oilNorm10Days', 'Норма мастил')}
+                        </div>
+                    </th>
+                    <th style="padding: 6px 4px; width: 75px;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
+                            <span>Макс 5 діб</span>
+                            ${efBtn('max5Days', 'Макс на 5 діб')}
+                        </div>
+                    </th>
+                    <th style="padding: 6px 4px; width: 75px;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
+                            <span>Макс 10 діб</span>
+                            ${efBtn('max10Days', 'Макс на 10 діб')}
+                        </div>
+                    </th>
+                    <th style="padding: 6px 4px; width: 75px;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
+                            <span>Макс 30 діб</span>
+                            ${efBtn('max30Days', 'Макс на 30 діб')}
+                        </div>
+                    </th>
+                    <th style="padding: 6px 4px; width: 65px;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
+                            <span>Норма мотог.</span>
+                            ${efBtn('motoHoursDay', 'Норма мотог.')}
+                        </div>
+                    </th>
+                    <th style="padding: 6px 4px; min-width: 90px;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                            <span>Підрозділ</span>
+                            ${efBtn('subdivision', 'Підрозділ')}
+                        </div>
+                        <input type="text" id="filter-gen-sub" placeholder="Фільтр..." value="${generatorsFilters.subdivision}" oninput="updateGenFilter('subdivision', this.value)" style="width: 100%; font-size: 11px; padding: 2px; border-radius: 2px; border: 1px solid #1b5e20; box-sizing: border-box; margin-top: 2px;">
+                    </th>
+                    <th style="padding: 6px 4px; min-width: 130px;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                            <span>Мат. Відп. Особа</span>
+                            ${efBtn('responsiblePerson', 'Відповідальна особа')}
+                        </div>
+                        <input type="text" id="filter-gen-resp" placeholder="Фільтр..." value="${generatorsFilters.responsiblePerson}" oninput="updateGenFilter('responsiblePerson', this.value)" style="width: 100%; font-size: 11px; padding: 2px; border-radius: 2px; border: 1px solid #1b5e20; box-sizing: border-box; margin-top: 2px;">
+                    </th>
+                    <th style="padding: 6px 4px; min-width: 100px;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                            <span>Де знаходиться</span>
+                            ${efBtn('locationSubdivision', 'Де знаходиться')}
+                        </div>
+                        <input type="text" id="filter-gen-loc" placeholder="Фільтр..." value="${generatorsFilters.locationSubdivision}" oninput="updateGenFilter('locationSubdivision', this.value)" style="width: 100%; font-size: 11px; padding: 2px; border-radius: 2px; border: 1px solid #1b5e20; box-sizing: border-box; margin-top: 2px;">
+                    </th>
+                    <th style="padding: 6px 4px; min-width: 120px;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
+                            <span>Серійний номер</span>
+                            ${efBtn('serialNumber', 'Серійний номер')}
+                        </div>
+                    </th>
+                    <th style="padding: 6px 4px; min-width: 80px;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
+                            <span>Примітка</span>
+                            ${efBtn('note', 'Примітка')}
+                        </div>
+                    </th>
                     <th style="padding: 6px 4px; width: 60px;">Дія</th>
                 </tr>
             </thead>
@@ -208,13 +307,22 @@ function renderGeneratorsView() {
     tbody.innerHTML = '';
 
     let list = getGeneratorsList();
+    if (typeof applyCategoryExcelSort === 'function') {
+        list = applyCategoryExcelSort(list, 'generators');
+    }
+
     const filtered = list.filter(item => {
         if (/знищ/ui.test(String(item.note || item.comment || ''))) return false;
 
+        // Построковий текстовий пошук (швидкий)
         if (generatorsFilters.model && !String(item.model || "").toLowerCase().includes(generatorsFilters.model.toLowerCase())) return false;
         if (generatorsFilters.subdivision && !String(item.subdivision || "").toLowerCase().includes(generatorsFilters.subdivision.toLowerCase())) return false;
         if (generatorsFilters.responsiblePerson && !String(item.responsiblePerson || "").toLowerCase().includes(generatorsFilters.responsiblePerson.toLowerCase())) return false;
         if (generatorsFilters.locationSubdivision && !String(item.locationSubdivision || "").toLowerCase().includes(generatorsFilters.locationSubdivision.toLowerCase())) return false;
+
+        // Excel-фільтри (мультиселект чекбокси)
+        if (typeof itemMatchesExcelFilters === 'function' && !itemMatchesExcelFilters(item, 'generators')) return false;
+
         return true;
     });
 

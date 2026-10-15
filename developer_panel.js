@@ -308,6 +308,9 @@ window.updateRoleUI = function() {
     const eqNavBtn = document.getElementById("nav-btn-equipment");
     if (eqNavBtn) eqNavBtn.style.display = isAdminOrHigher ? "inline-block" : "none";
 
+    const eqReportNavBtn = document.getElementById("nav-btn-equipment-report");
+    if (eqReportNavBtn) eqReportNavBtn.style.display = isModOrHigher ? "inline-block" : "none";
+
     const destNavBtn = document.getElementById("nav-btn-destroyed");
     if (destNavBtn) destNavBtn.style.display = isAdminOrHigher ? "inline-block" : "none";
 
@@ -333,6 +336,11 @@ window.updateRoleUI = function() {
 
     const eqView = document.getElementById("generators-view");
     if (eqView && (eqView.classList.contains("active") || eqView.style.display !== "none") && !isAdminOrHigher) {
+        if (typeof switchView === "function") switchView("base");
+    }
+
+    const eqReportView = document.getElementById("equipment-report-view");
+    if (eqReportView && (eqReportView.classList.contains("active") || eqReportView.style.display !== "none") && !isModOrHigher) {
         if (typeof switchView === "function") switchView("base");
     }
 
