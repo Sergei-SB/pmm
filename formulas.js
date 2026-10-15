@@ -23,17 +23,35 @@ function calculateRouteFuel(rows, baseRate, carFormulas = [1, 2, 3, 4], isMiles 
     let totalRawKm = 0;
     const multiplier = isMiles ? 1.61 : 1;
 
+    if (!Array.isArray(rows) && !(rows && typeof rows.forEach === 'function')) {
+        return { calculatedResults: [], totalFuel: 0 };
+    }
+
     rows.forEach(row => {
-        const nameInput = row.querySelector('input[type="text"]');
-        const kmInput = row.querySelector('.total-col') || row.querySelectorAll('input')[5];
-        const tkmInput = row.querySelector('.row-tkm');
-        
-        const routeName = nameInput ? nameInput.value.toLowerCase() : "";
-        const tripValRaw = parseFloat(kmInput?.value) || 0;
+        let routeName = "";
+        let tripValRaw = 0;
+        let tkmVal = 0;
+
+        if (row && typeof row.querySelector === 'function') {
+            const nameInput = row.querySelector('input[type="text"]');
+            const kmInput = row.querySelector('.total-col') || row.querySelectorAll('input')[5];
+            const tkmInput = row.querySelector('.row-tkm');
+            routeName = nameInput ? nameInput.value.toLowerCase() : "";
+            tripValRaw = parseFloat(kmInput?.value) || 0;
+            tkmVal = parseFloat(tkmInput?.value) || 0;
+        } else if (row) {
+            routeName = (row.name || row.routeName || (row.inputs && row.inputs[0]) || "").toLowerCase();
+            if (row.inputs && Array.isArray(row.inputs)) {
+                tripValRaw = parseFloat(row.inputs[5]) || 0;
+                tkmVal = parseFloat(row.inputs[7]) || 0;
+            } else {
+                tripValRaw = parseFloat(row.km || row.totalKm) || 0;
+                tkmVal = parseFloat(row.tkm) || 0;
+            }
+        }
+
         const tripVal = tripValRaw * multiplier; 
         totalRawKm += tripVal;
-        const tkmVal = parseFloat(tkmInput?.value) || 0;
-
         totalTkm += tkmVal;
 
         if (routeName.includes("міста-мільйонники")) {
@@ -51,8 +69,14 @@ function calculateRouteFuel(rows, baseRate, carFormulas = [1, 2, 3, 4], isMiles 
 
     let isMotoBzRoute = false;
     rows.forEach(row => {
-        const nameInput = row.querySelector('input[type="text"]');
-        if (nameInput && nameInput.value.toLowerCase().includes("виконання бз харків")) {
+        let routeName = "";
+        if (row && typeof row.querySelector === 'function') {
+            const nameInput = row.querySelector('input[type="text"]');
+            routeName = nameInput ? nameInput.value.toLowerCase() : "";
+        } else if (row) {
+            routeName = (row.name || row.routeName || (row.inputs && row.inputs[0]) || "").toLowerCase();
+        }
+        if (routeName.includes("виконання бз харків")) {
             isMotoBzRoute = true;
         }
     });

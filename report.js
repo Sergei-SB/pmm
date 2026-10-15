@@ -842,6 +842,18 @@ function renderReportTable() {
         } catch (e) {}
 
         if (!carData) {
+            let initLeftFuel = currCardTop?.savedFuelLeft || '';
+            if (initLeftFuel === '' && currCardTop && (currCardTop.fuelStart || currCardTop.fuelReceived)) {
+                const st = evaluateExpression(currCardTop.fuelStart) || 0;
+                const rc = evaluateExpression(currCardTop.fuelReceived) || 0;
+                const sp = evaluateExpression(currCardTop.fuelSpent) || 0;
+                if (st > 0 || rc > 0) {
+                    initLeftFuel = Math.max(0, (st + rc) - sp).toFixed(2);
+                }
+            } else if (initLeftFuel === '' && autoPrevFuel !== '') {
+                initLeftFuel = autoPrevFuel;
+            }
+
             carData = {
                 prevFuel: autoPrevFuel !== '' ? autoPrevFuel : (currCardTop?.fuelStart || ''),
                 prevAdBlue: autoPrevAdBlue !== '' ? autoPrevAdBlue : (currCardTop?.adblueStart || ''),
@@ -852,7 +864,7 @@ function renderReportTable() {
                 refuelWasher: '',
                 note: car.note || '',
                 docNo: '',
-                leftFuel: currCardTop?.savedFuelLeft || '',
+                leftFuel: initLeftFuel,
                 leftAdBlue: currCardTop?.savedAdblueLeft || '',
                 odo: currCardTop?.odo2 || ''
             };
@@ -866,8 +878,24 @@ function renderReportTable() {
             if ((carData.prevOdo === '' || carData.prevOdo == null) && autoPrevOdo !== '') {
                 carData.prevOdo = autoPrevOdo;
             }
-            if ((carData.leftFuel === '' || carData.leftFuel == null) && currCardTop?.savedFuelLeft) {
-                carData.leftFuel = currCardTop.savedFuelLeft;
+            if (carData.leftFuel === '' || carData.leftFuel == null) {
+                if (currCardTop?.savedFuelLeft) {
+                    carData.leftFuel = currCardTop.savedFuelLeft;
+                } else if (currCardTop && (currCardTop.fuelStart || currCardTop.fuelReceived)) {
+                    const st = evaluateExpression(currCardTop.fuelStart) || 0;
+                    const rc = evaluateExpression(currCardTop.fuelReceived) || 0;
+                    const sp = evaluateExpression(currCardTop.fuelSpent) || 0;
+                    if (st > 0 || rc > 0) {
+                        carData.leftFuel = Math.max(0, (st + rc) - sp).toFixed(2);
+                    }
+                } else if (carData.prevFuel || carData.refuelFuel) {
+                    const st = evaluateExpression(carData.prevFuel) || 0;
+                    const rc = evaluateExpression(carData.refuelFuel) || 0;
+                    const sp = evaluateExpression(carData.spentFuel) || 0;
+                    if (st > 0 || rc > 0) {
+                        carData.leftFuel = Math.max(0, (st + rc) - sp).toFixed(2);
+                    }
+                }
             }
             if ((carData.leftAdBlue === '' || carData.leftAdBlue == null) && currCardTop?.savedAdblueLeft) {
                 carData.leftAdBlue = currCardTop.savedAdblueLeft;

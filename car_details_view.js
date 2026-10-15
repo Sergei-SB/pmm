@@ -483,6 +483,46 @@ function renderCarPeriodsAndStats(car) {
 
     periodsTbody.innerHTML = periodsHtml;
 
+    // Резервні джерела для визначення залишку палива, якщо в періодах він не зафіксований явно
+    if (latestLeftFuel === 0) {
+        if (typeof currentCarId !== 'undefined' && Number(currentCarId) === Number(car.id)) {
+            const screenLeft = evalNum(document.getElementById('fuel-left')?.textContent);
+            if (screenLeft > 0) {
+                latestLeftFuel = screenLeft;
+            }
+        }
+    }
+    if (latestLeftFuel === 0) {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith('isolated_car_routes_') && k.endsWith('_' + car.id)) {
+                try {
+                    const c = JSON.parse(localStorage.getItem(k));
+                    if (c && c.topFields) {
+                        const sLeft = evalNum(c.topFields.savedFuelLeft);
+                        if (sLeft > 0) {
+                            latestLeftFuel = sLeft;
+                            break;
+                        }
+                        const sStart = evalNum(c.topFields.fuelStart);
+                        const sRec = evalNum(c.topFields.fuelReceived);
+                        const sSpent = evalNum(c.topFields.fuelSpent);
+                        if (sStart > 0 || sRec > 0) {
+                            const diff = (sStart + sRec) - sSpent;
+                            if (diff > 0) {
+                                latestLeftFuel = diff;
+                                break;
+                            }
+                        }
+                    }
+                } catch(e) {}
+            }
+        }
+    }
+    if (latestLeftFuel === 0 && (totalReceivedFuel - totalSpentFuel) > 0) {
+        latestLeftFuel = totalReceivedFuel - totalSpentFuel;
+    }
+
     const elMileage = document.getElementById('det-total-mileage');
     const elFuel = document.getElementById('det-total-fuel');
     const elSpent = document.getElementById('det-total-spent-fuel');
@@ -568,26 +608,73 @@ function renderCarDocuments(car) {
     docsList.innerHTML = html;
 }
 
-function viewCarDoc(carId, index) {
+window.deleteCarDoc = function(carId, index) {
+    let sourceCars = typeof carsData !== 'undefined' ? carsData : [];
+    const car = sourceCars.find(c => Number(c.id) === Number(carId)) || getActiveReportCar();
+    if (!car) return;
+
+    const storageKey = `car_folder_${car.id}`;
+    let folderData = { files: [] };
+    try {
+        const stored = localStorage.getItem(storageKey);
+        if (stored) folderData = JSON.parse(stored);
+    } catch(e) {}
+
+    if (!folderData.files || !folderData.files[index]) return;
+
+    const fileName = folderData.files[index].name || 'файл';
+    const isConfirmed = confirm(`Дійсно видалити файл "${fileName}"?`);
+    if (!isConfirmed) return;
+
+    folderData.files.splice(index, 1);
+    localStorage.setItem(storageKey, JSON.stringify(folderData));
+    renderCarDocuments(car);
+};
+
+window.viewCarDoc = function(carId, index) {
     try {
         const stored = localStorage.getItem(`car_folder_${carId}`);
-        if (stored) {
-            const folderData = JSON.parse(stored);
-            const doc = folderData.files[index];
-            if (doc && doc.dataUrl) {
-                const win = window.open();
-                const isImage = doc.dataUrl.startsWith('data:image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.name);
-                win.document.write(`
-                    <html>
-                        <head><title>Перегляд: ${doc.name}</title></head>
-                        <body style="margin:0; background:#222; display:flex; justify-content:center; align-items:center; height:100vh;">
-                            ${isImage ? `<img src="${doc.dataUrl}" style="max-width:100%; max-height:100%; object-fit:contain;" />` : `<iframe src="${doc.dataUrl}" style="width:100%; height:100%; border:none;"></iframe>`}
-                        </body>
-                    </html>
-                `);
-            }
+        if (!stored) return;
+        const folderData = JSON.parse(stored);
+        const doc = folderData.files[index];
+        if (!doc || !doc.dataUrl) return;
+
+        const isImage = doc.dataUrl.startsWith('data:image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.name);
+
+        let win = null;
+        try {
+            win = window.open();
+        } catch(e) {}
+
+        if (win) {
+            win.document.write(`
+                <html>
+                    <head><title>Перегляд: ${doc.name}</title></head>
+                    <body style="margin:0; background:#222; display:flex; justify-content:center; align-items:center; height:100vh;">
+                        ${isImage ? `<img src="${doc.dataUrl}" style="max-width:100%; max-height:100%; object-fit:contain;" />` : `<iframe src="${doc.dataUrl}" style="width:100%; height:100%; border:none;"></iframe>`}
+                    </body>
+                </html>
+            `);
+        } else {
+            let modal = document.getElementById('car-doc-view-modal');
+            if (modal) modal.remove();
+            modal = document.createElement('div');
+            modal.id = 'car-doc-view-modal';
+            modal.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:99999; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:20px;';
+            modal.innerHTML = `
+                <div style="background:white; border-radius:8px; width:90%; max-width:900px; height:85vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 4px 20px rgba(0,0,0,0.5);">
+                    <div style="background:#2c3e50; color:white; padding:10px 16px; display:flex; justify-content:space-between; align-items:center;">
+                        <strong>📄 ${doc.name}</strong>
+                        <button onclick="document.getElementById('car-doc-view-modal').remove()" style="background:none; border:none; color:white; font-size:20px; cursor:pointer; font-weight:bold;">✕</button>
+                    </div>
+                    <div style="flex:1; display:flex; justify-content:center; align-items:center; background:#f4f6f7; overflow:auto; padding:10px;">
+                        ${isImage ? `<img src="${doc.dataUrl}" style="max-width:100%; max-height:100%; object-fit:contain;" />` : `<iframe src="${doc.dataUrl}" style="width:100%; height:100%; border:none;"></iframe>`}
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
         }
     } catch(e) {
         alert('Не вдалося відкрити документ.');
     }
-}
+};
