@@ -251,6 +251,9 @@ function changeEqReportPeriod(val) {
     if (customInput) customInput.value = val;
     updateEquipmentReportHeaders();
     renderEquipmentReportView();
+    if (typeof applyModeratorReportLock === 'function') {
+        applyModeratorReportLock();
+    }
 }
 
 window.navigateEquipmentReportPeriod = function(direction) {
@@ -285,6 +288,9 @@ window.navigateEquipmentReportPeriod = function(direction) {
         if (customInput) customInput.value = activeEquipmentReportPeriod;
         initEqReportPeriodDropdown();
         renderEquipmentReportView();
+        if (typeof applyModeratorReportLock === 'function') {
+            applyModeratorReportLock();
+        }
     }
 };
 

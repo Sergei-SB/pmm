@@ -364,13 +364,14 @@ function isValidPlate(plate) {
 
 function saveCarsToStorage() {
     try {
-        // Очищаємо масив від машин без номерів перед збереженням
         const validCars = carsData.filter(c => isValidPlate(c.plate));
         localStorage.setItem('user_cars_database_v2', JSON.stringify(validCars));
+        window.carsData = carsData;
     } catch (e) {
         console.error("Помилка збереження даних:", e);
     }
 }
+window.saveCarsToStorage = saveCarsToStorage;
 
 window.reloadCarsFromStorage = function() {
     try {
@@ -379,13 +380,17 @@ window.reloadCarsFromStorage = function() {
             const parsed = JSON.parse(saved);
             if (Array.isArray(parsed) && parsed.length > 0) {
                 carsData = parsed.filter(c => isValidPlate(c.plate));
+                window.carsData = carsData;
             }
+        } else {
+            saveCarsToStorage();
         }
     } catch (e) {
         console.error("Помилка завантаження даних:", e);
     }
 };
 window.reloadCarsFromStorage();
+window.carsData = carsData;
 
 function renderCarsTable(filterQuery = '') {
     const tbody = document.getElementById('cars-tbody');

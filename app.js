@@ -306,6 +306,8 @@ function saveCarsModificationsToStorage() {
         saveCarsToStorage();
     }
 }
+window.loadCarsModifications = loadCarsModifications;
+window.saveCarsModificationsToStorage = saveCarsModificationsToStorage;
 
 function fmt(val, decimals = 2) {
     if (isNaN(val)) return val;

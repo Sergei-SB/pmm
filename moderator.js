@@ -20,15 +20,15 @@ function checkModeratorPassword(callback) {
 
 // Блокування полів звіту для модератора, залишаючи активним лише фільтр "Підр." та перемикання періодів
 function applyModeratorReportLock() {
-    if (typeof window.applyReportRolePermissions === 'function') {
-        window.applyReportRolePermissions();
-    }
     const role = (typeof window.getCurrentAppRole === 'function')
         ? window.getCurrentAppRole()
-        : ((typeof currentRole !== 'undefined') ? currentRole : 'user');
+        : ((typeof window.currentRole !== 'undefined') ? window.currentRole : ((typeof currentRole !== 'undefined') ? currentRole : 'user'));
 
     if (role !== 'admin' && role !== 'developer') {
-        const reportInputs = document.querySelectorAll('#report-tbody input, #report-tbody select, #report-table tbody input, #report-table tbody select');
+        const reportInputs = document.querySelectorAll(
+            '#report-tbody input, #report-tbody select, #report-table tbody input, #report-table tbody select, ' +
+            '#equipment-report-tbody input, #equipment-report-tbody select, #equipment-report-table tbody input, #equipment-report-table tbody select'
+        );
         reportInputs.forEach(input => {
             input.setAttribute('disabled', 'true');
             input.setAttribute('readonly', 'true');
@@ -40,7 +40,10 @@ function applyModeratorReportLock() {
             input.title = 'Редагування доступне тільки для Адміна та Розробника';
         });
 
-        const saveBtns = document.querySelectorAll('#report-view button[onclick*="saveReportData"], #rep-save-btn, #report-view .report-save-btn');
+        const saveBtns = document.querySelectorAll(
+            '#report-view button[onclick*="saveReportData"], #rep-save-btn, #report-view .report-save-btn, ' +
+            '#equipment-report-view button[onclick*="saveEquipmentReportData"], button[onclick*="saveEquipmentReportData"]'
+        );
         saveBtns.forEach(btn => btn.style.setProperty('display', 'none', 'important'));
 
         // Фільтр підрозділу та вибір періоду залишаються активними для перегляду
@@ -70,15 +73,59 @@ function applyModeratorReportLock() {
             nextBtn.disabled = false;
             nextBtn.style.cursor = 'pointer';
         }
+
+        const eqPeriodSelect = document.getElementById('eq-report-period-select');
+        if (eqPeriodSelect) {
+            eqPeriodSelect.removeAttribute('disabled');
+            eqPeriodSelect.disabled = false;
+            eqPeriodSelect.style.cursor = 'pointer';
+        }
+        const eqPrevBtn = document.getElementById('eq-rep-nav-prev-btn');
+        if (eqPrevBtn) {
+            eqPrevBtn.removeAttribute('disabled');
+            eqPrevBtn.disabled = false;
+            eqPrevBtn.style.cursor = 'pointer';
+        }
+        const eqNextBtn = document.getElementById('eq-rep-nav-next-btn');
+        if (eqNextBtn) {
+            eqNextBtn.removeAttribute('disabled');
+            eqNextBtn.disabled = false;
+            eqNextBtn.style.cursor = 'pointer';
+        }
     }
 }
 window.applyModeratorReportLock = applyModeratorReportLock;
+
+// Захист на рівні подій: жоден інпут у звітах не може отримати фокус або редагуватися Модератором чи Юзером
+document.addEventListener('focusin', function(e) {
+    const role = (typeof window.getCurrentAppRole === 'function')
+        ? window.getCurrentAppRole()
+        : ((typeof window.currentRole !== 'undefined') ? window.currentRole : ((typeof currentRole !== 'undefined') ? currentRole : 'user'));
+    if (role !== 'admin' && role !== 'developer') {
+        const target = e.target;
+        if (target && target.closest && (target.closest('#report-tbody') || target.closest('#equipment-report-tbody'))) {
+            target.setAttribute('disabled', 'true');
+            target.setAttribute('readonly', 'true');
+            target.disabled = true;
+            target.readOnly = true;
+            target.blur();
+        }
+    }
+}, true);
 
 document.addEventListener('DOMContentLoaded', () => {
     const reportNavBtn = document.getElementById('nav-btn-report');
     if (reportNavBtn) {
         reportNavBtn.addEventListener('click', () => {
-            setTimeout(applyModeratorReportLock, 300);
+            setTimeout(applyModeratorReportLock, 100);
+            setTimeout(applyModeratorReportLock, 350);
+        });
+    }
+    const eqReportNavBtn = document.getElementById('nav-btn-equipment-report');
+    if (eqReportNavBtn) {
+        eqReportNavBtn.addEventListener('click', () => {
+            setTimeout(applyModeratorReportLock, 100);
+            setTimeout(applyModeratorReportLock, 350);
         });
     }
 });
