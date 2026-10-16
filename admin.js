@@ -11,11 +11,12 @@
 
 let currentRole = "user";
 try {
-    const savedRole = localStorage.getItem('app_current_role');
+    const savedRole = localStorage.getItem('app_current_role') || localStorage.getItem('currentRole');
     if (savedRole && ["user", "moderator", "admin", "developer"].includes(savedRole)) {
         currentRole = savedRole;
     }
 } catch(e) {}
+window.currentRole = currentRole;
 let isDeveloperLoggedIn = (currentRole === "developer");
 
 // --- ДОПОМІЖНІ ФУНКЦІЇ ЗВ'ЯЗКУ З ПАНЕЛЛЮ РОЗРОБНИКА ---
@@ -85,8 +86,12 @@ function selectRole(role) {
 
     // Якщо Розробник вже авторизований у цій сесії — пускаємо у будь-який кабінет без пароля
     if (isDeveloperLoggedIn) {
+        window.currentRole = role;
         currentRole = role;
-        try { localStorage.setItem('app_current_role', currentRole); } catch(e) {}
+        try {
+            localStorage.setItem('app_current_role', role);
+            localStorage.setItem('currentRole', role);
+        } catch(e) {}
         addSecurityLog('info', `Швидкий перехід Розробника`, `Перехід у кабінет: ${getRoleDisplayName(role)}`);
         updateRoleUI();
         return;
@@ -109,8 +114,12 @@ function selectRole(role) {
     }
 
     if (role === "user") {
+        window.currentRole = "user";
         currentRole = "user";
-        try { localStorage.setItem('app_current_role', 'user'); } catch(e) {}
+        try {
+            localStorage.setItem('app_current_role', 'user');
+            localStorage.setItem('currentRole', 'user');
+        } catch(e) {}
         updateRoleUI();
         return;
     }
@@ -120,8 +129,12 @@ function selectRole(role) {
             if (pwd === null) return;
             // Перевіряємо або загальний пароль Модератора, або індивідуальний пароль користувача з роллю moderator
             if (pwd === passwords.moderator || checkCustomUserPassword('moderator', pwd)) {
+                window.currentRole = "moderator";
                 currentRole = "moderator";
-                try { localStorage.setItem('app_current_role', 'moderator'); } catch(e) {}
+                try {
+                    localStorage.setItem('app_current_role', 'moderator');
+                    localStorage.setItem('currentRole', 'moderator');
+                } catch(e) {}
                 addSecurityLog('success', 'Успішний вхід: Модератор', 'Авторизація пройдена');
                 updateRoleUI();
             } else {
@@ -133,8 +146,12 @@ function selectRole(role) {
         showCustomPasswordModal("Введіть пароль Адміна:", (pwd) => {
             if (pwd === null) return;
             if (pwd === passwords.admin || checkCustomUserPassword('admin', pwd)) {
+                window.currentRole = "admin";
                 currentRole = "admin";
-                try { localStorage.setItem('app_current_role', 'admin'); } catch(e) {}
+                try {
+                    localStorage.setItem('app_current_role', 'admin');
+                    localStorage.setItem('currentRole', 'admin');
+                } catch(e) {}
                 addSecurityLog('success', 'Успішний вхід: Адмін', 'Авторизація пройдена');
                 updateRoleUI();
             } else {
@@ -146,9 +163,14 @@ function selectRole(role) {
         showCustomPasswordModal("Введіть пароль Розробника:", (pwd) => {
             if (pwd === null) return;
             if (pwd === passwords.developer) {
+                window.currentRole = "developer";
                 currentRole = "developer";
                 isDeveloperLoggedIn = true;
-                try { localStorage.setItem('app_current_role', 'developer'); } catch(e) {}
+                try {
+                    localStorage.setItem('app_current_role', 'developer');
+                    localStorage.setItem('currentRole', 'developer');
+                    localStorage.setItem('isDeveloperLoggedIn', 'true');
+                } catch(e) {}
                 addSecurityLog('success', 'Успішний вхід: Розробник (Супер-доступ)', 'Активовано вільний перехід між кабінетами');
                 updateRoleUI();
             } else {
@@ -358,33 +380,30 @@ function updateRoleUI() {
     });
 
     // 5. Розділ "Звіт (10 днів)":
-    // Розробник та Адмін (або Модератор, якщо Розробник увімкнув йому дозвіл у Панелі) — можуть редагувати
-    const canEditReport = isAdminOrHigher || (currentRole === "moderator" && secCfg.moderatorCanEditReport);
+    // Тільки Розробник та Адмін можуть редагувати
+    const canEditReport = isAdminOrHigher;
+    if (typeof window.applyReportRolePermissions === 'function') {
+        window.applyReportRolePermissions();
+    } else {
+        const reportInputs = document.querySelectorAll('#report-tbody input.report-cell-input, #report-tbody select');
+        reportInputs.forEach(input => {
+            input.disabled = !canEditReport;
+            input.readOnly = !canEditReport;
+            input.style.backgroundColor = canEditReport ? "" : "#f0f3f4";
+            input.style.cursor = canEditReport ? "text" : "not-allowed";
+        });
 
-    const reportInputs = document.querySelectorAll('#report-tbody input.report-cell-input');
-    reportInputs.forEach(input => {
-        input.disabled = !canEditReport;
-        input.readOnly = !canEditReport;
-        input.style.backgroundColor = canEditReport ? "" : "#f0f3f4";
-        input.style.cursor = canEditReport ? "text" : "not-allowed";
-    });
-
-    const reportPeriodInput = document.getElementById('report-custom-period');
-    if (reportPeriodInput) {
-        reportPeriodInput.disabled = !canEditReport;
-        reportPeriodInput.readOnly = !canEditReport;
-    }
-
-    const reportActionButtons = document.querySelectorAll('#report-view .report-header button');
-    reportActionButtons.forEach(btn => {
-        const text = (btn.innerText || "").trim();
-        if (text.includes("Друк") || text === "◄" || text === "►") {
-            btn.style.display = "inline-block";
-            btn.disabled = false;
-        } else {
-            btn.style.display = canEditReport ? "inline-block" : "none";
+        const reportPeriodInput = document.getElementById('report-custom-period');
+        if (reportPeriodInput) {
+            reportPeriodInput.disabled = !canEditReport;
+            reportPeriodInput.readOnly = !canEditReport;
         }
-    });
+
+        const reportActionButtons = document.querySelectorAll('#report-view button[onclick*="saveReportData"], #rep-save-btn');
+        reportActionButtons.forEach(btn => {
+            btn.style.display = canEditReport ? "inline-block" : "none";
+        });
+    }
 
     // Оновлюємо Панель розробника, якщо вона відкрита
     if (isDev && typeof renderDeveloperPanel === "function") {

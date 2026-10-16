@@ -485,6 +485,12 @@ function renderEquipmentReportView() {
             }
         }
 
+        const curRole = (typeof window.getCurrentAppRole === 'function')
+            ? window.getCurrentAppRole()
+            : ((typeof currentRole !== 'undefined') ? currentRole : 'user');
+        const canEditEq = (curRole === 'admin' || curRole === 'developer');
+        const eqLock = canEditEq ? '' : 'disabled readonly style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px; background-color: #f1f2f6; cursor: not-allowed; color: #2c3e50;" title="Редагування доступне тільки для Адміна та Розробника"';
+
         const tr = document.createElement('tr');
         tr.setAttribute('data-fuel-type', (item.fuelType || '').toUpperCase());
         tr.innerHTML = `
@@ -493,18 +499,25 @@ function renderEquipmentReportView() {
             <td style="text-align: center;"><strong>${item.subdivision}</strong></td>
             <td><strong>${item.model}</strong></td>
             <td style="text-align: center;" class="eq-row-fuel-type">${item.fuelType}</td>
-            <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="prevFuel" value="${itemData.prevFuel || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px; ${itemData._autoCarried ? 'background-color: #f0fdf4;' : ''}"></td>
-            <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="prevOil" value="${itemData.prevOil || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;"></td>
-            <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p1Fuel" value="${itemData.p1Fuel || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;"></td>
-            <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p1Oil" value="${itemData.p1Oil || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;"></td>
-            <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p2Fuel" value="${itemData.p2Fuel || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;"></td>
-            <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p2Oil" value="${itemData.p2Oil || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;"></td>
-            <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p3Fuel" value="${itemData.p3Fuel || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;"></td>
-            <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p3Oil" value="${itemData.p3Oil || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;"></td>
-            <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="nextFuel" value="${itemData.nextFuel || ''}" style="width: 100%; text-align: center; border: 1px solid #27ae60; background: #f0fdf4; padding: 4px; font-weight: bold; color: #166534;" placeholder="0.0"></td>
+            <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="prevFuel" value="${itemData.prevFuel || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px; ${itemData._autoCarried ? 'background-color: #f0fdf4;' : ''}" ${eqLock}></td>
+            <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="prevOil" value="${itemData.prevOil || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
+            <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p1Fuel" value="${itemData.p1Fuel || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
+            <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p1Oil" value="${itemData.p1Oil || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
+            <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p2Fuel" value="${itemData.p2Fuel || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
+            <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p2Oil" value="${itemData.p2Oil || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
+            <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p3Fuel" value="${itemData.p3Fuel || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
+            <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p3Oil" value="${itemData.p3Oil || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
+            <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="nextFuel" value="${itemData.nextFuel || ''}" style="width: 100%; text-align: center; border: 1px solid #27ae60; background: #f0fdf4; padding: 4px; font-weight: bold; color: #166534;" placeholder="0.0" ${eqLock}></td>
         `;
         tbody.appendChild(tr);
     });
+
+    const curRole2 = (typeof window.getCurrentAppRole === 'function')
+        ? window.getCurrentAppRole()
+        : ((typeof currentRole !== 'undefined') ? currentRole : 'user');
+    const canEditEq2 = (curRole2 === 'admin' || curRole2 === 'developer');
+    const eqSaveBtn = document.querySelector('button[onclick="saveEquipmentReportData()"]');
+    if (eqSaveBtn) eqSaveBtn.style.setProperty('display', canEditEq2 ? 'inline-flex' : 'none', 'important');
 
     updateEquipmentReportTotals();
 }

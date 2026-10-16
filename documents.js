@@ -2251,35 +2251,41 @@ async function extractDocxRichHtmlAndText(arrayBuffer) {
             };
         }
 
-        Array.from(bodyNode.childNodes).forEach(node => {
-            if (node.nodeName === 'w:p') {
-                const res = parseParagraph(node);
-                htmlParts.push(res.html);
-                if (res.text) plainParts.push(res.text);
-            } else if (node.nodeName === 'w:tbl') {
-                let tblHtml = '<table style="width:100%; border-collapse:collapse; margin:8px 0; border:1px solid #475569;">';
-                const rows = Array.from(node.getElementsByTagName('w:tr'));
-                rows.forEach(tr => {
-                    tblHtml += '<tr>';
-                    const cells = Array.from(tr.getElementsByTagName('w:tc'));
-                    cells.forEach(tc => {
-                        let cellHtml = '';
-                        let cellText = [];
-                        const ps = Array.from(tc.getElementsByTagName('w:p'));
-                        ps.forEach(p => {
-                            const pRes = parseParagraph(p);
-                            cellHtml += pRes.html;
-                            if (pRes.text) cellText.push(pRes.text);
+        function collectBlocks(containerNode) {
+            Array.from(containerNode.childNodes).forEach(node => {
+                const name = (node.nodeName || '').toLowerCase();
+                if (name === 'w:p') {
+                    const res = parseParagraph(node);
+                    htmlParts.push(res.html);
+                    if (res.text) plainParts.push(res.text);
+                } else if (name === 'w:tbl') {
+                    let tblHtml = '<table style="width:100%; border-collapse:collapse; margin:8px 0; border:1px solid #475569;">';
+                    const rows = Array.from(node.getElementsByTagName('w:tr'));
+                    rows.forEach(tr => {
+                        tblHtml += '<tr>';
+                        const cells = Array.from(tr.getElementsByTagName('w:tc'));
+                        cells.forEach(tc => {
+                            let cellHtml = '';
+                            let cellText = [];
+                            const ps = Array.from(tc.getElementsByTagName('w:p'));
+                            ps.forEach(p => {
+                                const pRes = parseParagraph(p);
+                                cellHtml += pRes.html;
+                                if (pRes.text) cellText.push(pRes.text);
+                            });
+                            plainParts.push(cellText.join(' '));
+                            tblHtml += `<td style="border:1px solid #64748b; padding:4px 6px; vertical-align:top;">${cellHtml}</td>`;
                         });
-                        plainParts.push(cellText.join(' '));
-                        tblHtml += `<td style="border:1px solid #64748b; padding:4px 6px; vertical-align:top;">${cellHtml}</td>`;
+                        tblHtml += '</tr>';
                     });
-                    tblHtml += '</tr>';
-                });
-                tblHtml += '</table>';
-                htmlParts.push(tblHtml);
-            }
-        });
+                    tblHtml += '</table>';
+                    htmlParts.push(tblHtml);
+                } else if (name.includes('sdt') || name.includes('customxml') || name.includes('smarttag') || name.includes('content') || name.includes('drawing') || name.includes('txbx')) {
+                    collectBlocks(node);
+                }
+            });
+        }
+        collectBlocks(bodyNode);
 
         return {
             html: htmlParts.join(''),
@@ -3131,10 +3137,10 @@ window.openDocumentEditorModal = async function (docId) {
 
                     <!-- Контейнер Аркуша А4 -->
                     <div style="background:#e2e8f0; border:1px solid #cbd5e1; border-radius:10px; padding:24px; overflow:auto; display:flex; justify-content:center;">
-                        <div id="a4-paper-sheet" style="width:210mm; min-height:297mm; background:#ffffff; color:#000000; padding:20mm 18mm 20mm 25mm; box-sizing:border-box; box-shadow:0 8px 30px rgba(0,0,0,0.18); position:relative; overflow:hidden;">
+                        <div id="a4-paper-sheet" style="width:210mm; min-height:297mm; height:auto; background:#ffffff; color:#000000; padding:20mm 18mm 20mm 25mm; box-sizing:border-box; box-shadow:0 8px 30px rgba(0,0,0,0.18); position:relative; overflow:visible;">
                             
                             <!-- Верхній рядок шапок (1. Ліва шапка + 2. Права шапка) -->
-                            <div id="doc-ed-headers-row" style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:${docLayoutState.docTitle.gapFromHeaders}px; position:relative; min-height:65px;">
+                            <div id="doc-ed-headers-row" style="display:${(!docLayoutState.leftHeader.text && !docLayoutState.leftHeader.html && !docLayoutState.rightHeader.text && !docLayoutState.rightHeader.html && (doc.bodyHtml || doc.content)) ? 'none' : 'flex'}; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:${docLayoutState.docTitle.gapFromHeaders}px; position:relative; min-height:${(!docLayoutState.leftHeader.text && !docLayoutState.rightHeader.text) ? '0px' : '45px'};">
                                 
                                 <!-- 1. ВЕРХНЯ ЛІВА ШАПКА -->
                                 <div id="doc-ed-left-header-wrap"
@@ -3216,7 +3222,7 @@ window.openDocumentEditorModal = async function (docId) {
                                 onfocus="setActiveBlockForFormatting('doc-ed-body-text')"
                                 onmouseup="preserveCurrentSelection()"
                                 onkeyup="preserveCurrentSelection(); syncBodyTextToSidebar()"
-                                style="outline:none; min-height:360px; width:100%; box-sizing:border-box; white-space:pre-wrap; word-break:break-word; padding:4px 0; font-family:${docLayoutState.bodyStyle.fontFamily}; font-size:${docLayoutState.bodyStyle.fontSize}pt; line-height:${docLayoutState.bodyStyle.lineHeight}; text-align:${docLayoutState.bodyStyle.align}; font-weight:${docLayoutState.bodyStyle.bold ? 'bold' : 'normal'}; font-style:${docLayoutState.bodyStyle.italic ? 'italic' : 'normal'}; text-decoration:${docLayoutState.bodyStyle.underline ? 'underline' : 'none'};"
+                                style="outline:none; min-height:360px; width:100%; box-sizing:border-box; white-space:${doc.bodyHtml ? 'normal' : 'pre-wrap'}; word-break:break-word; padding:4px 0; font-family:${docLayoutState.bodyStyle.fontFamily}; font-size:${docLayoutState.bodyStyle.fontSize}pt; line-height:${docLayoutState.bodyStyle.lineHeight || 1.4}; text-align:${docLayoutState.bodyStyle.align}; font-weight:${docLayoutState.bodyStyle.bold ? 'bold' : 'normal'}; font-style:${docLayoutState.bodyStyle.italic ? 'italic' : 'normal'}; text-decoration:${docLayoutState.bodyStyle.underline ? 'underline' : 'none'};"
                             >${doc.bodyHtml ? doc.bodyHtml : escapeHtml(doc.content || '')}</div>
 
                             <!-- 5. БЛОК ПІДПИСАНТІВ -->
@@ -3877,9 +3883,9 @@ window.printCurrentA4Document = function () {
             <meta charset="UTF-8">
             <title>Друк документа А4</title>
             <style>
-                @page { size: A4; margin: 0; }
-                body { margin: 0; padding: 0; background: #fff; -webkit-print-color-adjust: exact; }
-                #a4-paper-sheet { box-shadow: none !important; margin: 0 !important; }
+                @page { size: A4 portrait; margin: 15mm 15mm 15mm 20mm; }
+                body { margin: 0; padding: 0; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                #a4-paper-sheet { box-shadow: none !important; margin: 0 !important; width: 100% !important; min-height: auto !important; height: auto !important; overflow: visible !important; padding: 0 !important; }
                 .a4-non-print-helper { display: none !important; }
             </style>
         </head>

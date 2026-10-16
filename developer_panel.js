@@ -117,8 +117,12 @@ window.selectRole = function(role) {
     const passwords = getSystemPasswords();
 
     if (window.isDeveloperLoggedIn) {
+        window.currentRole = role;
         currentRole = role;
-        try { localStorage.setItem('currentRole', currentRole); } catch(e) {}
+        try {
+            localStorage.setItem('currentRole', role);
+            localStorage.setItem('app_current_role', role);
+        } catch(e) {}
         addSecurityLog('info', `Швидкий перехід Розробника`, `Перехід у кабінет: ${getRoleDisplayName(role)}`);
         updateRoleUI();
         return;
@@ -136,8 +140,12 @@ window.selectRole = function(role) {
     }
 
     if (role === "user") {
+        window.currentRole = "user";
         currentRole = "user";
-        try { localStorage.setItem('currentRole', 'user'); } catch(e) {}
+        try {
+            localStorage.setItem('currentRole', 'user');
+            localStorage.setItem('app_current_role', 'user');
+        } catch(e) {}
         updateRoleUI();
         return;
     }
@@ -146,8 +154,12 @@ window.selectRole = function(role) {
         showCustomPasswordModal("Введіть пароль Модератора:", (pwd) => {
             if (pwd === null) return;
             if (pwd === passwords.moderator || checkCustomUserPassword('moderator', pwd)) {
+                window.currentRole = "moderator";
                 currentRole = "moderator";
-                try { localStorage.setItem('currentRole', 'moderator'); } catch(e) {}
+                try {
+                    localStorage.setItem('currentRole', 'moderator');
+                    localStorage.setItem('app_current_role', 'moderator');
+                } catch(e) {}
                 addSecurityLog('success', 'Успішний вхід: Модератор', 'Авторизація пройдена');
                 updateRoleUI();
             } else {
@@ -159,8 +171,12 @@ window.selectRole = function(role) {
         showCustomPasswordModal("Введіть пароль Адміна:", (pwd) => {
             if (pwd === null) return;
             if (pwd === passwords.admin || checkCustomUserPassword('admin', pwd)) {
+                window.currentRole = "admin";
                 currentRole = "admin";
-                try { localStorage.setItem('currentRole', 'admin'); } catch(e) {}
+                try {
+                    localStorage.setItem('currentRole', 'admin');
+                    localStorage.setItem('app_current_role', 'admin');
+                } catch(e) {}
                 addSecurityLog('success', 'Успішний вхід: Адмін', 'Авторизація пройдена');
                 updateRoleUI();
             } else {
@@ -172,10 +188,12 @@ window.selectRole = function(role) {
         showCustomPasswordModal("Введіть пароль Розробника:", (pwd) => {
             if (pwd === null) return;
             if (pwd === passwords.developer) {
+                window.currentRole = "developer";
                 currentRole = "developer";
                 window.isDeveloperLoggedIn = true;
                 try {
                     localStorage.setItem('currentRole', 'developer');
+                    localStorage.setItem('app_current_role', 'developer');
                     localStorage.setItem('isDeveloperLoggedIn', 'true');
                 } catch(e) {}
                 addSecurityLog('success', 'Успішний вхід: Розробник (Супер-доступ)', 'Активовано вільний перехід між кабінетами');
@@ -402,6 +420,13 @@ window.updateRoleUI = function() {
     }
     if (typeof syncTransferButtonVisibility === 'function') {
         syncTransferButtonVisibility();
+    }
+
+    if (typeof window.applyReportRolePermissions === 'function') {
+        window.applyReportRolePermissions();
+    }
+    if (typeof applyModeratorReportLock === 'function') {
+        applyModeratorReportLock();
     }
 
     if (isDev) {

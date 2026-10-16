@@ -18,11 +18,12 @@ let webastoFilters = { model: "", subdivision: "", responsiblePerson: "", locati
 
 function getWebastoList() {
     try {
-        const storedVer = localStorage.getItem('webasto_data_version');
         const stored = localStorage.getItem('webasto_custom_data');
-        if (stored && storedVer === CURRENT_WEB_VERSION) return JSON.parse(stored);
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
     } catch(e) {}
-    localStorage.setItem('webasto_data_version', CURRENT_WEB_VERSION);
     localStorage.setItem('webasto_custom_data', JSON.stringify(defaultWebastoData));
     return defaultWebastoData;
 }

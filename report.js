@@ -247,7 +247,7 @@ function upgradeReportControlsUI() {
             <button id="rep-nav-next-btn" type="button" class="action-btn" onclick="navigateReportPeriod(1)" style="background: #34495e; padding: 4px 8px; font-size: 11px; color: white; border: none; border-radius: 3px; cursor: pointer;">►</button>
         </div>
         <input type="hidden" id="report-custom-period" value="${activeReportPeriod}">
-        <button class="action-btn" onclick="saveReportData()" style="background-color: #27ae60; font-weight: bold;">💾 Зберегти звіт</button>
+        <button id="rep-save-btn" class="action-btn" onclick="saveReportData()" style="background-color: #27ae60; font-weight: bold;">💾 Зберегти звіт</button>
         <button id="print-ten-days-report-btn" class="action-btn print-btn" onclick="printTenDaysReport()" style="background-color: #337ab7; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; white-space: nowrap;">
             <span style="font-size: 14px; margin-right: 6px; vertical-align: middle;">🖨️</span> Друк звіту
         </button>
@@ -570,6 +570,26 @@ function saveCurrentReportSilently() {
     localStorage.setItem(storageKey, JSON.stringify(reportData));
 }
 
+window.getCurrentAppRole = function() {
+    let r = '';
+    try {
+        if (typeof window.currentRole !== 'undefined' && window.currentRole) r = window.currentRole;
+    } catch(e) {}
+    if (!r) {
+        try {
+            if (typeof currentRole !== 'undefined' && currentRole) r = currentRole;
+        } catch(e) {}
+    }
+    if (!r) {
+        try {
+            r = localStorage.getItem('currentRole') || localStorage.getItem('app_current_role') || '';
+        } catch(e) {}
+    }
+    r = String(r || 'user').toLowerCase().trim();
+    if (!['user', 'moderator', 'admin', 'developer'].includes(r)) r = 'user';
+    return r;
+};
+
 function changeReportPeriod(val) {
     if (!val) return;
     saveCurrentReportSilently();
@@ -578,6 +598,12 @@ function changeReportPeriod(val) {
     if (customInput) customInput.value = val;
     updateReportHeaders();
     renderReportTable();
+    if (typeof window.applyReportRolePermissions === 'function') {
+        window.applyReportRolePermissions();
+    }
+    if (typeof applyModeratorReportLock === 'function') {
+        applyModeratorReportLock();
+    }
 }
 
 window.navigateReportPeriod = function(direction) {
@@ -607,6 +633,12 @@ window.navigateReportPeriod = function(direction) {
         populatePeriodDropdown(activeReportPeriod);
         updateReportHeaders();
         renderReportTable();
+        if (typeof window.applyReportRolePermissions === 'function') {
+            window.applyReportRolePermissions();
+        }
+        if (typeof applyModeratorReportLock === 'function') {
+            applyModeratorReportLock();
+        }
     }
 };
 
@@ -728,6 +760,80 @@ function printTenDaysReport() {
         printWindow.close();
     }, 250);
 }
+
+window.applyReportRolePermissions = function() {
+    const role = (typeof window.getCurrentAppRole === 'function')
+        ? window.getCurrentAppRole()
+        : ((typeof currentRole !== 'undefined') ? currentRole : 'user');
+    const canEdit = (role === 'admin' || role === 'developer');
+
+    const inputs = document.querySelectorAll('#report-tbody input.report-cell-input, #report-tbody select, #report-table tbody input, #report-table tbody select');
+    inputs.forEach(inp => {
+        if (!canEdit) {
+            inp.setAttribute('disabled', 'true');
+            inp.setAttribute('readonly', 'true');
+            inp.disabled = true;
+            inp.readOnly = true;
+            inp.style.backgroundColor = '#f1f2f6';
+            inp.style.cursor = 'not-allowed';
+            inp.style.color = '#2c3e50';
+            inp.title = 'Редагування доступне тільки для Адміна та Розробника';
+        } else {
+            if (inp.getAttribute('data-no-adblue') === 'true') {
+                inp.setAttribute('disabled', 'true');
+                inp.disabled = true;
+                inp.style.backgroundColor = '#e0e0e0';
+                inp.style.cursor = 'not-allowed';
+            } else {
+                inp.removeAttribute('disabled');
+                inp.removeAttribute('readonly');
+                inp.disabled = false;
+                inp.readOnly = false;
+                inp.style.backgroundColor = '';
+                inp.style.cursor = '';
+                inp.style.color = '';
+                inp.removeAttribute('title');
+            }
+        }
+    });
+
+    const customPeriodInput = document.getElementById('report-custom-period');
+    if (customPeriodInput) {
+        customPeriodInput.disabled = !canEdit;
+        customPeriodInput.readOnly = !canEdit;
+    }
+
+    const saveBtns = document.querySelectorAll('#report-view button[onclick*="saveReportData"], #rep-save-btn');
+    saveBtns.forEach(btn => {
+        btn.style.setProperty('display', canEdit ? 'inline-block' : 'none', 'important');
+    });
+
+    // Підрозділ та період завжди активні для модератора для перегляду та фільтрації
+    const periodSelect = document.getElementById('report-period-select');
+    if (periodSelect) {
+        periodSelect.removeAttribute('disabled');
+        periodSelect.disabled = false;
+        periodSelect.style.cursor = 'pointer';
+    }
+    const subFilter = document.getElementById('report-subdivision-filter');
+    if (subFilter) {
+        subFilter.removeAttribute('disabled');
+        subFilter.disabled = false;
+        subFilter.style.cursor = 'pointer';
+    }
+    const prevBtn = document.getElementById('rep-nav-prev-btn');
+    if (prevBtn) {
+        prevBtn.removeAttribute('disabled');
+        prevBtn.disabled = false;
+        prevBtn.style.cursor = 'pointer';
+    }
+    const nextBtn = document.getElementById('rep-nav-next-btn');
+    if (nextBtn) {
+        nextBtn.removeAttribute('disabled');
+        nextBtn.disabled = false;
+        nextBtn.style.cursor = 'pointer';
+    }
+};
 
 function renderReportTable() {
     upgradeReportControlsUI();
@@ -911,33 +1017,45 @@ function renderReportTable() {
             }
         }
 
-        const noAdblueAttr = car.hasAdBlue ? '' : 'disabled data-no-adblue="true" style="background:#e0e0e0;"';
+        const role = (typeof window.getCurrentAppRole === 'function')
+            ? window.getCurrentAppRole()
+            : ((typeof currentRole !== 'undefined') ? currentRole : 'user');
+        const canEditReport = (role === 'admin' || role === 'developer');
+        const lockAttr = canEditReport ? '' : 'disabled readonly style="background:#f1f2f6; cursor:not-allowed; color:#2c3e50;" title="Редагування доступне тільки для Адміна та Розробника"';
+
+        const noAdblueAttr = car.hasAdBlue ? '' : 'disabled data-no-adblue="true" style="background:#e0e0e0; cursor:not-allowed;"';
 
         tr.innerHTML = `
             <td>${index + 1}</td>
             <td><strong>${car.plate}</strong></td>
             <td>${car.subdivision}</td>
             <td class="rep-row-fuel-type" style="padding: 2px;">
-                <input type="text" class="report-cell-input rep-fuel-type-input" data-car="${car.id}" data-field="fuelType" value="${car.fuelType || ''}" list="fuel-types-list" oninput="updateCarFuelTypeFromReport(${car.id}, this.value)" style="width: 100%; text-align: center; font-weight: bold; padding: 2px; border: 1px solid #bdc3c7; border-radius: 2px; font-size: 11px;">
+                <input type="text" class="report-cell-input rep-fuel-type-input" data-car="${car.id}" data-field="fuelType" value="${car.fuelType || ''}" list="fuel-types-list" oninput="updateCarFuelTypeFromReport(${car.id}, this.value)" style="width: 100%; text-align: center; font-weight: bold; padding: 2px; border: 1px solid #bdc3c7; border-radius: 2px; font-size: 11px;" ${lockAttr}>
             </td>
             <td style="text-align: left; padding-left: 10px;">${car.model}</td>
-            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="prevFuel" value="${carData.prevFuel}"></td>
-            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="prevAdBlue" value="${carData.prevAdBlue}" ${noAdblueAttr}></td>
-            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="prevOdo" value="${carData.prevOdo}"></td>
-            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="refuelFuel" value="${carData.refuelFuel}"></td>
-            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="refuelAdBlue" value="${carData.refuelAdBlue}" ${noAdblueAttr}></td>
-            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="refuelOil" value="${carData.refuelOil}"></td>
-            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="refuelWasher" value="${carData.refuelWasher}"></td>
-            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="note" value="${carData.note}"></td>
-            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="docNo" value="${carData.docNo}"></td>
-            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="leftFuel" value="${carData.leftFuel}"></td>
-            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="leftAdBlue" value="${carData.leftAdBlue}" ${noAdblueAttr}></td>
-            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="odo" value="${carData.odo}"></td>
+            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="prevFuel" value="${carData.prevFuel}" ${lockAttr}></td>
+            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="prevAdBlue" value="${carData.prevAdBlue}" ${noAdblueAttr || lockAttr}></td>
+            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="prevOdo" value="${carData.prevOdo}" ${lockAttr}></td>
+            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="refuelFuel" value="${carData.refuelFuel}" ${lockAttr}></td>
+            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="refuelAdBlue" value="${carData.refuelAdBlue}" ${noAdblueAttr || lockAttr}></td>
+            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="refuelOil" value="${carData.refuelOil}" ${lockAttr}></td>
+            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="refuelWasher" value="${carData.refuelWasher}" ${lockAttr}></td>
+            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="note" value="${carData.note}" ${lockAttr}></td>
+            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="docNo" value="${carData.docNo}" ${lockAttr}></td>
+            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="leftFuel" value="${carData.leftFuel}" ${lockAttr}></td>
+            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="leftAdBlue" value="${carData.leftAdBlue}" ${noAdblueAttr || lockAttr}></td>
+            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="odo" value="${carData.odo}" ${lockAttr}></td>
         `;
         tbody.appendChild(tr);
     });
 
     updateReportTotals();
+    if (typeof window.applyReportRolePermissions === 'function') {
+        window.applyReportRolePermissions();
+    }
+    if (typeof applyModeratorReportLock === 'function') {
+        applyModeratorReportLock();
+    }
     if (typeof updateRoleUI === 'function') {
         updateRoleUI();
     }

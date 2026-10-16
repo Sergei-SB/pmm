@@ -46,7 +46,7 @@
     var IDB_META_KEY = '__sync_idb_meta_v1';
 
     var LOCAL_ONLY_KEYS = [
-        'currentrole', 'userrole', 'role', 'isdeveloperloggedin',
+        'currentrole', 'app_current_role', 'userrole', 'role', 'isdeveloperloggedin',
         'last_active_car_id', 'last_active_car_period', 'last_active_report_period',
         'dev_role_time_stats'
     ];
@@ -465,11 +465,27 @@
                 var changed = applyRemoteKeys(incomingKeys, awaitingFirstPull);
                 if (typeof data.revision === 'number') setLastRev(data.revision);
                 else if (typeof data.version === 'number') { /* старий сервер: ревізій немає */ }
+
+                // Якщо на клієнті є локальні спільні дані (реєстр авто, звіти, модифікації),
+                // яких ще немає на сервері — ставимо їх у чергу відправки, щоб вони завантажились на сервер
+                if (awaitingFirstPull) {
+                    var localAll = localKeys();
+                    localAll.forEach(function (k) {
+                        if (!isSyncedKey(k)) return;
+                        if (!incomingKeys[k] && !pending[k]) {
+                            var val = localGet(k);
+                            if (val !== null && val !== undefined) {
+                                pending[k] = { value: String(val), deleted: false, preBoot: false };
+                            }
+                        }
+                    });
+                }
+
                 awaitingFirstPull = false;
                 saveMeta();
                 savePending();
 
-                if (changed > 0) refreshAllViewsSafely();
+                refreshAllViewsSafely();
                 setStatus(Object.keys(pending).length > 0 ? 'saving' : 'ok');
                 if (Object.keys(pending).length > 0) schedulePush(200);
                 if (typeof data.filesVersion === 'number') pullDocsIfNewer(data.filesVersion);
@@ -611,6 +627,8 @@
         callIfExists('reloadCarsFromStorage');
         callIfExists('loadCarsModifications');
         callIfExists('initCardPeriodsSelect');
+        callIfExists('initPeriodDropdown');
+        callIfExists('initEqReportPeriodDropdown');
 
         var period = readActiveReportPeriod();
         if (period !== undefined) callIfExists('populatePeriodDropdown', [period]);
@@ -620,6 +638,9 @@
         callIfExists('renderCarsTable');
         callIfExists('loadCarDataForActivePeriod');
         callIfExists('renderReportTable');
+        callIfExists('updateReportTotals');
+        callIfExists('renderEquipmentReportView');
+        callIfExists('updateEquipmentReportTotals');
         callIfExists('renderSubdivisionsView');
         callIfExists('renderGeneratorsView');
         callIfExists('renderWebastoView');
@@ -631,6 +652,7 @@
         callIfExists('renderDocumentsMainView');
         if (getRole() === 'developer') callIfExists('renderDeveloperPanel');
         callIfExists('updateEnvelopeBlinkState');
+        callIfExists('applyReportRolePermissions');
         callIfExists('updateRoleUI');
 
         restoreFocus(focusInfo);
@@ -799,11 +821,16 @@
     setInterval(function () { ensureHeaderWidget(); }, ROLE_REFRESH_MS);
 
     document.addEventListener('visibilitychange', function () {
-        if (document.visibilityState === 'hidden') flushPending();
-        else pullServer(false);
+        if (document.visibilityState === 'hidden') {
+            flushPending();
+        } else {
+            pullServer(false);
+            refreshAllViewsSafely();
+        }
     });
 
     origWinAdd('focus', function () { pullServer(false); });
+    origWinAdd('pageshow', function () { pullServer(false); });
     origWinAdd('online', function () { schedulePush(0); pullServer(false); });
     origWinAdd('pagehide', beaconFlush);
     origWinAdd('beforeunload', beaconFlush);

@@ -372,7 +372,7 @@ function saveCarsToStorage() {
     }
 }
 
-(function loadCarsFromStorage() {
+window.reloadCarsFromStorage = function() {
     try {
         const saved = localStorage.getItem('user_cars_database_v2');
         if (saved) {
@@ -384,7 +384,8 @@ function saveCarsToStorage() {
     } catch (e) {
         console.error("Помилка завантаження даних:", e);
     }
-})();
+};
+window.reloadCarsFromStorage();
 
 function renderCarsTable(filterQuery = '') {
     const tbody = document.getElementById('cars-tbody');

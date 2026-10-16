@@ -12,11 +12,12 @@ let chainsawsFilters = { model: "", subdivision: "", responsiblePerson: "", loca
 
 function getChainsawsList() {
     try {
-        const storedVer = localStorage.getItem('chainsaws_data_version');
         const stored = localStorage.getItem('chainsaws_custom_data');
-        if (stored && storedVer === CURRENT_CHAIN_VERSION) return JSON.parse(stored);
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
     } catch(e) {}
-    localStorage.setItem('chainsaws_data_version', CURRENT_CHAIN_VERSION);
     localStorage.setItem('chainsaws_custom_data', JSON.stringify(defaultChainsawsData));
     return defaultChainsawsData;
 }
