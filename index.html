@@ -8,8 +8,53 @@
     <meta property="og:title" content="Облік палива та конструктор документів А4" />
     <meta property="og:description" content="Система обліку палива, транспортних засобів, агрегатів та конструктор документів А4 зі збереженням шаблонів фрагментів." />
     <meta property="og:type" content="website" />
-    <link rel="icon" type="image/jpeg" href="fhjnd4dd4ww11.jfif">
-    <link rel="shortcut icon" href="fhjnd4dd4ww11.jfif">
+    <link id="app-favicon-svg" rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%232e7d32'/%3E%3Cstop offset='100%25' stop-color='%231b5e20'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Cpath d='M18 17 L38 17 L44 23 L44 52 A2 2 0 0 1 42 54 L18 54 A2 2 0 0 1 16 52 L16 19 A2 2 0 0 1 18 17 Z' fill='%23ffffff'/%3E%3Cpath d='M23 12 L33 12 A2 2 0 0 1 35 14 L35 17 L21 17 L21 14 A2 2 0 0 1 23 12 Z' fill='%23ffffff'/%3E%3Cline x1='22' y1='27' x2='38' y2='45' stroke='%232e7d32' stroke-width='2.5' stroke-linecap='round'/%3E%3Cline x1='38' y1='27' x2='22' y2='45' stroke='%232e7d32' stroke-width='2.5' stroke-linecap='round'/%3E%3Cpath d='M46 33 C46 33 54 41 54 46 A4 4 0 0 1 46 50 A4 4 0 0 1 42 46 C42 41 46 33 46 33 Z' fill='%23f39c12'/%3E%3C/svg%3E">
+    <link id="app-favicon-link" rel="icon" type="image/jpeg" href="fhjnd4dd4ww11.jfif">
+    <link id="app-favicon-shortcut" rel="shortcut icon" href="fhjnd4dd4ww11.jfif">
+    <script>
+        (function() {
+            try {
+                var custom = localStorage.getItem('site_favicon_custom');
+                if (custom) {
+                    var l = document.getElementById('app-favicon-link');
+                    if (l) l.href = custom;
+                    var s = document.getElementById('app-favicon-svg');
+                    if (s) s.href = custom;
+                    var sc = document.getElementById('app-favicon-shortcut');
+                    if (sc) sc.href = custom;
+                }
+            } catch(e) {}
+        })();
+
+        function handleFaviconFileSelect(input) {
+            if (!input || !input.files || !input.files[0]) return;
+            var file = input.files[0];
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                var dataUrl = e.target.result;
+                try {
+                    localStorage.setItem('site_favicon_custom', dataUrl);
+                    var l = document.getElementById('app-favicon-link');
+                    if (l) l.href = dataUrl;
+                    var s = document.getElementById('app-favicon-svg');
+                    if (s) s.href = dataUrl;
+                    var sc = document.getElementById('app-favicon-shortcut');
+                    if (sc) sc.href = dataUrl;
+
+                    fetch('/api/upload-favicon', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ dataUrl: dataUrl, fileName: file.name })
+                    }).catch(function() {});
+
+                    alert('✓ Фавікон "' + file.name + '" успішно встановлено!');
+                } catch(err) {
+                    console.error('Помилка встановлення фавікона:', err);
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+    </script>
     <link rel="stylesheet" href="style.css">
     <style>
         table thead tr, 
@@ -135,6 +180,10 @@
             
             <label id="header-direct-import-btn" title="Імпортувати дані з JSON" style="background-color: #8e44ad; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; display: none; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                 📂 Імпорт <input type="file" id="header-import-json-file" accept=".json" onchange="importDataFromJson(this)" style="display: none;">
+            </label>
+
+            <label id="header-favicon-upload-btn" title="Встановити фавікон (fhjnd4dd4ww11.jfif)" style="background-color: #2e7d32; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); gap: 4px;">
+                🖼️ Фавікон <input type="file" id="favicon-file-input" accept=".jfif,.jpg,.jpeg,.png,.ico,.svg" onchange="handleFaviconFileSelect(this)" style="display: none;">
             </label>
 
             <input type="text" id="base-search-input" placeholder="Пошук по авто, номеру, водію..." oninput="filterBaseTable(this.value)" style="padding: 6px; width: 220px; border-radius: 4px; border: none;" autocomplete="off">
