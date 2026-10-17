@@ -765,7 +765,7 @@ window.applyReportRolePermissions = function() {
     const role = (typeof window.getCurrentAppRole === 'function')
         ? window.getCurrentAppRole()
         : ((typeof currentRole !== 'undefined') ? currentRole : 'user');
-    const canEdit = (role === 'admin' || role === 'developer');
+    const canEdit = (role === 'developer') || (typeof window.canRoleEdit === 'function' ? (window.canRoleEdit(role, 'report') && window.canRoleDo(role, 'report_edit_cells')) : (role === 'admin'));
 
     const inputs = document.querySelectorAll('#report-tbody input.report-cell-input, #report-tbody select, #report-table tbody input, #report-table tbody select');
     inputs.forEach(inp => {

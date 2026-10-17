@@ -2361,9 +2361,9 @@ function syncDocumentsButtonVisibility() {
     }
 
     const role = getCurrentUserRoleForDocs();
-    const shouldShow = isDevVisible || role === 'dev' || role === 'admin';
+    const canAccess = isDevVisible || role === 'dev' || role === 'developer' || (typeof window.canRoleAccess === 'function' ? window.canRoleAccess(role, 'documents') : (role === 'admin'));
 
-    if (shouldShow) {
+    if (canAccess) {
         docsBtn.style.setProperty('display', 'inline-flex', 'important');
         docsBtn.style.alignItems = 'center';
         docsBtn.style.justifyContent = 'center';
@@ -2380,7 +2380,9 @@ function openDocumentsTabView() {
     const role = getCurrentUserRoleForDocs();
     const devPanelBtn = document.getElementById('nav-btn-dev-panel');
     const isDevVisible = devPanelBtn && window.getComputedStyle(devPanelBtn).display !== 'none';
-    if (role !== 'dev' && role !== 'admin' && !isDevVisible) {
+    const canAccess = isDevVisible || role === 'dev' || role === 'developer' || (typeof window.canRoleAccess === 'function' ? window.canRoleAccess(role, 'documents') : (role === 'admin'));
+    if (!canAccess) {
+        alert('⛔ Доступ до Документів та Шаблонів заблоковано Розробником!');
         return;
     }
 
@@ -2541,7 +2543,7 @@ function renderDocumentsMainView() {
                 <label for="doc-upload-input" style="background:#2563eb; color:#fff; padding:10px 18px; border-radius:8px; cursor:pointer; font-weight:700; font-size:14px; display:inline-flex; align-items:center; gap:8px; box-shadow:0 2px 8px rgba(37,99,235,0.25); margin:0;">
                     ➕ Додати документи (З файлу)
                 </label>
-                <input type="file" id="doc-upload-input" multiple accept=".txt,.doc,.docx,.pdf,.rtf,.html,.png,.jpg,.jpeg,.webp" style="display:none;" onchange="handleUploadDocumentFile(event)">
+                <input type="file" id="doc-upload-input" multiple accept=".txt,.doc,.docx,.pdf,.rtf,.html,.xlsx,.xls,.csv,.tsv,.png,.jpg,.jpeg,.webp,.jfif,.svg,*/*" style="display:none;" onchange="handleUploadDocumentFile(event)">
                 <button onclick="createNewBlankDocument()" style="background:#16a34a; color:#fff; border:none; padding:10px 18px; border-radius:8px; cursor:pointer; font-weight:700; font-size:14px; display:inline-flex; align-items:center; gap:8px; box-shadow:0 2px 8px rgba(22,163,74,0.25);">
                     📝 Створити новий документ А4
                 </button>
@@ -2552,11 +2554,11 @@ function renderDocumentsMainView() {
             <table style="width:100%; border-collapse:collapse; text-align:left; font-size:14px; color:#1e293b;">
                 <thead>
                     <tr style="background:#2e7d32; color:#ffffff;">
-                        <th style="padding:12px 14px; border-right:1px solid rgba(255,255,255,0.15); width:55px; text-align:center;">№</th>
+                        <th style="padding:12px 14px; border-right:1px solid rgba(255,255,255,0.15); width:50px; text-align:center;">№</th>
                         <th style="padding:12px 14px; border-right:1px solid rgba(255,255,255,0.15);">Назва документа (можна редагувати)</th>
-                        <th style="padding:12px 14px; border-right:1px solid rgba(255,255,255,0.15); width:170px;">Формат / Тип</th>
-                        <th style="padding:12px 14px; border-right:1px solid rgba(255,255,255,0.15); width:130px;">Дата</th>
-                        <th style="padding:12px 14px; width:360px; text-align:center;">Дії</th>
+                        <th style="padding:12px 14px; border-right:1px solid rgba(255,255,255,0.15); width:160px;">Формат / Тип</th>
+                        <th style="padding:12px 14px; border-right:1px solid rgba(255,255,255,0.15); width:110px;">Дата</th>
+                        <th style="padding:12px 14px; width:430px; text-align:center;">Дії</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -2584,20 +2586,25 @@ function renderDocumentsMainView() {
                             </td>
                             <td style="padding:10px 14px; color:#475569; font-weight:500; border-right:1px solid #e2e8f0;">${escapeHtml(doc.date || '—')}</td>
                             <td style="padding:10px 14px; text-align:center;">
-                                <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
-                                    <button onclick="openDocumentEditorModal('${doc.id}')"
-                                        style="background:#2563eb; color:#fff; border:none; padding:7px 13px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:5px;">
-                                        👁️ Відкрити / Редагувати
+                                <div style="display:flex; gap:6px; justify-content:center; flex-wrap:wrap; align-items:center;">
+                                    <button onclick="previewDocumentInNativeFormat('${doc.id}')"
+                                        style="background:#0284c7; color:#fff; border:none; padding:7px 12px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:700; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 4px rgba(2,132,199,0.25);"
+                                        title="Переглянути оригінальний документ у його рідному форматі (${(doc.originalFormat || 'файл').toUpperCase()})">
+                                        👁️ Переглянути оригінал
                                     </button>
-                                    ${doc.hasOriginalBinary || doc.fileDataUrl ? `
-                                        <button onclick="downloadOriginalDocFile('${doc.id}')"
-                                            style="background:#059669; color:#fff; border:none; padding:7px 12px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600;"
-                                            title="Завантажити у тому форматі, в якому файл був закачаний">
-                                            📥 Оригінал
-                                        </button>
-                                    ` : ''}
+                                    <button onclick="openDocumentEditorModal('${doc.id}')"
+                                        style="background:#2563eb; color:#fff; border:none; padding:7px 12px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; display:inline-flex; align-items:center; gap:4px;"
+                                        title="Відкрити конструктор А4 (шаблони, друк А4, підписи)">
+                                        📝 Конструктор А4
+                                    </button>
+                                    <button onclick="downloadOriginalDocFile('${doc.id}')"
+                                        style="background:#059669; color:#fff; border:none; padding:7px 11px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; display:inline-flex; align-items:center; gap:4px;"
+                                        title="Завантажити у тому форматі, в якому файл був завантажений">
+                                        📥 Скачати
+                                    </button>
                                     <button onclick="deleteDocumentById('${doc.id}')"
-                                        style="background:#ef4444; color:#fff; border:none; padding:7px 12px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600;">
+                                        style="background:#ef4444; color:#fff; border:none; padding:7px 10px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600;"
+                                        title="Видалити документ">
                                         🗑️
                                     </button>
                                 </div>
@@ -2625,6 +2632,38 @@ window.updateDocumentTitleInline = function (docId, newName) {
     saveDocumentsList(docs);
 };
 
+window.previewDocumentInNativeFormat = async function (docId) {
+    const docs = getSavedDocumentsList();
+    const doc = docs.find(d => d.id === docId);
+    if (!doc) return;
+
+    let dataUrl = doc.fileDataUrl || '';
+    let fileName = doc.originalFileName || doc.name || doc.title || 'Документ';
+    let ext = (doc.originalFormat || (fileName.includes('.') ? fileName.split('.').pop() : '') || 'a4').toLowerCase();
+
+    if (!dataUrl) {
+        const idbRecord = await getDocBinaryFromIDB(docId);
+        if (idbRecord && idbRecord.fileDataUrl) {
+            dataUrl = idbRecord.fileDataUrl;
+            if (idbRecord.originalFileName) fileName = idbRecord.originalFileName;
+            if (idbRecord.ext) ext = idbRecord.ext.toLowerCase();
+        }
+    }
+
+    if (typeof openUniversalFilePreviewModal === 'function') {
+        openUniversalFilePreviewModal({
+            name: fileName,
+            ext: ext,
+            dataUrl: dataUrl,
+            bodyHtml: doc.bodyHtml || '',
+            content: doc.content || '',
+            date: doc.date || ''
+        });
+    } else {
+        alert('Помилка: модуль перегляду недоступний.');
+    }
+};
+
 window.handleUploadDocumentFile = async function (event) {
     const files = Array.from(event.target.files || []);
     if (!files.length) return;
@@ -2632,7 +2671,7 @@ window.handleUploadDocumentFile = async function (event) {
     const docs = getSavedDocumentsList();
 
     for (const file of files) {
-        const ext = (file.name.split('.').pop() || '').toLowerCase();
+        const ext = (file.name.includes('.') ? file.name.split('.').pop() : '').toLowerCase();
         const cleanName = file.name.replace(/\.[^/.]+$/, '');
         const newDocId = 'doc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
 
@@ -2648,23 +2687,63 @@ window.handleUploadDocumentFile = async function (event) {
             ext: ext
         });
 
-        if (ext === 'txt' || ext === 'html' || ext === 'rtf') {
+        if (ext === 'txt' || ext === 'html' || ext === 'rtf' || ext === 'md' || ext === 'json' || ext === 'xml' || ext === 'log') {
             bodyText = await readFileAsTextAsync(file);
             if (ext === 'html') {
                 bodyHtml = bodyText;
             }
         } else if (ext === 'docx') {
             const buffer = await readFileAsArrayBufferAsync(file);
+            if (typeof window.mammoth !== 'undefined' && window.mammoth.convertToHtml) {
+                try {
+                    const mRes = await window.mammoth.convertToHtml({ arrayBuffer: buffer });
+                    if (mRes && mRes.value) bodyHtml = mRes.value;
+                } catch(e) {}
+            }
             const parsed = await extractDocxRichHtmlAndText(buffer);
             if (parsed && (parsed.html || parsed.text)) {
-                bodyHtml = parsed.html;
+                if (!bodyHtml) bodyHtml = parsed.html;
                 bodyText = parsed.text;
             } else {
-                bodyText = `Документ Word: «${file.name}».\nВи можете редагувати текст на аркуші А4 або завантажити оригінал кнопкою «📥 Завантажити оригінал».`;
+                bodyText = `Документ Word: «${file.name}».\nВи можете редагувати текст на аркуші А4 або завантажити оригінал кнопкою «📥 Скачати».`;
             }
+        } else if (ext === 'doc') {
+            const buffer = await readFileAsArrayBufferAsync(file);
+            if (typeof extractDocBinaryText === 'function') {
+                bodyText = extractDocBinaryText(buffer);
+            }
+            if (!bodyText) bodyText = `Документ Word (.DOC): «${file.name}».`;
+        } else if (ext === 'xlsx' || ext === 'xls') {
+            const buffer = await readFileAsArrayBufferAsync(file);
+            if (typeof window.XLSX !== 'undefined') {
+                try {
+                    const wb = window.XLSX.read(buffer, { type: 'array' });
+                    const firstSheetName = wb.SheetNames[0];
+                    if (firstSheetName) {
+                        const s = wb.Sheets[firstSheetName];
+                        bodyHtml = window.XLSX.utils.sheet_to_html(s, { header: '', footer: '' });
+                        bodyText = window.XLSX.utils.sheet_to_csv(s);
+                    }
+                } catch(e) {}
+            }
+            if (!bodyText) bodyText = `Таблиця Excel: «${file.name}»`;
+        } else if (ext === 'csv' || ext === 'tsv') {
+            bodyText = await readFileAsTextAsync(file);
+            const lines = bodyText.trim().split(/\r?\n/);
+            const delim = ext === 'tsv' ? '\t' : (lines[0] && lines[0].includes(';') ? ';' : ',');
+            let tHtml = '<table style="width:100%; border-collapse:collapse; font-size:12px;">';
+            lines.slice(0, 150).forEach((line, rIdx) => {
+                const cells = line.split(delim);
+                const tag = rIdx === 0 ? 'th' : 'td';
+                tHtml += `<tr style="${rIdx === 0 ? 'background:#e2e8f0; font-weight:bold;' : ''}">`;
+                cells.forEach(c => { tHtml += `<${tag} style="border:1px solid #cbd5e1; padding:4px 6px;">${escapeHtml(c.trim())}</${tag}>`; });
+                tHtml += '</tr>';
+            });
+            tHtml += '</table>';
+            bodyHtml = tHtml;
         } else if (ext === 'pdf') {
             bodyText = `PDF-документ: «${file.name}»`;
-        } else if (['png', 'jpg', 'jpeg', 'webp'].includes(ext)) {
+        } else if (['png', 'jpg', 'jpeg', 'webp', 'jfif', 'svg', 'gif', 'bmp'].includes(ext)) {
             bodyHtml = `<div style="text-align:center;"><img src="${dataUrl}" style="max-width:100%; height:auto;" /></div>`;
             bodyText = '';
         } else {
@@ -2719,12 +2798,7 @@ window.downloadOriginalDocFile = async function (docId) {
         return;
     }
 
-    const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    downloadUniversalFile(encodeURIComponent(dataUrl), encodeURIComponent(fileName));
 };
 
 function readFileAsTextAsync(file) {
@@ -2849,12 +2923,16 @@ window.openDocumentEditorModal = async function (docId) {
                     </span>
                 </div>
                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button type="button" onclick="previewDocumentInNativeFormat('${doc.id}')"
+                        style="background:#0284c7; color:#fff; border:none; padding:9px 15px; border-radius:8px; cursor:pointer; font-weight:700; font-size:13px; display:inline-flex; align-items:center; gap:6px; box-shadow:0 2px 8px rgba(2,132,199,0.3);">
+                        👁️ Переглянути оригінал (${(ext || 'файл').toUpperCase()})
+                    </button>
                     <button type="button" onclick="openAllFragmentTemplatesModal()" style="background:#7c3aed; color:#fff; border:none; padding:9px 14px; border-radius:8px; cursor:pointer; font-weight:700; font-size:13px;">
                         📚 Усі шаблони фрагментів
                     </button>
                     ${binaryDataUrl ? `
-                        <button onclick="downloadOriginalDocFile('${doc.id}')" style="background:#0284c7; color:#fff; border:none; padding:9px 15px; border-radius:8px; cursor:pointer; font-weight:700; font-size:13px;">
-                            📥 Завантажити оригінал (${(ext || 'файл').toUpperCase()})
+                        <button onclick="downloadOriginalDocFile('${doc.id}')" style="background:#059669; color:#fff; border:none; padding:9px 15px; border-radius:8px; cursor:pointer; font-weight:700; font-size:13px;">
+                            📥 Завантажити (${(ext || 'файл').toUpperCase()})
                         </button>
                     ` : ''}
                     <button onclick="saveCurrentDocumentFromEditor()" style="background:#16a34a; color:#fff; border:none; padding:9px 18px; border-radius:8px; cursor:pointer; font-weight:700; font-size:14px;">

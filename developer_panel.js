@@ -67,6 +67,258 @@ function getRoleSecurityConfig() {
     }
 }
 
+// =========================================================================
+// ДЕТАЛЬНА МАТРИЦЯ ПРАВ ТА ДОСТУПУ ДО СТОРІНОК (dev_page_permissions_matrix_v1)
+// =========================================================================
+
+const DEFAULT_PAGE_PERMISSIONS_MATRIX = {
+    base: {
+        id: "base",
+        name: "База (Реєстр авто)",
+        desc: "Реєстр авто, пошук, фільтрація категорій, характеристики",
+        icon: "🚗",
+        admin: { access: true, view: true, edit: true },
+        moderator: { access: true, view: true, edit: false },
+        user: { access: true, view: true, edit: false }
+    },
+    card: {
+        id: "card",
+        name: "Картка авто та Маршрути",
+        desc: "Маршрути, час, одометри, заправки, залишки палива, AdBlue",
+        icon: "📋",
+        admin: { access: true, view: true, edit: true },
+        moderator: { access: true, view: true, edit: false },
+        user: { access: true, view: true, edit: false }
+    },
+    car_details: {
+        id: "car_details",
+        name: "Детальна картка (ТТХ та Документи)",
+        desc: "Характеристики авто, примітки ТО, папка документів та сканів",
+        icon: "📑",
+        admin: { access: true, view: true, edit: true },
+        moderator: { access: false, view: false, edit: false },
+        user: { access: false, view: false, edit: false }
+    },
+    report: {
+        id: "report",
+        name: "Звіт (10 днів)",
+        desc: "Зведена відомість палива за декади, залишки та видача",
+        icon: "📊",
+        admin: { access: true, view: true, edit: true },
+        moderator: { access: true, view: true, edit: false },
+        user: { access: false, view: false, edit: false }
+    },
+    subdivisions: {
+        id: "subdivisions",
+        name: "Звіт по підрозділах",
+        desc: "Аналітика та облік палива в розрізі військових підрозділів",
+        icon: "🏢",
+        admin: { access: true, view: true, edit: true },
+        moderator: { access: false, view: false, edit: false },
+        user: { access: false, view: false, edit: false }
+    },
+    equipment: {
+        id: "equipment",
+        name: "Облік обладнання",
+        desc: "Генератори, Webasto, обігрівачі, мотопили, мотогодини",
+        icon: "⚡",
+        admin: { access: true, view: true, edit: true },
+        moderator: { access: false, view: false, edit: false },
+        user: { access: false, view: false, edit: false }
+    },
+    equipment_report: {
+        id: "equipment_report",
+        name: "Звіт по обладнанню",
+        desc: "Відомість напрацювання мотогодин, палива та мастила обладнання",
+        icon: "⏱️",
+        admin: { access: true, view: true, edit: true },
+        moderator: { access: true, view: true, edit: false },
+        user: { access: false, view: false, edit: false }
+    },
+    aggregates_calc: {
+        id: "aggregates_calc",
+        name: "Розрахунок агрегатів",
+        desc: "Калькулятор мотогодин, норми, збереження розрахунків",
+        icon: "🧮",
+        admin: { access: true, view: true, edit: true },
+        moderator: { access: true, view: true, edit: true },
+        user: { access: true, view: true, edit: true }
+    },
+    destroyed: {
+        id: "destroyed",
+        name: "Знищена техніка",
+        desc: "Журнал знищеної та списаної техніки, відновлення техніки",
+        icon: "💥",
+        admin: { access: true, view: true, edit: true },
+        moderator: { access: false, view: false, edit: false },
+        user: { access: false, view: false, edit: false }
+    },
+    documents: {
+        id: "documents",
+        name: "Документи та Шаблони А4",
+        desc: "Конструктор документів А4, шаблони, завантаження оригіналів",
+        icon: "📄",
+        admin: { access: true, view: true, edit: true },
+        moderator: { access: false, view: false, edit: false },
+        user: { access: false, view: false, edit: false }
+    },
+    mail: {
+        id: "mail",
+        name: "Системна пошта (✉️)",
+        desc: "Вхідні листи керівництва, написання та відправка нових листів",
+        icon: "✉️",
+        admin: { access: true, view: true, edit: true },
+        moderator: { access: true, view: true, edit: false },
+        user: { access: true, view: true, edit: false }
+    },
+    header_backup: {
+        id: "header_backup",
+        name: "Швидкий бекап (💾 / 📂)",
+        desc: "Кнопки прямого збереження та завантаження JSON у шапці сайту",
+        icon: "💾",
+        admin: { access: true, view: true, edit: true },
+        moderator: { access: false, view: false, edit: false },
+        user: { access: false, view: false, edit: false }
+    }
+};
+
+const DEFAULT_GRANULAR_PERMISSIONS = {
+    base_add_car: { name: "Кнопка «+ Додати автомобіль» у Базі", admin: true, moderator: false, user: false },
+    base_delete_car: { name: "Кнопка видалення авто з реєстру (🗑️)", admin: true, moderator: false, user: false },
+    base_report_col: { name: "Стовпчик «Звіт» у таблиці Бази авто", admin: true, moderator: false, user: false },
+    base_transfer_btn: { name: "Кнопка «Перенесення даних» між авто", admin: true, moderator: false, user: false },
+    card_save_btn: { name: "Кнопка «💾 Зберегти зміни» у Картці авто", admin: true, moderator: false, user: false },
+    card_routes_edit: { name: "Редагування одометрів, маршрутів та палива", admin: true, moderator: false, user: false },
+    card_clear_btn: { name: "Кнопка «🔄 Очистити маршрути»", admin: true, moderator: false, user: false },
+    car_details_edit: { name: "Редагування ТТХ авто та приміток ТО", admin: true, moderator: false, user: false },
+    car_details_docs: { name: "Завантаження та видалення документів авто", admin: true, moderator: false, user: false },
+    report_edit_cells: { name: "Введення чисел у комірки «Звіт (10 днів)»", admin: true, moderator: false, user: false },
+    report_save_btn: { name: "Кнопка «Зберегти» у «Звіт (10 днів)»", admin: true, moderator: false, user: false },
+    eq_add_item: { name: "Додавання нового обладнання (+ Генератор/Вебасто)", admin: true, moderator: false, user: false },
+    eq_edit_hours: { name: "Редагування напрацювання мотогодин обладнання", admin: true, moderator: false, user: false },
+    eq_report_edit: { name: "Редагування комірок «Звіт по обладнанню»", admin: true, moderator: false, user: false },
+    destroyed_restore: { name: "Відновлення знищеного авто в робочу базу", admin: true, moderator: false, user: false },
+    docs_create_a4: { name: "Створення та редагування документів у Конструкторі А4", admin: true, moderator: false, user: false },
+    docs_upload_file: { name: "Завантаження та видалення оригіналів документів", admin: true, moderator: false, user: false },
+    mail_send_new: { name: "Написання та відправка нових листів у Пошті", admin: true, moderator: false, user: false }
+};
+
+function getPagePermissionsMatrix() {
+    try {
+        const raw = localStorage.getItem('dev_page_permissions_matrix_v1');
+        if (!raw) return JSON.parse(JSON.stringify(DEFAULT_PAGE_PERMISSIONS_MATRIX));
+        const saved = JSON.parse(raw);
+        const merged = JSON.parse(JSON.stringify(DEFAULT_PAGE_PERMISSIONS_MATRIX));
+        Object.keys(merged).forEach(k => {
+            if (saved[k]) {
+                ['admin', 'moderator', 'user'].forEach(r => {
+                    if (saved[k][r]) {
+                        merged[k][r] = Object.assign({}, merged[k][r], saved[k][r]);
+                    }
+                });
+            }
+        });
+        return merged;
+    } catch (e) {
+        return JSON.parse(JSON.stringify(DEFAULT_PAGE_PERMISSIONS_MATRIX));
+    }
+}
+
+function savePagePermissionsMatrix(matrix) {
+    try {
+        localStorage.setItem('dev_page_permissions_matrix_v1', JSON.stringify(matrix));
+    } catch (e) {}
+}
+
+function getGranularPermissions() {
+    try {
+        const raw = localStorage.getItem('dev_granular_permissions_v1');
+        if (!raw) return JSON.parse(JSON.stringify(DEFAULT_GRANULAR_PERMISSIONS));
+        const saved = JSON.parse(raw);
+        const merged = JSON.parse(JSON.stringify(DEFAULT_GRANULAR_PERMISSIONS));
+        Object.keys(merged).forEach(k => {
+            if (saved[k]) {
+                ['admin', 'moderator', 'user'].forEach(r => {
+                    if (typeof saved[k][r] !== 'undefined') {
+                        merged[k][r] = !!saved[k][r];
+                    }
+                });
+            }
+        });
+        return merged;
+    } catch (e) {
+        return JSON.parse(JSON.stringify(DEFAULT_GRANULAR_PERMISSIONS));
+    }
+}
+
+function saveGranularPermissions(perms) {
+    try {
+        localStorage.setItem('dev_granular_permissions_v1', JSON.stringify(perms));
+    } catch (e) {}
+}
+
+window.canRoleAccess = function(role, moduleKey) {
+    if (!role || role === 'developer') return true;
+    const matrix = getPagePermissionsMatrix();
+    return matrix[moduleKey]?.[role]?.access !== false;
+};
+
+window.canRoleView = function(role, moduleKey) {
+    if (!role || role === 'developer') return true;
+    const matrix = getPagePermissionsMatrix();
+    return matrix[moduleKey]?.[role]?.view !== false;
+};
+
+window.canRoleEdit = function(role, moduleKey) {
+    if (!role || role === 'developer') return true;
+    const matrix = getPagePermissionsMatrix();
+    if (matrix[moduleKey]?.[role]?.edit === true) return true;
+    if (moduleKey === 'report' && role === 'moderator') {
+        const secCfg = getRoleSecurityConfig();
+        if (secCfg.moderatorCanEditReport) return true;
+    }
+    return false;
+};
+
+window.canRoleDo = function(role, featureKey) {
+    if (!role || role === 'developer') return true;
+    const perms = getGranularPermissions();
+    return perms[featureKey]?.[role] === true;
+};
+
+window.canCurrentRoleAccess = function(moduleKey) {
+    const role = (typeof window.getCurrentAppRole === 'function')
+        ? window.getCurrentAppRole()
+        : ((typeof currentRole !== 'undefined') ? currentRole : 'user');
+    return window.canRoleAccess(role, moduleKey);
+};
+
+window.canCurrentRoleView = function(moduleKey) {
+    const role = (typeof window.getCurrentAppRole === 'function')
+        ? window.getCurrentAppRole()
+        : ((typeof currentRole !== 'undefined') ? currentRole : 'user');
+    return window.canRoleView(role, moduleKey);
+};
+
+window.canCurrentRoleEdit = function(moduleKey) {
+    const role = (typeof window.getCurrentAppRole === 'function')
+        ? window.getCurrentAppRole()
+        : ((typeof currentRole !== 'undefined') ? currentRole : 'user');
+    return window.canRoleEdit(role, moduleKey);
+};
+
+window.canCurrentRoleDo = function(featureKey) {
+    const role = (typeof window.getCurrentAppRole === 'function')
+        ? window.getCurrentAppRole()
+        : ((typeof currentRole !== 'undefined') ? currentRole : 'user');
+    return window.canRoleDo(role, featureKey);
+};
+
+window.getModuleNameUkrainian = function(moduleKey) {
+    const matrix = getPagePermissionsMatrix();
+    return matrix[moduleKey]?.name || moduleKey;
+};
+
 function addSecurityLog(type, title, details) {
     try {
         const logs = JSON.parse(localStorage.getItem('dev_security_logs') || '[]');
@@ -217,14 +469,14 @@ window.logoutDeveloperSession = function() {
     updateRoleUI();
 };
 
-window.applyCarsReportColumnRoleStyle = function(isAdminOrHigher) {
+window.applyCarsReportColumnRoleStyle = function(canShowReportCol) {
     let styleEl = document.getElementById('cars-report-col-role-style');
     if (!styleEl) {
         styleEl = document.createElement('style');
         styleEl.id = 'cars-report-col-role-style';
         document.head.appendChild(styleEl);
     }
-    if (isAdminOrHigher) {
+    if (canShowReportCol) {
         styleEl.textContent = `
             #cars-table thead tr th:last-child,
             #cars-table tbody tr td:last-child,
@@ -238,17 +490,13 @@ window.applyCarsReportColumnRoleStyle = function(isAdminOrHigher) {
                 visibility: visible !important;
                 opacity: 1 !important;
             }
-            #card-save-btn {
-                display: inline-flex !important;
-            }
         `;
     } else {
         styleEl.textContent = `
             #cars-table thead tr th:last-child,
             #cars-table tbody tr td:last-child,
             #cars-table .cars-report-col,
-            #cars-report-col-th,
-            #card-save-btn {
+            #cars-report-col-th {
                 display: none !important;
             }
         `;
@@ -256,14 +504,16 @@ window.applyCarsReportColumnRoleStyle = function(isAdminOrHigher) {
 };
 
 window.updateRoleUI = function() {
-    const role = (typeof currentRole !== 'undefined') ? currentRole : 'user';
-    const isModOrHigher = (role === "moderator" || role === "admin" || role === "developer");
-    const isAdminOrHigher = (role === "admin" || role === "developer");
+    const role = (typeof window.getCurrentAppRole === 'function')
+        ? window.getCurrentAppRole()
+        : ((typeof currentRole !== 'undefined') ? currentRole : 'user');
     const isDev = (role === "developer");
-    const secCfg = getRoleSecurityConfig();
 
-    window.applyCarsReportColumnRoleStyle(isAdminOrHigher);
+    // 0. Стовпчик «Звіт» у реєстрі авто
+    const showReportCol = isDev || (typeof window.canRoleDo === 'function' ? window.canRoleDo(role, 'base_report_col') : (role === 'admin'));
+    window.applyCarsReportColumnRoleStyle(showReportCol);
 
+    // Візуальне підсвічування кнопок ролей у шапці
     const roles = ["user", "moderator", "admin", "developer"];
     const activeColors = {
         user: "#3498db",
@@ -287,6 +537,7 @@ window.updateRoleUI = function() {
         }
     });
 
+    // Бейдж супер-доступу Розробника
     let devBadge = document.getElementById('dev-super-badge');
     const roleSwitchContainer = document.getElementById('role-btn-developer')?.parentElement;
     if (window.isDeveloperLoggedIn && roleSwitchContainer) {
@@ -304,134 +555,247 @@ window.updateRoleUI = function() {
         devBadge.style.display = 'none';
     }
 
-    const baseNavBtn = document.getElementById("nav-btn-base");
-    if (baseNavBtn) baseNavBtn.style.display = "inline-block";
+    // 1. Управління видимістю кнопок навігації у шапці (ЗАХОДИТИ / ACCESS)
+    const setNavBtnDisplay = (id, shouldShow, flex = false) => {
+        const btn = document.getElementById(id);
+        if (btn) {
+            btn.style.setProperty('display', shouldShow ? (flex ? 'inline-flex' : 'inline-block') : 'none', 'important');
+        }
+    };
 
-    const cardNavBtn = document.getElementById("nav-btn-card");
-    if (cardNavBtn) cardNavBtn.style.display = "inline-block";
+    setNavBtnDisplay("nav-btn-base", isDev || window.canRoleAccess(role, 'base'));
+    setNavBtnDisplay("nav-btn-card", isDev || window.canRoleAccess(role, 'card'));
+    setNavBtnDisplay("nav-btn-report", isDev || window.canRoleAccess(role, 'report'));
+    setNavBtnDisplay("nav-btn-subdivisions", isDev || window.canRoleAccess(role, 'subdivisions'));
+    setNavBtnDisplay("nav-btn-equipment", isDev || window.canRoleAccess(role, 'equipment'));
+    setNavBtnDisplay("nav-btn-equipment-report", isDev || window.canRoleAccess(role, 'equipment_report'));
+    setNavBtnDisplay("nav-btn-aggregates-calc", isDev || window.canRoleAccess(role, 'aggregates_calc'));
+    setNavBtnDisplay("nav-btn-destroyed", isDev || window.canRoleAccess(role, 'destroyed'));
+    setNavBtnDisplay("nav-btn-documents", isDev || window.canRoleAccess(role, 'documents'), true);
+    setNavBtnDisplay("nav-btn-dev-panel", isDev);
 
-    const aggNavBtn = document.getElementById("nav-btn-aggregates-calc");
-    if (aggNavBtn) aggNavBtn.style.display = "inline-block";
-
-    // 1. Вкладка "Звіт (10 днів)" — бачать Модератор, Адмін, Розробник
-    const reportNavBtn = document.getElementById("nav-btn-report");
-    if (reportNavBtn) {
-        reportNavBtn.style.display = isModOrHigher ? "inline-block" : "none";
+    const faviconUploadBtn = document.getElementById("header-favicon-upload-btn");
+    if (faviconUploadBtn) {
+        faviconUploadBtn.style.setProperty("display", isDev ? "inline-flex" : "none", "important");
     }
 
-    // 2. Вкладки "Звіт по підрозділах", "Облік обладнання", "Знищена техніка", "Документи" — бачать ТІЛЬКИ Адмін та Розробник!
-    const subNavBtn = document.getElementById("nav-btn-subdivisions");
-    if (subNavBtn) subNavBtn.style.display = isAdminOrHigher ? "inline-block" : "none";
-
-    const eqNavBtn = document.getElementById("nav-btn-equipment");
-    if (eqNavBtn) eqNavBtn.style.display = isAdminOrHigher ? "inline-block" : "none";
-
-    const eqReportNavBtn = document.getElementById("nav-btn-equipment-report");
-    if (eqReportNavBtn) eqReportNavBtn.style.display = isModOrHigher ? "inline-block" : "none";
-
-    const destNavBtn = document.getElementById("nav-btn-destroyed");
-    if (destNavBtn) destNavBtn.style.display = isAdminOrHigher ? "inline-block" : "none";
-
-    const docsNavBtn = document.getElementById("nav-btn-documents");
-    if (docsNavBtn) docsNavBtn.style.display = isAdminOrHigher ? "inline-flex" : "none";
-
-    // 3. Вкладка "Панель розробника" — бачить ТІЛЬКИ Розробник!
-    const devPanelBtn = document.getElementById("nav-btn-dev-panel");
-    if (devPanelBtn) {
-        devPanelBtn.style.display = isDev ? "inline-block" : "none";
+    const envelopeBtn = document.getElementById("broadcast-envelope-btn");
+    if (envelopeBtn) {
+        envelopeBtn.style.setProperty("display", (isDev || window.canRoleAccess(role, 'mail')) ? "inline-flex" : "none", "important");
     }
 
-    // Перевірка активного вікна при перемиканні ролей (якщо роль не має доступу — повертаємо на базу)
-    const reportView = document.getElementById("report-view");
-    if (reportView && (reportView.classList.contains("active") || reportView.style.display !== "none") && !isModOrHigher) {
-        if (typeof switchView === "function") switchView("base");
+    const headerSaveBtn = document.getElementById("header-direct-save-btn");
+    if (headerSaveBtn) {
+        headerSaveBtn.style.setProperty("display", (isDev || window.canRoleAccess(role, 'header_backup')) ? "inline-flex" : "none", "important");
     }
 
-    const subView = document.getElementById("subdivisions-view");
-    if (subView && (subView.classList.contains("active") || subView.style.display !== "none") && !isAdminOrHigher) {
-        if (typeof switchView === "function") switchView("base");
+    const headerImportBtn = document.getElementById("header-direct-import-btn");
+    if (headerImportBtn) {
+        headerImportBtn.style.setProperty("display", (isDev || (window.canRoleAccess(role, 'header_backup') && window.canRoleEdit(role, 'header_backup'))) ? "inline-flex" : "none", "important");
     }
 
-    const eqView = document.getElementById("generators-view");
-    if (eqView && (eqView.classList.contains("active") || eqView.style.display !== "none") && !isAdminOrHigher) {
-        if (typeof switchView === "function") switchView("base");
-    }
+    // 2. Безпечне перенаправлення, якщо активний розділ заборонений для поточної ролі
+    const checkRedirect = (viewId, modKey) => {
+        const viewEl = document.getElementById(viewId);
+        if (viewEl && (viewEl.classList.contains("active") || (viewEl.style.display && viewEl.style.display !== "none"))) {
+            if (!isDev && !window.canRoleAccess(role, modKey)) {
+                if (typeof switchView === "function") switchView("base");
+            }
+        }
+    };
 
-    const eqReportView = document.getElementById("equipment-report-view");
-    if (eqReportView && (eqReportView.classList.contains("active") || eqReportView.style.display !== "none") && !isModOrHigher) {
-        if (typeof switchView === "function") switchView("base");
-    }
-
-    const destView = document.getElementById("destroyed-view");
-    if (destView && (destView.classList.contains("active") || destView.style.display !== "none") && !isAdminOrHigher) {
-        if (typeof switchView === "function") switchView("base");
-    }
+    checkRedirect("report-view", "report");
+    checkRedirect("subdivisions-view", "subdivisions");
+    checkRedirect("generators-view", "equipment");
+    checkRedirect("equipment-report-view", "equipment_report");
+    checkRedirect("destroyed-view", "destroyed");
+    checkRedirect("card-view", "card");
+    checkRedirect("car-details-view", "car_details");
+    checkRedirect("aggregates-calc-view", "aggregates_calc");
 
     const devPanelView = document.getElementById("dev-panel-view") || document.getElementById("developer-panel-view");
-    if (devPanelView && (devPanelView.classList.contains("active") || devPanelView.style.display !== "none") && !isDev) {
+    if (devPanelView && (devPanelView.classList.contains("active") || (devPanelView.style.display && devPanelView.style.display !== "none")) && !isDev) {
         if (typeof switchView === "function") switchView("base");
     }
+
+    const docsMainSec = document.getElementById("documents-main-section");
+    if (docsMainSec && docsMainSec.style.display !== "none" && !isDev && !window.canRoleAccess(role, 'documents')) {
+        if (typeof closeDocumentsTabView === 'function') closeDocumentsTabView();
+        if (typeof switchView === "function") switchView("base");
+    }
+
+    // 3. Управління правами РЕДАГУВАННЯ (EDIT) та ДЕТАЛЬНИМИ ФУНКЦІЯМИ
+
+    // [БАЗА АВТО]
+    const canEditBase = isDev || window.canRoleEdit(role, 'base');
+    const canAddCar = isDev || (canEditBase && window.canRoleDo(role, 'base_add_car'));
+    const canDeleteCar = isDev || (canEditBase && window.canRoleDo(role, 'base_delete_car'));
+    const canTransfer = isDev || window.canRoleDo(role, 'base_transfer_btn');
 
     const addCarBtn = document.getElementById('add-car-btn');
     if (addCarBtn) {
-        addCarBtn.style.display = isAdminOrHigher ? 'inline-block' : 'none';
+        addCarBtn.style.setProperty('display', canAddCar ? 'inline-block' : 'none', 'important');
     }
 
-    // Повністю приховуємо стовпчик "Звіт" (шапку та всі комірки) у таблиці "База (Реєстр)" для Модератора та Юзера
-    if (typeof window.syncCarsReportColumnVisibility === 'function') {
-        window.syncCarsReportColumnVisibility();
-    } else {
-        const carsTable = document.getElementById('cars-table');
-        if (carsTable) {
-            let reportColIdx = -1;
-            const headers = carsTable.querySelectorAll('thead th');
-            headers.forEach((th, idx) => {
-                if (th.id === 'cars-report-col-th' || th.classList.contains('cars-report-col') || (th.textContent || '').trim() === 'Звіт') {
-                    reportColIdx = idx;
-                    th.style.setProperty('display', isAdminOrHigher ? 'table-cell' : 'none', 'important');
-                }
-            });
-            const rows = carsTable.querySelectorAll('tbody tr');
-            rows.forEach(tr => {
-                let targetTd = tr.querySelector('.cars-report-col');
-                if (!targetTd && reportColIdx >= 0 && tr.children[reportColIdx]) {
-                    targetTd = tr.children[reportColIdx];
-                }
-                if (targetTd) {
-                    targetTd.style.setProperty('display', isAdminOrHigher ? 'table-cell' : 'none', 'important');
-                    const btn = targetTd.querySelector('button');
-                    if (btn) {
-                        btn.style.setProperty('display', isAdminOrHigher ? 'inline-block' : 'none', 'important');
-                    }
-                }
-            });
-        }
+    const deleteActionHeader = document.getElementById("delete-action-header");
+    if (deleteActionHeader) {
+        deleteActionHeader.style.setProperty('display', canDeleteCar ? '' : 'none', 'important');
     }
-
-    // Якщо відкрито детальний звіт авто (#car-details-view), а роль змінили на Модератора або Юзера — повертаємо в Базу
-    const carDetailsView = document.getElementById('car-details-view');
-    if (carDetailsView && (carDetailsView.classList.contains('active') || carDetailsView.style.display === 'block') && !isAdminOrHigher) {
-        if (typeof switchView === 'function') switchView('base');
-    }
+    const deleteCells = document.querySelectorAll('#cars-tbody .delete-cell');
+    deleteCells.forEach(cell => {
+        cell.style.setProperty('display', canDeleteCar ? '' : 'none', 'important');
+    });
 
     const transferDataBtn = document.getElementById('transfer-data-btn');
     if (transferDataBtn) {
-        transferDataBtn.style.setProperty('display', isAdminOrHigher ? 'inline-flex' : 'none', 'important');
-    }
-    if (typeof syncTransferButtonVisibility === 'function') {
-        syncTransferButtonVisibility();
+        transferDataBtn.style.setProperty('display', canTransfer ? 'inline-flex' : 'none', 'important');
     }
 
+    // Стовпчик «Звіт» у Базі авто
+    const carsTable = document.getElementById('cars-table');
+    if (carsTable) {
+        let reportColIdx = -1;
+        const headers = carsTable.querySelectorAll('thead th');
+        headers.forEach((th, idx) => {
+            if (th.id === 'cars-report-col-th' || th.classList.contains('cars-report-col') || (th.textContent || '').trim() === 'Звіт') {
+                reportColIdx = idx;
+                th.style.setProperty('display', showReportCol ? 'table-cell' : 'none', 'important');
+            }
+        });
+        const rows = carsTable.querySelectorAll('tbody tr');
+        rows.forEach(tr => {
+            let targetTd = tr.querySelector('.cars-report-col');
+            if (!targetTd && reportColIdx >= 0 && tr.children[reportColIdx]) {
+                targetTd = tr.children[reportColIdx];
+            }
+            if (targetTd) {
+                targetTd.style.setProperty('display', showReportCol ? 'table-cell' : 'none', 'important');
+                const btn = targetTd.querySelector('button');
+                if (btn) {
+                    btn.style.setProperty('display', showReportCol ? 'inline-block' : 'none', 'important');
+                }
+            }
+        });
+    }
+
+    // [КАРТКА АВТО ТА МАРШРУТИ]
+    const canEditCard = isDev || window.canRoleEdit(role, 'card');
+    const canSaveCard = isDev || (canEditCard && window.canRoleDo(role, 'card_save_btn'));
+    const canClearRoutes = isDev || (canEditCard && window.canRoleDo(role, 'card_clear_btn'));
+    const canEditRoutes = isDev || (canEditCard && window.canRoleDo(role, 'card_routes_edit'));
+
+    const cardSaveBtn = document.getElementById("card-save-btn");
+    if (cardSaveBtn) {
+        cardSaveBtn.style.setProperty("display", canSaveCard ? "inline-flex" : "none", "important");
+    }
+
+    const clearRoutesBtns = document.querySelectorAll('#card-view .routes-panel .btn-red, #card-view button[onclick*="clearActiveCarCardRoutes"]');
+    clearRoutesBtns.forEach(b => b.style.setProperty("display", canClearRoutes ? "inline-block" : "none", "important"));
+
+    const addRouteBtn = document.querySelector('#card-view button[onclick="addRouteRow()"]');
+    if (addRouteBtn) {
+        addRouteBtn.style.setProperty("display", canEditRoutes ? "inline-block" : "none", "important");
+    }
+
+    const presetBtns = document.querySelectorAll('#card-view .preset-btn');
+    presetBtns.forEach(pb => {
+        pb.style.setProperty("display", canEditRoutes ? "inline-block" : "none", "important");
+    });
+
+    const cardInputs = document.querySelectorAll('#card-view input, #card-view select:not(#card-period-select)');
+    cardInputs.forEach(input => {
+        if (input.id === 'car-search-input') return;
+        input.disabled = !canEditRoutes;
+        input.readOnly = !canEditRoutes;
+        input.style.backgroundColor = canEditRoutes ? '' : '#f5f5f5';
+        input.style.cursor = canEditRoutes ? '' : 'not-allowed';
+    });
+
+    // [ДЕТАЛЬНА КАРТКА АВТО (ТТХ ТА ДОКУМЕНТИ)]
+    const canEditDetails = isDev || window.canRoleEdit(role, 'car_details');
+    const canEditSpecs = isDev || (canEditDetails && window.canRoleDo(role, 'car_details_edit'));
+    const canManageCarDocs = isDev || (canEditDetails && window.canRoleDo(role, 'car_details_docs'));
+
+    const detSaveBtn = document.querySelector('button[onclick="saveCarDetailsToBasePath()"]');
+    if (detSaveBtn) {
+        detSaveBtn.style.setProperty('display', canEditSpecs ? 'inline-block' : 'none', 'important');
+    }
+    const detInputs = document.querySelectorAll('#car-details-view input, #car-details-view select, #det-maintenance-note');
+    detInputs.forEach(inp => {
+        if (inp.id === 'car-doc-file-input') return;
+        inp.disabled = !canEditSpecs;
+        inp.readOnly = !canEditSpecs;
+        inp.style.backgroundColor = canEditSpecs ? '' : '#f5f5f5';
+        inp.style.cursor = canEditSpecs ? '' : 'not-allowed';
+    });
+    const fuelPillBtns = document.querySelectorAll('.fuel-select-pill');
+    fuelPillBtns.forEach(fp => fp.style.setProperty('display', canEditSpecs ? 'inline-block' : 'none', 'important'));
+
+    const carDocFileInput = document.getElementById('car-doc-file-input');
+    if (carDocFileInput) {
+        carDocFileInput.style.setProperty('display', canManageCarDocs ? 'inline-block' : 'none', 'important');
+    }
+    const carDocDelBtns = document.querySelectorAll('#car-docs-list button[onclick*="deleteCarDoc"]');
+    carDocDelBtns.forEach(btn => btn.style.setProperty('display', canManageCarDocs ? 'inline-block' : 'none', 'important'));
+
+    // [ЗВІТ 10 ДНІВ ТА ОБЛАДНАННЯ]
     if (typeof window.applyReportRolePermissions === 'function') {
         window.applyReportRolePermissions();
     }
     if (typeof applyModeratorReportLock === 'function') {
         applyModeratorReportLock();
     }
+    const repSaveBtn = document.getElementById('rep-save-btn') || document.querySelector('button[onclick*="saveReportData"]');
+    if (repSaveBtn) {
+        const canSaveReport = isDev || (window.canRoleEdit(role, 'report') && window.canRoleDo(role, 'report_save_btn'));
+        repSaveBtn.style.setProperty('display', canSaveReport ? 'inline-block' : 'none', 'important');
+    }
 
+    // [ОБЛІК ОБЛАДНАННЯ]
+    const canEditEquipment = isDev || window.canRoleEdit(role, 'equipment');
+    const canAddEq = isDev || (canEditEquipment && window.canRoleDo(role, 'eq_add_item'));
+    const canEditEqHours = isDev || (canEditEquipment && window.canRoleDo(role, 'eq_edit_hours'));
+    const eqAddBtns = document.querySelectorAll('#generators-view button[onclick*="add"], #generators-view .btn-add-item');
+    eqAddBtns.forEach(btn => btn.style.setProperty('display', canAddEq ? 'inline-block' : 'none', 'important'));
+
+    // [РОЗРАХУНОК АГРЕГАТІВ]
+    const canEditAgg = isDev || window.canRoleEdit(role, 'aggregates_calc');
+    const aggInputs = document.querySelectorAll('#aggregates-calc-view input, #aggregates-calc-view select');
+    aggInputs.forEach(inp => {
+        inp.disabled = !canEditAgg;
+        inp.readOnly = !canEditAgg;
+        inp.style.backgroundColor = canEditAgg ? '' : '#f5f5f5';
+        inp.style.cursor = canEditAgg ? '' : 'not-allowed';
+    });
+
+    // [ЗНИЩЕНА ТЕХНІКА]
+    const canRestoreDestroyed = isDev || (window.canRoleEdit(role, 'destroyed') && window.canRoleDo(role, 'destroyed_restore'));
+    const restoreBtns = document.querySelectorAll('#destroyed-view button[onclick*="restoreDestroyedItemFromTable"]');
+    restoreBtns.forEach(btn => btn.style.setProperty('display', canRestoreDestroyed ? 'inline-block' : 'none', 'important'));
+
+    // [ДОКУМЕНТИ ТА ШАБЛОНИ А4]
+    const canEditDocs = isDev || window.canRoleEdit(role, 'documents');
+    const canCreateA4 = isDev || (canEditDocs && window.canRoleDo(role, 'docs_create_a4'));
+    const canUploadDocs = isDev || (canEditDocs && window.canRoleDo(role, 'docs_upload_file'));
+
+    const btnNewDocA4 = document.getElementById('btn-new-doc-a4');
+    if (btnNewDocA4) btnNewDocA4.style.setProperty('display', canCreateA4 ? 'inline-flex' : 'none', 'important');
+
+    const btnNewTemplate = document.querySelector('button[onclick*="openTemplateEditor"]');
+    if (btnNewTemplate) btnNewTemplate.style.setProperty('display', canCreateA4 ? 'inline-flex' : 'none', 'important');
+
+    const docUploadLabel = document.querySelector('label[for="doc-upload-input"]');
+    if (docUploadLabel) docUploadLabel.style.setProperty('display', canUploadDocs ? 'inline-flex' : 'none', 'important');
+
+    const docDelBtns = document.querySelectorAll('#documents-main-section button[onclick*="deleteSavedDocument"]');
+    docDelBtns.forEach(btn => btn.style.setProperty('display', canUploadDocs ? 'inline-block' : 'none', 'important'));
+
+    // Оновлення Панелі розробника, якщо відкрита
     if (isDev) {
         ensureDevPanelHeaderButtons();
-        renderDeveloperPanel();
+        if (typeof renderDeveloperPanel === 'function') {
+            renderDeveloperPanel();
+        }
     }
 };
 
@@ -709,6 +1073,8 @@ window.exportFullDatabaseBackup = async function() {
                 systemSettingsAndMail: {
                     passwords: allStorage['dev_system_passwords'] || {},
                     roleSecurityConfig: allStorage['dev_role_security_config'] || {},
+                    permissionsMatrix: allStorage['dev_page_permissions_matrix_v1'] || {},
+                    granularPermissions: allStorage['dev_granular_permissions_v1'] || {},
                     managedUsers: allStorage['dev_managed_users'] || [],
                     securityLogs: allStorage['dev_security_logs'] || [],
                     roleTimeStats: allStorage['dev_role_time_stats'] || {},
@@ -1149,6 +1515,137 @@ window.switchDevSubTab = function(tabName) {
     renderDeveloperPanel();
 };
 
+let currentDevPermRoleFilter = 'all';
+
+window.switchDevPermissionsFilter = function(filterRole) {
+    currentDevPermRoleFilter = filterRole;
+    renderDeveloperPanel();
+};
+
+window.updateRolePermissionCheckbox = function(moduleKey, targetRole, action, checked) {
+    const matrix = getPagePermissionsMatrix();
+    if (!matrix[moduleKey]) return;
+    if (!matrix[moduleKey][targetRole]) matrix[moduleKey][targetRole] = { access: true, view: true, edit: false };
+    matrix[moduleKey][targetRole][action] = !!checked;
+
+    // Якщо увімкнено редагування, обов'язково даємо доступ і перегляд
+    if (action === 'edit' && checked) {
+        matrix[moduleKey][targetRole].access = true;
+        matrix[moduleKey][targetRole].view = true;
+    }
+
+    savePagePermissionsMatrix(matrix);
+    const modName = matrix[moduleKey]?.name || moduleKey;
+    const actionUa = action === 'access' ? 'Вхід (Заходити)' : (action === 'view' ? 'Перегляд' : 'Редагування');
+    addSecurityLog('info', `Зміна прав: ${getRoleDisplayName(targetRole)}`, `Розділ «${modName}» -> ${actionUa}: ${checked ? 'ДОЗВОЛЕНО' : 'ЗАБОРОНЕНО'}`);
+    showDevNotification(`🛡️ Оновлено: <b>${getRoleDisplayName(targetRole)}</b> | ${modName} → ${actionUa}: ${checked ? '✅ Дозволено' : '⛔ Заборонено'}`, checked ? '#27ae60' : '#e67e22');
+    updateRoleUI();
+};
+
+window.updateGranularPermissionCheckbox = function(featureKey, targetRole, checked) {
+    const perms = getGranularPermissions();
+    if (!perms[featureKey]) perms[featureKey] = { name: featureKey, admin: false, moderator: false, user: false };
+    perms[featureKey][targetRole] = !!checked;
+    saveGranularPermissions(perms);
+    const featName = perms[featureKey]?.name || featureKey;
+    addSecurityLog('info', `Функціональний дозвіл: ${getRoleDisplayName(targetRole)}`, `Дія «${featName}»: ${checked ? 'ДОЗВОЛЕНО' : 'ЗАБОРОНЕНО'}`);
+    showDevNotification(`⚙️ Оновлено: <b>${getRoleDisplayName(targetRole)}</b> | ${featName}: ${checked ? '✅ Дозволено' : '⛔ Заборонено'}`, checked ? '#27ae60' : '#e67e22');
+    updateRoleUI();
+};
+
+window.applyRolePreset = function(presetType, targetRole) {
+    const matrix = getPagePermissionsMatrix();
+    const perms = getGranularPermissions();
+
+    if (presetType === 'admin_full') {
+        Object.keys(matrix).forEach(k => {
+            matrix[k].admin = { access: true, view: true, edit: true };
+        });
+        Object.keys(perms).forEach(k => {
+            perms[k].admin = true;
+        });
+        addSecurityLog('warning', 'Пресет прав: Адмін', 'Встановлено повний доступ до всіх сторінок та редагування');
+        showDevNotification('✅ Встановлено повний доступ для ролі <b>Адмін</b>!', '#27ae60');
+    } else if (presetType === 'moderator_default') {
+        Object.keys(matrix).forEach(k => {
+            if (['base', 'card', 'report', 'equipment_report', 'aggregates_calc', 'mail'].includes(k)) {
+                matrix[k].moderator = { access: true, view: true, edit: (k === 'aggregates_calc') };
+            } else {
+                matrix[k].moderator = { access: false, view: false, edit: false };
+            }
+        });
+        Object.keys(perms).forEach(k => {
+            perms[k].moderator = false;
+        });
+        addSecurityLog('info', 'Пресет прав: Модератор', 'Відновлено стандартний профіль Модератора');
+        showDevNotification('✅ Встановлено стандартні права для <b>Модератора</b>!', '#2980b9');
+    } else if (presetType === 'moderator_view_all') {
+        Object.keys(matrix).forEach(k => {
+            matrix[k].moderator = { access: true, view: true, edit: false };
+        });
+        Object.keys(perms).forEach(k => {
+            perms[k].moderator = false;
+        });
+        addSecurityLog('info', 'Пресет прав: Модератор', 'Увімкнено перегляд усіх сторінок без права редагування');
+        showDevNotification('👁️ Встановлено перегляд усіх розділів для <b>Модератора</b>!', '#16a085');
+    } else if (presetType === 'user_default') {
+        Object.keys(matrix).forEach(k => {
+            if (['base', 'card', 'aggregates_calc', 'mail'].includes(k)) {
+                matrix[k].user = { access: true, view: true, edit: (k === 'aggregates_calc') };
+            } else {
+                matrix[k].user = { access: false, view: false, edit: false };
+            }
+        });
+        Object.keys(perms).forEach(k => {
+            perms[k].user = false;
+        });
+        addSecurityLog('info', 'Пресет прав: Юзер', 'Встановлено стандартні права Юзера (База, Картка, Агрегати)');
+        showDevNotification('✅ Встановлено стандартні права для <b>Юзера</b>!', '#2980b9');
+    } else if (presetType === 'user_view_all') {
+        Object.keys(matrix).forEach(k => {
+            matrix[k].user = { access: true, view: true, edit: false };
+        });
+        Object.keys(perms).forEach(k => {
+            perms[k].user = false;
+        });
+        addSecurityLog('info', 'Пресет прав: Юзер', 'Відкрито доступ на перегляд усіх розділів для Юзера');
+        showDevNotification('👁️ Встановлено перегляд усіх розділів для <b>Юзера</b>!', '#16a085');
+    } else if (presetType === 'user_block_all') {
+        Object.keys(matrix).forEach(k => {
+            matrix[k].user = { access: false, view: false, edit: false };
+        });
+        Object.keys(perms).forEach(k => {
+            perms[k].user = false;
+        });
+        addSecurityLog('danger', 'Пресет прав: Юзер', 'Повне блокування доступу для Юзера');
+        showDevNotification('⛔ Повністю заблоковано доступ для <b>Юзера</b>!', '#e74c3c');
+    } else if (presetType === 'reset_all') {
+        localStorage.removeItem('dev_page_permissions_matrix_v1');
+        localStorage.removeItem('dev_granular_permissions_v1');
+        addSecurityLog('warning', 'Скидання матриці прав', 'Всі налаштування прав скинуто до початкових заводських');
+        showDevNotification('🔄 Матрицю прав скинуто до стандартних налаштувань!', '#8e44ad');
+        updateRoleUI();
+        renderDeveloperPanel();
+        return;
+    }
+
+    savePagePermissionsMatrix(matrix);
+    saveGranularPermissions(perms);
+    updateRoleUI();
+    renderDeveloperPanel();
+};
+
+window.saveAllPermissionsNow = function() {
+    const matrix = getPagePermissionsMatrix();
+    const perms = getGranularPermissions();
+    savePagePermissionsMatrix(matrix);
+    saveGranularPermissions(perms);
+    addSecurityLog('success', 'Фіксація прав доступу', 'Розробник зберіг поточну конфігурацію матриці прав');
+    showDevNotification('💾 Всі налаштування прав успішно зафіксовано в системі!', '#27ae60');
+    updateRoleUI();
+    renderDeveloperPanel();
+};
+
 window.resetRoleTimeStats = function() {
     localStorage.setItem('dev_role_time_stats', JSON.stringify({ user: 0, moderator: 0, admin: 0, developer: 0 }));
     addSecurityLog('info', 'Скинуто статистику часу ролей', 'Час роботи всіх ролей обнулено');
@@ -1257,6 +1754,8 @@ window.renderDeveloperPanel = function() {
 
         const passwords = getSystemPasswords();
         const secCfg = getRoleSecurityConfig();
+        const permMatrix = getPagePermissionsMatrix();
+        const granularPerms = getGranularPermissions();
         let users = [];
         try {
             users = getManagedUsers();
@@ -1367,6 +1866,251 @@ window.renderDeveloperPanel = function() {
                     </div>
                 </div>
                 <div style="text-align: center; font-size: 12px; color: #7f8c8d; margin-top: 8px;">Розподіл активності ролей у системі обліку</div>
+            </div>
+        `;
+    } else if (currentDevSubTab === 'permissions') {
+        const filterBtnStyle = (roleKey) => {
+            const active = currentDevPermRoleFilter === roleKey;
+            return `padding: 8px 14px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; border: 1px solid ${active ? '#8e44ad' : '#cbd5e1'}; background: ${active ? '#8e44ad' : '#ffffff'}; color: ${active ? '#ffffff' : '#334155'}; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px;`;
+        };
+
+        const activeRoles = (currentDevPermRoleFilter === 'all')
+            ? ['admin', 'moderator', 'user']
+            : [currentDevPermRoleFilter];
+
+        const roleColor = {
+            admin: '#e74c3c',
+            moderator: '#16a085',
+            user: '#2980b9'
+        };
+
+        const roleBg = {
+            admin: '#fef2f2',
+            moderator: '#f0fdf4',
+            user: '#f0f9ff'
+        };
+
+        const granularGroups = [
+            {
+                title: "🚗 База автомобілів (Реєстр)",
+                keys: ['base_add_car', 'base_delete_car', 'base_report_col', 'base_transfer_btn']
+            },
+            {
+                title: "📋 Картка автомобіля та Маршрути",
+                keys: ['card_save_btn', 'card_routes_edit', 'card_clear_btn']
+            },
+            {
+                title: "📑 Детальна картка (ТТХ та Документи авто)",
+                keys: ['car_details_edit', 'car_details_docs']
+            },
+            {
+                title: "📊 Звіт (10 днів)",
+                keys: ['report_edit_cells', 'report_save_btn']
+            },
+            {
+                title: "⚡ Облік обладнання та Мотогодини",
+                keys: ['eq_add_item', 'eq_edit_hours', 'eq_report_edit']
+            },
+            {
+                title: "💥 Знищена техніка",
+                keys: ['destroyed_restore']
+            },
+            {
+                title: "📄 Документи та Конструктор А4",
+                keys: ['docs_create_a4', 'docs_upload_file']
+            },
+            {
+                title: "✉️ Системна пошта",
+                keys: ['mail_send_new']
+            }
+        ];
+
+        subTabContentHtml = `
+            <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 22px; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
+                <!-- Заголовок та опис -->
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px; flex-wrap: wrap;">
+                    <div>
+                        <h3 style="margin: 0 0 6px 0; color: #2c3e50; font-size: 18px; display: flex; align-items: center; gap: 8px;">
+                            🛡️ Матриця прав та контроль доступу для ролей
+                            <span style="font-size: 11px; padding: 3px 8px; border-radius: 12px; background: #ede9fe; color: #6d28d9; font-weight: bold;">Тільки для Розробника</span>
+                        </h3>
+                        <p style="margin: 0; font-size: 13px; color: #64748b; max-width: 820px; line-height: 1.5;">
+                            Керуйте можливістю <b>заходити на сторінки</b>, <b>переглядати дані</b> та <b>редагувати вміст</b> для кожного кабінету (<b>Адмін</b>, <b>Модератор</b>, <b>Юзер</b>), а також вмикайте або вимикайте детальні кнопки і функції.
+                        </p>
+                    </div>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button type="button" onclick="saveAllPermissionsNow()" style="background: #27ae60; color: #fff; border: none; padding: 9px 16px; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(39, 174, 96, 0.25);">
+                            💾 Зафіксувати всі права
+                        </button>
+                        <button type="button" onclick="applyRolePreset('reset_all')" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 9px 14px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                            🔄 Скинути до заводських
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Панель швидких пресетів -->
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px;">
+                    <div style="font-size: 12px; font-weight: bold; color: #475569; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                        ⚡ Швидкі готові пресети прав для кабінетів:
+                    </div>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button type="button" onclick="applyRolePreset('admin_full')" style="background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; padding: 6px 12px; border-radius: 5px; font-size: 11px; font-weight: bold; cursor: pointer;">
+                            🔴 Адмін: Повний доступ
+                        </button>
+                        <button type="button" onclick="applyRolePreset('moderator_default')" style="background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; padding: 6px 12px; border-radius: 5px; font-size: 11px; font-weight: bold; cursor: pointer;">
+                            🟢 Модератор: Стандартні права
+                        </button>
+                        <button type="button" onclick="applyRolePreset('moderator_view_all')" style="background: #e6fffa; color: #234e52; border: 1px solid #81e6d9; padding: 6px 12px; border-radius: 5px; font-size: 11px; font-weight: bold; cursor: pointer;">
+                            🟢 Модератор: Перегляд усього
+                        </button>
+                        <button type="button" onclick="applyRolePreset('user_default')" style="background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; padding: 6px 12px; border-radius: 5px; font-size: 11px; font-weight: bold; cursor: pointer;">
+                            🔵 Юзер: Стандартні права
+                        </button>
+                        <button type="button" onclick="applyRolePreset('user_view_all')" style="background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; padding: 6px 12px; border-radius: 5px; font-size: 11px; font-weight: bold; cursor: pointer;">
+                            🔵 Юзер: Перегляд усього
+                        </button>
+                        <button type="button" onclick="applyRolePreset('user_block_all')" style="background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; padding: 6px 12px; border-radius: 5px; font-size: 11px; font-weight: bold; cursor: pointer;">
+                            ⛔ Юзер: Заблокувати все
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Фільтр перегляду за ролями -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <span style="font-size: 12px; font-weight: bold; color: #64748b;">Фільтр ролей:</span>
+                        <button type="button" onclick="switchDevPermissionsFilter('all')" style="${filterBtnStyle('all')}">
+                            📊 Всі ролі (Адмін + Модер + Юзер)
+                        </button>
+                        <button type="button" onclick="switchDevPermissionsFilter('admin')" style="${filterBtnStyle('admin')}">
+                            🔴 Тільки Адмін
+                        </button>
+                        <button type="button" onclick="switchDevPermissionsFilter('moderator')" style="${filterBtnStyle('moderator')}">
+                            🟢 Тільки Модератор
+                        </button>
+                        <button type="button" onclick="switchDevPermissionsFilter('user')" style="${filterBtnStyle('user')}">
+                            🔵 Тільки Юзер
+                        </button>
+                    </div>
+                    <div style="font-size: 12px; color: #64748b;">
+                        Всі перемикачі зберігаються <b>миттєво</b> в системі
+                    </div>
+                </div>
+
+                <!-- ТАБЛИЦЯ 1: МАТРИЦЯ ДОСТУПУ ДО РОЗДІЛІВ ТА СТОРІНОК -->
+                <div style="margin-bottom: 26px; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden;">
+                    <div style="background: #334155; color: #fff; padding: 10px 16px; font-weight: bold; font-size: 14px; display: flex; justify-content: space-between; align-items: center;">
+                        <span>📋 1. Доступ до розділів (Вхід, Перегляд, Редагування)</span>
+                        <span style="font-size: 11px; opacity: 0.85;">Всього розділів: ${Object.keys(permMatrix).length}</span>
+                    </div>
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                            <thead>
+                                <tr style="background: #f1f5f9; color: #334155;">
+                                    <th style="padding: 10px 14px; border: 1px solid #cbd5e1; text-align: left; min-width: 260px;">Розділ / Сторінка</th>
+                                    ${activeRoles.map(r => `
+                                        <th style="padding: 10px 12px; border: 1px solid #cbd5e1; text-align: center; min-width: 210px; background: ${roleBg[r]}; color: ${roleColor[r]};">
+                                            <b>${getRoleDisplayName(r)}</b>
+                                        </th>
+                                    `).join('')}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${Object.keys(permMatrix).map((modKey, idx) => {
+                                    const mod = permMatrix[modKey];
+                                    const rowBg = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
+                                    return `
+                                        <tr style="background: ${rowBg};">
+                                            <td style="padding: 10px 14px; border: 1px solid #cbd5e1; vertical-align: middle;">
+                                                <div style="display: flex; align-items: flex-start; gap: 10px;">
+                                                    <span style="font-size: 20px; line-height: 1;">${mod.icon || '📄'}</span>
+                                                    <div>
+                                                        <div style="font-weight: bold; color: #1e293b; font-size: 13px;">${mod.name || modKey}</div>
+                                                        <div style="font-size: 11px; color: #64748b; margin-top: 2px;">${mod.desc || ''}</div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            ${activeRoles.map(r => {
+                                                const rPerm = mod[r] || { access: false, view: false, edit: false };
+                                                return `
+                                                    <td style="padding: 8px 12px; border: 1px solid #cbd5e1; vertical-align: middle; background: ${rPerm.access ? roleBg[r] : '#ffffff'};">
+                                                        <div style="display: flex; flex-direction: column; gap: 5px;">
+                                                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; color: ${rPerm.access ? '#166534' : '#64748b'}; font-weight: ${rPerm.access ? 'bold' : 'normal'};">
+                                                                <input type="checkbox" ${rPerm.access ? 'checked' : ''} onchange="updateRolePermissionCheckbox('${modKey}', '${r}', 'access', this.checked)" style="width: 15px; height: 15px; accent-color: #27ae60; cursor: pointer;">
+                                                                <span>🚪 Заходити (Вхід)</span>
+                                                            </label>
+                                                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; color: ${rPerm.view ? '#1e40af' : '#64748b'}; font-weight: ${rPerm.view ? 'bold' : 'normal'};">
+                                                                <input type="checkbox" ${rPerm.view ? 'checked' : ''} onchange="updateRolePermissionCheckbox('${modKey}', '${r}', 'view', this.checked)" style="width: 15px; height: 15px; accent-color: #2980b9; cursor: pointer;">
+                                                                <span>👁️ Перегляд даних</span>
+                                                            </label>
+                                                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; color: ${rPerm.edit ? '#c2410c' : '#64748b'}; font-weight: ${rPerm.edit ? 'bold' : 'normal'};">
+                                                                <input type="checkbox" ${rPerm.edit ? 'checked' : ''} onchange="updateRolePermissionCheckbox('${modKey}', '${r}', 'edit', this.checked)" style="width: 15px; height: 15px; accent-color: #e67e22; cursor: pointer;">
+                                                                <span>✏️ Редагувати вміст</span>
+                                                            </label>
+                                                        </div>
+                                                    </td>
+                                                `;
+                                            }).join('')}
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- ТАБЛИЦЯ 2: ДЕТАЛЬНІ ФУНКЦІЇ ТА КНОПКИ -->
+                <div style="border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden;">
+                    <div style="background: #334155; color: #fff; padding: 10px 16px; font-weight: bold; font-size: 14px; display: flex; justify-content: space-between; align-items: center;">
+                        <span>⚙️ 2. Дозволи для окремих функцій, дій та кнопок</span>
+                        <span style="font-size: 11px; opacity: 0.85;">Всього функцій: ${Object.keys(granularPerms).length}</span>
+                    </div>
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                            <thead>
+                                <tr style="background: #f1f5f9; color: #334155;">
+                                    <th style="padding: 10px 14px; border: 1px solid #cbd5e1; text-align: left; min-width: 320px;">Функція / Дія / Кнопка</th>
+                                    ${activeRoles.map(r => `
+                                        <th style="padding: 10px 12px; border: 1px solid #cbd5e1; text-align: center; min-width: 150px; background: ${roleBg[r]}; color: ${roleColor[r]};">
+                                            <b>${getRoleDisplayName(r)}</b>
+                                        </th>
+                                    `).join('')}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${granularGroups.map(grp => `
+                                    <tr style="background: #e2e8f0; font-weight: bold; color: #1e293b;">
+                                        <td colspan="${activeRoles.length + 1}" style="padding: 8px 14px; border: 1px solid #cbd5e1; font-size: 12px; letter-spacing: 0.5px;">
+                                            ${grp.title}
+                                        </td>
+                                    </tr>
+                                    ${grp.keys.map((featKey, fIdx) => {
+                                        const feat = granularPerms[featKey] || { name: featKey, admin: false, moderator: false, user: false };
+                                        const rowBg = fIdx % 2 === 0 ? '#ffffff' : '#f8fafc';
+                                        return `
+                                            <tr style="background: ${rowBg};">
+                                                <td style="padding: 9px 14px; border: 1px solid #cbd5e1; vertical-align: middle;">
+                                                    <span style="font-weight: 600; color: #334155;">${feat.name || featKey}</span>
+                                                </td>
+                                                ${activeRoles.map(r => {
+                                                    const isChecked = !!feat[r];
+                                                    return `
+                                                        <td style="padding: 8px 12px; border: 1px solid #cbd5e1; text-align: center; vertical-align: middle; background: ${isChecked ? roleBg[r] : '#ffffff'};">
+                                                            <label style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; font-size: 12px; color: ${isChecked ? roleColor[r] : '#94a3b8'}; font-weight: ${isChecked ? 'bold' : 'normal'};">
+                                                                <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="updateGranularPermissionCheckbox('${featKey}', '${r}', this.checked)" style="width: 16px; height: 16px; accent-color: ${roleColor[r]}; cursor: pointer;">
+                                                                <span>${isChecked ? '✅ Дозволено' : '⛔ Вимкнено'}</span>
+                                                            </label>
+                                                        </td>
+                                                    `;
+                                                }).join('')}
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         `;
     } else if (currentDevSubTab === 'passwords') {
@@ -1524,8 +2268,11 @@ window.renderDeveloperPanel = function() {
             <button type="button" onclick="switchDevSubTab('dashboard')" style="${subTabBtnStyle('dashboard')}">
                 📊 Статистика та графіки
             </button>
+            <button type="button" onclick="switchDevSubTab('permissions')" style="${subTabBtnStyle('permissions')}">
+                🛡️ Матриця прав та Доступ (Адмін / Модер / Юзер)
+            </button>
             <button type="button" onclick="switchDevSubTab('passwords')" style="${subTabBtnStyle('passwords')}">
-                🔑 Паролі та Ролі (Адмін / Модер)
+                🔑 Паролі кабінетів
             </button>
             <button type="button" onclick="switchDevSubTab('users')" style="${subTabBtnStyle('users')}">
                 👥 Користувачі та Бани (${users.length} / 🚫 ${bannedCount})

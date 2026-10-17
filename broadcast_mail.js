@@ -274,11 +274,14 @@ function renderQuickEmojiBar(fieldId) {
 
 // Відкриття модального вікна пошти
 function openBroadcastMailModal(tab) {
+    const currentRoleName = (typeof currentRole !== 'undefined') ? currentRole : 'user';
+    if (currentRoleName !== 'developer' && typeof window.canRoleAccess === 'function' && !window.canRoleAccess(currentRoleName, 'mail')) {
+        alert('⛔ Доступ до Системної пошти заблоковано Розробником!');
+        return;
+    }
     if (tab) activeMailTab = tab;
 
     const allMessages = getStoredBroadcasts();
-    const currentRoleName = (typeof currentRole !== 'undefined') ? currentRole : 'user';
-
     // Повідомлення, що видимі поточній ролі у «Вхідних»
     const visibleInbox = allMessages.filter(m => isMessageVisibleForRole(m, currentRoleName));
 
@@ -348,7 +351,10 @@ function openBroadcastMailModal(tab) {
     let contentHtml = `<div style="padding: 16px 20px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 16px;">`;
 
     // ФОРМА НАПИСАННЯ НОВОГО ЛИСТА
-    contentHtml += `
+    const canSendMail = (currentRoleName === 'developer') || (typeof window.canRoleEdit === 'function' ? (window.canRoleEdit(currentRoleName, 'mail') && window.canRoleDo(currentRoleName, 'mail_send_new')) : (currentRoleName === 'admin' || currentRoleName === 'moderator'));
+
+    if (canSendMail) {
+        contentHtml += `
         <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <h4 style="margin: 0; color: #1e293b; font-size: 14px; display: flex; align-items: center; gap: 6px;">
@@ -405,7 +411,14 @@ function openBroadcastMailModal(tab) {
                 </button>
             </div>
         </div>
-    `;
+        `;
+    } else {
+        contentHtml += `
+            <div style="background: #f1f5f9; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 12px; text-align: center; color: #64748b; font-size: 13px;">
+                🔒 Створення нових листів заблоковано Розробником для вашої ролі (${getRoleDisplayNameUa(currentRoleName)}). Ви можете переглядати вхідні повідомлення.
+            </div>
+        `;
+    }
 
     // СПИСОК ПОВІДОМЛЕНЬ В ЗАЛЕЖНОСТІ ВІД ВКЛАДКИ
     const displayList = (activeMailTab === 'inbox') ? visibleInbox : sentByMe;

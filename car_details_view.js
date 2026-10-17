@@ -547,16 +547,95 @@ function renderCarPeriodsAndStats(car) {
     if (elAdblue) elAdblue.textContent = totalReceivedAdBlue.toFixed(1) + ' л';
     if (elCount) elCount.textContent = reportsCount;
 }
+// ==========================================
+// УПРАВЛІННЯ ДОКУМЕНТАМИ ТА СКАНАМИ АВТОМОБІЛЯ
+// ==========================================
+
+const CAR_DOCS_IDB_NAME = 'CarDocsFilesDB_v2';
+const CAR_DOCS_IDB_STORE = 'car_files';
+
+function openCarDocsIDB() {
+    return new Promise((resolve) => {
+        if (!window.indexedDB) return resolve(null);
+        try {
+            const req = window.indexedDB.open(CAR_DOCS_IDB_NAME, 1);
+            req.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains(CAR_DOCS_IDB_STORE)) {
+                    db.createObjectStore(CAR_DOCS_IDB_STORE, { keyPath: 'id' });
+                }
+            };
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => resolve(null);
+        } catch (e) {
+            resolve(null);
+        }
+    });
+}
+
+async function saveCarDocBinaryToIDB(docId, binaryObj) {
+    const db = await openCarDocsIDB();
+    if (!db) return false;
+    return new Promise((resolve) => {
+        try {
+            const tx = db.transaction(CAR_DOCS_IDB_STORE, 'readwrite');
+            const store = tx.objectStore(CAR_DOCS_IDB_STORE);
+            store.put({ id: docId, ...binaryObj });
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => resolve(false);
+        } catch (err) {
+            resolve(false);
+        }
+    });
+}
+
+async function getCarDocBinaryFromIDB(docId) {
+    const db = await openCarDocsIDB();
+    if (!db) return null;
+    return new Promise((resolve) => {
+        try {
+            const tx = db.transaction(CAR_DOCS_IDB_STORE, 'readonly');
+            const store = tx.objectStore(CAR_DOCS_IDB_STORE);
+            const req = store.get(docId);
+            req.onsuccess = () => resolve(req.result || null);
+            req.onerror = () => resolve(null);
+        } catch (err) {
+            resolve(null);
+        }
+    });
+}
+
+async function deleteCarDocBinaryFromIDB(docId) {
+    const db = await openCarDocsIDB();
+    if (!db) return;
+    try {
+        const tx = db.transaction(CAR_DOCS_IDB_STORE, 'readwrite');
+        tx.objectStore(CAR_DOCS_IDB_STORE).delete(docId);
+    } catch (e) {}
+}
+
+function getCarFileIcon(ext) {
+    ext = (ext || '').toLowerCase();
+    if (ext === 'pdf') return '📕';
+    if (['doc', 'docx', 'rtf'].includes(ext)) return '📘';
+    if (['xls', 'xlsx', 'csv', 'tsv'].includes(ext)) return '📊';
+    if (['png', 'jpg', 'jpeg', 'webp', 'jfif', 'gif', 'svg', 'bmp'].includes(ext)) return '🖼️';
+    if (['txt', 'json', 'log', 'xml', 'md'].includes(ext)) return '📄';
+    if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return '📦';
+    if (['mp3', 'wav', 'ogg'].includes(ext)) return '🎵';
+    if (['mp4', 'webm', 'mov'].includes(ext)) return '🎬';
+    return '📁';
+}
 
 function uploadCarDocument(input) {
     const files = input.files;
     let car = getActiveReportCar();
     if (!files || files.length === 0 || !car) return;
-    
+
     const folderName = `Doc/${car.plate.replace(/[^a-zA-Z0-9А-Яа-яІіЇїЄє]/g, '_')}`;
     const storageKey = `car_folder_${car.id}`;
     let folderData = { path: folderName, files: [] };
-    
+
     try {
         const stored = localStorage.getItem(storageKey);
         if (stored) folderData = JSON.parse(stored);
@@ -564,18 +643,43 @@ function uploadCarDocument(input) {
 
     let processedCount = 0;
     for (let i = 0; i < files.length; i++) {
-        let file = files[i];
-        let reader = new FileReader();
-        reader.onload = function(e) {
-            folderData.files.push({
-                name: file.name,
-                size: (file.size / 1024).toFixed(1) + ' KB',
-                date: new Date().toLocaleDateString(),
-                dataUrl: e.target.result
+        const file = files[i];
+        const ext = (file.name.includes('.') ? file.name.split('.').pop() : '').toLowerCase();
+        const docId = 'cardoc_' + car.id + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+            const dataUrl = e.target.result;
+
+            // Зберігаємо повний файл у IndexedDB
+            await saveCarDocBinaryToIDB(docId, {
+                dataUrl: dataUrl,
+                fileName: file.name,
+                mimeType: file.type || 'application/octet-stream',
+                ext: ext,
+                size: (file.size / 1024).toFixed(1) + ' KB'
             });
+
+            // У localStorage зберігаємо метадані та легкий dataUrl (якщо менше 120КБ)
+            folderData.files.push({
+                id: docId,
+                name: file.name,
+                ext: ext,
+                size: (file.size / 1024).toFixed(1) + ' KB',
+                date: new Date().toLocaleDateString('uk-UA'),
+                hasBinary: true,
+                dataUrl: dataUrl.length < 120000 ? dataUrl : ''
+            });
+
             processedCount++;
             if (processedCount === files.length) {
-                localStorage.setItem(storageKey, JSON.stringify(folderData));
+                try {
+                    localStorage.setItem(storageKey, JSON.stringify(folderData));
+                } catch(quotaErr) {
+                    // Якщо localStorage переповнено, очищаємо dataUrl і зберігаємо тільки посилання на IDB
+                    const slimFiles = folderData.files.map(f => ({ ...f, dataUrl: '' }));
+                    localStorage.setItem(storageKey, JSON.stringify({ ...folderData, files: slimFiles }));
+                }
                 input.value = '';
                 renderCarDocuments(car);
             }
@@ -597,28 +701,67 @@ function renderCarDocuments(car) {
         if (stored) folderData = JSON.parse(stored);
     } catch(e) {}
 
-    let headerHtml = `<div style="margin-bottom: 8px; font-weight: bold; color: #2980b9; font-size: 12px;">📁 Шлях папки: ${folderData.path}</div>`;
+    let headerHtml = `
+        <div style="margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+            <div style="font-weight:bold; color:#1e40af; font-size:12px;">📁 Шлях папки: <code>${folderData.path}</code></div>
+            <span style="font-size:11px; background:#e0f2fe; color:#0369a1; padding:2px 8px; border-radius:4px; font-weight:700;">
+                Файлів: ${(folderData.files || []).length}
+            </span>
+        </div>
+    `;
 
     if (!folderData.files || folderData.files.length === 0) {
-        docsList.innerHTML = headerHtml + '<span style="color: #7f8c8d; font-style: italic;">Папка порожня. Документи не завантажено.</span>';
+        docsList.innerHTML = headerHtml + '<div style="padding:16px; text-align:center; color:#64748b; font-style:italic; background:#fff; border-radius:6px; border:1px dashed #cbd5e1;">Папка документів порожня. Завантажте файл кнопкою «Вибрати файли» вгорі (підтримуються будь-які формати: PDF, Word, Excel, фото, скани).</div>';
         return;
     }
 
-    let html = headerHtml + '<ul style="list-style-type: none; padding: 0; margin: 0;">';
+    let html = headerHtml + '<ul style="list-style-type:none; padding:0; margin:0; display:flex; flex-direction:column; gap:6px;">';
     folderData.files.forEach((doc, idx) => {
-        html += `<li style="padding: 6px 0; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center; gap: 10px;">
-            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; color: #2980b9;" onclick="viewCarDoc(${car.id}, ${idx})">📄 <strong>${doc.name}</strong> <small style="color: #7f8c8d;">(${doc.size})</small></span>
-            <div style="display: flex; gap: 5px; flex-shrink: 0;">
-                <button class="action-btn" style="padding: 2px 6px; font-size: 11px; background-color: #2980b9;" onclick="viewCarDoc(${car.id}, ${idx})">Переглянути</button>
-                <button class="delete-row-btn" onclick="deleteCarDoc(${car.id}, ${idx})">Видалити</button>
-            </div>
-        </li>`;
+        const ext = (doc.ext || (doc.name.includes('.') ? doc.name.split('.').pop() : '') || 'файл').toLowerCase();
+        const icon = getCarFileIcon(ext);
+
+        html += `
+            <li style="padding:8px 10px; background:#ffffff; border:1px solid #cbd5e1; border-radius:6px; display:flex; justify-content:space-between; align-items:center; gap:10px; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+                <div style="display:flex; align-items:center; gap:8px; overflow:hidden; flex:1; cursor:pointer;" onclick="viewCarDoc(${car.id}, ${idx})">
+                    <span style="font-size:18px; flex-shrink:0;">${icon}</span>
+                    <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                        <span style="font-weight:700; color:#1e293b; font-size:13px;" title="${escapeHtml(doc.name)}">${escapeHtml(doc.name)}</span>
+                        <div style="font-size:11px; color:#64748b; display:flex; gap:8px;">
+                            <span>${doc.size || '—'}</span>
+                            <span>•</span>
+                            <span>${doc.date || '—'}</span>
+                            <span style="background:#f1f5f9; color:#475569; padding:0 4px; border-radius:3px; text-transform:uppercase; font-weight:bold;">${ext}</span>
+                        </div>
+                    </div>
+                </div>
+                <div style="display:flex; gap:6px; flex-shrink:0; align-items:center;">
+                    <button class="action-btn"
+                        style="padding:5px 10px; font-size:12px; background-color:#2563eb; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:600; display:inline-flex; align-items:center; gap:4px;"
+                        onclick="viewCarDoc(${car.id}, ${idx})"
+                        title="Відкрити та переглянути файл у рідному форматі (${ext.toUpperCase()})">
+                        👁️ Відкрити
+                    </button>
+                    <button class="action-btn"
+                        style="padding:5px 10px; font-size:12px; background-color:#059669; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:600; display:inline-flex; align-items:center; gap:4px;"
+                        onclick="downloadCarDoc(${car.id}, ${idx})"
+                        title="Скачати файл на комп'ютер у вихідному форматі">
+                        📥 Скачати
+                    </button>
+                    <button class="delete-row-btn"
+                        style="padding:5px 8px; font-size:12px; background-color:#ef4444; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;"
+                        onclick="deleteCarDoc(${car.id}, ${idx})"
+                        title="Видалити цей файл">
+                        🗑️
+                    </button>
+                </div>
+            </li>
+        `;
     });
     html += '</ul>';
     docsList.innerHTML = html;
 }
 
-window.deleteCarDoc = function(carId, index) {
+window.deleteCarDoc = async function(carId, index) {
     let sourceCars = typeof carsData !== 'undefined' ? carsData : [];
     const car = sourceCars.find(c => Number(c.id) === Number(carId)) || getActiveReportCar();
     if (!car) return;
@@ -632,59 +775,75 @@ window.deleteCarDoc = function(carId, index) {
 
     if (!folderData.files || !folderData.files[index]) return;
 
-    const fileName = folderData.files[index].name || 'файл';
-    const isConfirmed = confirm(`Дійсно видалити файл "${fileName}"?`);
+    const doc = folderData.files[index];
+    const fileName = doc.name || 'файл';
+    const isConfirmed = confirm(`Дійсно видалити файл «${fileName}» з папки авто?`);
     if (!isConfirmed) return;
+
+    if (doc.id) {
+        await deleteCarDocBinaryFromIDB(doc.id);
+    }
 
     folderData.files.splice(index, 1);
     localStorage.setItem(storageKey, JSON.stringify(folderData));
     renderCarDocuments(car);
 };
 
-window.viewCarDoc = function(carId, index) {
+window.downloadCarDoc = async function(carId, index) {
     try {
         const stored = localStorage.getItem(`car_folder_${carId}`);
         if (!stored) return;
         const folderData = JSON.parse(stored);
         const doc = folderData.files[index];
-        if (!doc || !doc.dataUrl) return;
+        if (!doc) return;
 
-        const isImage = doc.dataUrl.startsWith('data:image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.name);
-
-        let win = null;
-        try {
-            win = window.open();
-        } catch(e) {}
-
-        if (win) {
-            win.document.write(`
-                <html>
-                    <head><title>Перегляд: ${doc.name}</title></head>
-                    <body style="margin:0; background:#222; display:flex; justify-content:center; align-items:center; height:100vh;">
-                        ${isImage ? `<img src="${doc.dataUrl}" style="max-width:100%; max-height:100%; object-fit:contain;" />` : `<iframe src="${doc.dataUrl}" style="width:100%; height:100%; border:none;"></iframe>`}
-                    </body>
-                </html>
-            `);
-        } else {
-            let modal = document.getElementById('car-doc-view-modal');
-            if (modal) modal.remove();
-            modal = document.createElement('div');
-            modal.id = 'car-doc-view-modal';
-            modal.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:99999; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:20px;';
-            modal.innerHTML = `
-                <div style="background:white; border-radius:8px; width:90%; max-width:900px; height:85vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 4px 20px rgba(0,0,0,0.5);">
-                    <div style="background:#2c3e50; color:white; padding:10px 16px; display:flex; justify-content:space-between; align-items:center;">
-                        <strong>📄 ${doc.name}</strong>
-                        <button onclick="document.getElementById('car-doc-view-modal').remove()" style="background:none; border:none; color:white; font-size:20px; cursor:pointer; font-weight:bold;">✕</button>
-                    </div>
-                    <div style="flex:1; display:flex; justify-content:center; align-items:center; background:#f4f6f7; overflow:auto; padding:10px;">
-                        ${isImage ? `<img src="${doc.dataUrl}" style="max-width:100%; max-height:100%; object-fit:contain;" />` : `<iframe src="${doc.dataUrl}" style="width:100%; height:100%; border:none;"></iframe>`}
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(modal);
+        let dataUrl = doc.dataUrl || '';
+        if (!dataUrl && doc.id) {
+            const idbRecord = await getCarDocBinaryFromIDB(doc.id);
+            if (idbRecord && idbRecord.dataUrl) {
+                dataUrl = idbRecord.dataUrl;
+            }
         }
+
+        if (!dataUrl) {
+            alert('Не вдалося отримати вміст файлу для завантаження.');
+            return;
+        }
+
+        downloadUniversalFile(encodeURIComponent(dataUrl), encodeURIComponent(doc.name || 'document'));
     } catch(e) {
+        console.error('Помилка скачування файлу авто:', e);
+        alert('Помилка під час завантаження файлу.');
+    }
+};
+
+window.viewCarDoc = async function(carId, index) {
+    try {
+        const stored = localStorage.getItem(`car_folder_${carId}`);
+        if (!stored) return;
+        const folderData = JSON.parse(stored);
+        const doc = folderData.files[index];
+        if (!doc) return;
+
+        let dataUrl = doc.dataUrl || '';
+        if (!dataUrl && doc.id) {
+            const idbRecord = await getCarDocBinaryFromIDB(doc.id);
+            if (idbRecord && idbRecord.dataUrl) {
+                dataUrl = idbRecord.dataUrl;
+            }
+        }
+
+        const ext = (doc.ext || (doc.name.includes('.') ? doc.name.split('.').pop() : '') || 'файл').toLowerCase();
+
+        openUniversalFilePreviewModal({
+            name: doc.name,
+            ext: ext,
+            dataUrl: dataUrl,
+            size: doc.size,
+            date: doc.date
+        });
+    } catch(e) {
+        console.error('Помилка відкриття документа авто:', e);
         alert('Не вдалося відкрити документ.');
     }
 };

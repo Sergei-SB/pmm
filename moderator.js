@@ -24,7 +24,9 @@ function applyModeratorReportLock() {
         ? window.getCurrentAppRole()
         : ((typeof window.currentRole !== 'undefined') ? window.currentRole : ((typeof currentRole !== 'undefined') ? currentRole : 'user'));
 
-    if (role !== 'admin' && role !== 'developer') {
+    const canEdit = (role === 'developer') || (typeof window.canRoleEdit === 'function' ? window.canRoleEdit(role, 'report') : (role === 'admin'));
+
+    if (!canEdit) {
         const reportInputs = document.querySelectorAll(
             '#report-tbody input, #report-tbody select, #report-table tbody input, #report-table tbody select, ' +
             '#equipment-report-tbody input, #equipment-report-tbody select, #equipment-report-table tbody input, #equipment-report-table tbody select'
@@ -96,12 +98,13 @@ function applyModeratorReportLock() {
 }
 window.applyModeratorReportLock = applyModeratorReportLock;
 
-// Захист на рівні подій: жоден інпут у звітах не може отримати фокус або редагуватися Модератором чи Юзером
+// Захист на рівні подій: перевіряємо право редагування звіту
 document.addEventListener('focusin', function(e) {
     const role = (typeof window.getCurrentAppRole === 'function')
         ? window.getCurrentAppRole()
         : ((typeof window.currentRole !== 'undefined') ? window.currentRole : ((typeof currentRole !== 'undefined') ? currentRole : 'user'));
-    if (role !== 'admin' && role !== 'developer') {
+    const canEdit = (role === 'developer') || (typeof window.canRoleEdit === 'function' ? window.canRoleEdit(role, 'report') : (role === 'admin'));
+    if (!canEdit) {
         const target = e.target;
         if (target && target.closest && (target.closest('#report-tbody') || target.closest('#equipment-report-tbody'))) {
             target.setAttribute('disabled', 'true');

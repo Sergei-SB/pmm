@@ -538,6 +538,30 @@ async function startServer(): Promise<void> {
     }
   });
 
+  // 7b) Завантаження фавікона сайту
+  app.post('/api/upload-favicon', (req, res) => {
+    try {
+      const { dataUrl } = req.body || {};
+      if (typeof dataUrl === 'string' && dataUrl.includes(',')) {
+        const base64Data = dataUrl.split(',')[1];
+        const buffer = Buffer.from(base64Data, 'base64');
+        const targetPath = path.join(__dirname, 'fhjnd4dd4ww11.jfif');
+        fs.writeFileSync(targetPath, buffer);
+        
+        const distDir = path.join(__dirname, 'dist');
+        if (fs.existsSync(distDir)) {
+          fs.writeFileSync(path.join(distDir, 'fhjnd4dd4ww11.jfif'), buffer);
+        }
+        res.json({ ok: true, message: 'Фавікон успішно збережено на сервері' });
+        return;
+      }
+      res.status(400).json({ ok: false, error: 'Некоректні дані файлу' });
+    } catch (err: unknown) {
+      console.error('Помилка збереження фавікона:', err);
+      res.status(500).json({ ok: false, error: errorMessage(err) });
+    }
+  });
+
   // 8) Роздача застосунку: Vite у dev, dist у production
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

@@ -494,7 +494,7 @@ function renderEquipmentReportView() {
         const curRole = (typeof window.getCurrentAppRole === 'function')
             ? window.getCurrentAppRole()
             : ((typeof currentRole !== 'undefined') ? currentRole : 'user');
-        const canEditEq = (curRole === 'admin' || curRole === 'developer');
+        const canEditEq = (curRole === 'developer') || (typeof window.canRoleEdit === 'function' ? (window.canRoleEdit(curRole, 'equipment_report') && window.canRoleDo(curRole, 'eq_report_edit')) : (curRole === 'admin'));
         const eqLock = canEditEq ? '' : 'disabled readonly style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px; background-color: #f1f2f6; cursor: not-allowed; color: #2c3e50;" title="Редагування доступне тільки для Адміна та Розробника"';
 
         const tr = document.createElement('tr');
@@ -521,7 +521,7 @@ function renderEquipmentReportView() {
     const curRole2 = (typeof window.getCurrentAppRole === 'function')
         ? window.getCurrentAppRole()
         : ((typeof currentRole !== 'undefined') ? currentRole : 'user');
-    const canEditEq2 = (curRole2 === 'admin' || curRole2 === 'developer');
+    const canEditEq2 = (curRole2 === 'developer') || (typeof window.canRoleEdit === 'function' ? window.canRoleEdit(curRole2, 'equipment_report') : (curRole2 === 'admin'));
     const eqSaveBtn = document.querySelector('button[onclick="saveEquipmentReportData()"]');
     if (eqSaveBtn) eqSaveBtn.style.setProperty('display', canEditEq2 ? 'inline-flex' : 'none', 'important');
 

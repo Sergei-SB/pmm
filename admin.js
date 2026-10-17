@@ -294,6 +294,12 @@ function updateRoleUI() {
         devPanelBtn.style.display = isDev ? "inline-block" : "none";
     }
 
+    // Кнопка зміни фавікона — доступна ТІЛЬКИ для Розробника (прихована для Адміна, Модератора, Юзера)
+    const faviconUploadBtn = document.getElementById("header-favicon-upload-btn");
+    if (faviconUploadBtn) {
+        faviconUploadBtn.style.setProperty("display", isDev ? "inline-flex" : "none", "important");
+    }
+
     const reportView = document.getElementById("report-view");
     if (reportView && reportView.style.display !== "none" && !isModOrHigher) {
         if (typeof switchView === "function") switchView("base");

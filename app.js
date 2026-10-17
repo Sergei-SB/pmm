@@ -337,6 +337,31 @@ function evaluateExpression(val) {
 }
 
 function switchView(viewName) {
+    const role = (typeof window.getCurrentAppRole === 'function')
+        ? window.getCurrentAppRole()
+        : ((typeof window.currentRole !== 'undefined') ? window.currentRole : ((typeof currentRole !== 'undefined') ? currentRole : 'user'));
+
+    if (role !== 'developer') {
+        let modKey = viewName;
+        if (viewName === 'generators') modKey = 'equipment';
+        if (viewName === 'equipment-report-view' || viewName === 'equipment-report') modKey = 'equipment_report';
+        if (viewName === 'destroyed-view' || viewName === 'destroyed') modKey = 'destroyed';
+        if (viewName === 'aggregates-calc' || viewName === 'aggregates-calc-view') modKey = 'aggregates_calc';
+        if (viewName === 'car-details') modKey = 'car_details';
+
+        if (viewName === 'dev-panel' || viewName === 'developer-panel' || viewName === 'dev-panel-view') {
+            alert('⛔ Доступ до Панелі розробника має виключно Розробник!');
+            return;
+        }
+
+        if (typeof window.canRoleAccess === 'function' && !window.canRoleAccess(role, modKey)) {
+            const modTitle = (typeof window.getModuleNameUkrainian === 'function') ? window.getModuleNameUkrainian(modKey) : modKey;
+            const roleName = (typeof getRoleDisplayName === 'function') ? getRoleDisplayName(role) : role;
+            alert(`⛔ Доступ до розділу «${modTitle}» заблоковано Розробником для вашої ролі (${roleName})!`);
+            return;
+        }
+    }
+
     document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
 
