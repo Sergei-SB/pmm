@@ -2,31 +2,148 @@
 // КАЛЬКУЛЯТОР АГРЕГАТІВ (aggregates_calc.js)
 // ==========================================
 
+const AGG_CALC_STATE_KEY = 'aggregates_calc_saved_state';
+
+// Завантаження збереженого стану
+function loadAggCalcState() {
+    try {
+        const raw = localStorage.getItem(AGG_CALC_STATE_KEY);
+        if (raw) {
+            return JSON.parse(raw);
+        }
+    } catch (e) {}
+    return null;
+}
+
+// Збереження повного стану калькулятора
+function saveAggCalcState() {
+    try {
+        const rows = [];
+        for (let i = 1; i <= 10; i++) {
+            rows.push({
+                days: document.getElementById(`b-days-${i}`)?.value || '',
+                start: document.getElementById(`b-start-${i}`)?.value || '',
+                rec: document.getElementById(`b-rec-${i}`)?.value || '',
+                end: document.getElementById(`b-end-${i}`)?.value || '',
+                spent: document.getElementById(`b-spent-${i}`)?.value || ''
+            });
+        }
+
+        const state = {
+            selectedAggIndex: window._selectedAggIndex !== undefined ? window._selectedAggIndex : 'custom',
+            customAggText: window._customAggText || '',
+            customCons: document.getElementById('custom-cons-input')?.value || '3.33',
+            customOil: document.getElementById('custom-oil-input')?.value || '1.1',
+            maxDailyHours: document.getElementById('calc-max-daily-hours')?.value || '12',
+            oilCalcExpr: document.getElementById('oil-calc-input')?.value || '',
+            isVerification: !!window._isVerificationMode,
+            isIntegerHours: !!window._isIntegerHours,
+            manualMotoHours: window._manualMotoHours || {},
+            periodRandomSeeds: window._periodRandomSeeds || {},
+            rows: rows
+        };
+
+        localStorage.setItem(AGG_CALC_STATE_KEY, JSON.stringify(state));
+    } catch (e) {}
+}
+
+// Завантаження всього списку обладнання з усіх категорій
+function getAllEquipmentList() {
+    let allEquipment = [];
+    
+    // 1. Генератори
+    try {
+        let gens = [];
+        if (typeof getGeneratorsList === 'function') {
+            gens = getGeneratorsList();
+        } else {
+            const stored = localStorage.getItem('generators_custom_data');
+            gens = stored ? JSON.parse(stored) : (typeof defaultGeneratorsData !== 'undefined' ? defaultGeneratorsData : []);
+        }
+        if (Array.isArray(gens)) {
+            gens.forEach(i => allEquipment.push({ ...i, category: 'Генератор' }));
+        }
+    } catch(e) {}
+
+    // 2. Webasto
+    try {
+        let web = [];
+        if (typeof getWebastoList === 'function') {
+            web = getWebastoList();
+        } else {
+            const stored = localStorage.getItem('webasto_custom_data');
+            web = stored ? JSON.parse(stored) : (typeof defaultWebastoData !== 'undefined' ? defaultWebastoData : []);
+        }
+        if (Array.isArray(web)) {
+            web.forEach(i => allEquipment.push({ ...i, category: 'Webasto' }));
+        }
+    } catch(e) {}
+
+    // 3. Теплові пушки
+    try {
+        let heat = [];
+        if (typeof getHeatersList === 'function') {
+            heat = getHeatersList();
+        } else {
+            const stored = localStorage.getItem('heaters_custom_data');
+            heat = stored ? JSON.parse(stored) : (typeof defaultHeatersData !== 'undefined' ? defaultHeatersData : []);
+        }
+        if (Array.isArray(heat)) {
+            heat.forEach(i => allEquipment.push({ ...i, category: 'Теплова пушка' }));
+        }
+    } catch(e) {}
+
+    // 4. Бензопили
+    try {
+        let saws = [];
+        if (typeof getChainsawsList === 'function') {
+            saws = getChainsawsList();
+        } else {
+            const stored = localStorage.getItem('chainsaws_custom_data');
+            saws = stored ? JSON.parse(stored) : (typeof defaultChainsawsData !== 'undefined' ? defaultChainsawsData : []);
+        }
+        if (Array.isArray(saws)) {
+            saws.forEach(i => allEquipment.push({ ...i, category: 'Бензопила' }));
+        }
+    } catch(e) {}
+
+    return allEquipment;
+}
+
+// Оновлення списку в дропдауні без стирання форми (для фонової синхронізації)
+window.refreshAggregatesEquipmentList = function() {
+    const listContainer = document.getElementById('agg-items-list');
+    if (!listContainer) return;
+    const all = getAllEquipmentList();
+    window._allCalculatedEquipment = all;
+    renderAggDropdownItems(all);
+};
+
+// ГОЛОВНЕ ВІДОБРАЖЕННЯ КАЛЬКУЛЯТОРА
 function renderAggregatesCalcView() {
     const container = document.getElementById('aggregates-calc-container');
     if (!container) return;
 
-    window._periodRandomSeeds = {};
-    if (!window._manualMotoHours) window._manualMotoHours = {};
+    const savedState = loadAggCalcState();
 
-    let allEquipment = [];
-    
-    try {
-        const gens = JSON.parse(localStorage.getItem('generators_custom_data')) || [];
-        gens.forEach(i => allEquipment.push({ ...i, category: 'Генератор' }));
-    } catch(e) {}
+    if (savedState) {
+        window._selectedAggIndex = savedState.selectedAggIndex !== undefined ? savedState.selectedAggIndex : 'custom';
+        window._customAggText = savedState.customAggText || '';
+        window._isVerificationMode = !!savedState.isVerification;
+        window._isIntegerHours = !!savedState.isIntegerHours;
+        window._manualMotoHours = savedState.manualMotoHours || {};
+        window._periodRandomSeeds = savedState.periodRandomSeeds || {};
+    } else {
+        if (window._selectedAggIndex === undefined) window._selectedAggIndex = 'custom';
+        if (window._customAggText === undefined) window._customAggText = '';
+        if (window._isVerificationMode === undefined) window._isVerificationMode = false;
+        if (window._isIntegerHours === undefined) window._isIntegerHours = false;
+        if (!window._manualMotoHours) window._manualMotoHours = {};
+        if (!window._periodRandomSeeds) window._periodRandomSeeds = {};
+    }
 
-    ['webasto', 'heaters', 'chainsaws'].forEach(type => {
-        try {
-            const data = JSON.parse(localStorage.getItem(`equipment_data_${type}`)) || [];
-            let catName = type === 'webasto' ? 'Webasto' : (type === 'heaters' ? 'Теплова пушка' : 'Бензопила');
-            data.forEach(i => allEquipment.push({ ...i, category: catName }));
-        } catch(e) {}
-    });
-
+    const allEquipment = getAllEquipmentList();
     window._allCalculatedEquipment = allEquipment;
-    if (window._selectedAggIndex === undefined) window._selectedAggIndex = 'custom';
-    if (window._customAggText === undefined) window._customAggText = '';
 
     let currentSelectedText = 'Свій агрегат';
     if (window._selectedAggIndex === 'custom') {
@@ -38,14 +155,26 @@ function renderAggregatesCalcView() {
         currentSelectedText = window._customAggText;
     }
 
+    const maxH = (savedState && savedState.maxDailyHours) ? savedState.maxDailyHours : '12';
+    const oilExpr = (savedState && savedState.oilCalcExpr) ? savedState.oilCalcExpr : '';
+
     let html = `
         <div style="background: white; padding: 20px; border-radius: 6px; border: 1px solid #bdc3c7; max-width: 1050px; margin: 0 auto;">
-            <!-- ЦЕНТРАЛЬНИЙ ЗАГОЛОВОК ТА КНОПКА ДРУКУ -->
-            <div style="position: relative; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid #2e7d32; padding-bottom: 10px; margin-bottom: 15px;">
-                <h3 style="color: #2e7d32; margin: 0; font-size: 18px; text-align: center; font-weight: bold;">Розрахунок витрати палива та мастил агрегатів</h3>
-                <button class="action-btn print-btn" style="position: absolute; right: 0; background-color: #337ab7; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; white-space: nowrap;" onclick="printAggregatesReport()">
-                    <span style="font-size: 14px; margin-right: 6px; vertical-align: middle;">🖨️</span> Друк
-                </button>
+            <!-- ЦЕНТРАЛЬНИЙ ЗАГОЛОВОК ТА КНОПКИ -->
+            <div style="position: relative; display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #2e7d32; padding-bottom: 10px; margin-bottom: 15px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <button id="btn-reset-agg-calc" class="action-btn" style="background-color: #95a5a6; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; display: inline-flex; align-items: center;" onclick="resetAggregatesCalc()">
+                        <span style="font-size: 13px; margin-right: 5px;">🔄</span> Очистити
+                    </button>
+                </div>
+
+                <h3 style="color: #2e7d32; margin: 0; font-size: 18px; text-align: center; font-weight: bold; flex-grow: 1;">Розрахунок витрати палива та мастил агрегатів</h3>
+                
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <button class="action-btn print-btn" style="background-color: #337ab7; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; white-space: nowrap;" onclick="printAggregatesReport()">
+                        <span style="font-size: 14px; margin-right: 6px; vertical-align: middle;">🖨️</span> Друк
+                    </button>
+                </div>
             </div>
             
             <!-- ДВА СТОВПЧИКИ ЗВЕРХУ -->
@@ -100,13 +229,14 @@ function renderAggregatesCalcView() {
     `;
 
     for (let i = 1; i <= 10; i++) {
+        const rowData = (savedState && savedState.rows && savedState.rows[i - 1]) ? savedState.rows[i - 1] : { days: '', start: '', rec: '', end: '', spent: '' };
         html += `
             <tr>
-                <td style="padding: 2px; border: 1px solid #bdc3c7;"><input type="number" step="1" min="0" max="31" id="b-days-${i}" value="" oninput="triggerRecalc()" style="width: 100%; border: none; text-align: center; font-size: 11px; padding: 3px;" placeholder=""></td>
-                <td style="padding: 2px; border: 1px solid #bdc3c7;"><input type="number" step="0.1" id="b-start-${i}" oninput="calculateVariantBRow(${i})" style="width: 100%; border: none; text-align: center; font-size: 11px; padding: 3px;" placeholder=""></td>
-                <td style="padding: 2px; border: 1px solid #bdc3c7;"><input type="number" step="0.1" id="b-rec-${i}" oninput="calculateVariantBRow(${i})" style="width: 100%; border: none; text-align: center; font-size: 11px; padding: 3px;" placeholder=""></td>
-                <td style="padding: 2px; border: 1px solid #bdc3c7;"><input type="number" step="0.1" id="b-end-${i}" oninput="calculateVariantBRow(${i})" style="width: 100%; border: none; text-align: center; font-size: 11px; padding: 3px;" placeholder=""></td>
-                <td style="padding: 2px; border: 1px solid #bdc3c7;"><input type="number" step="0.1" id="b-spent-${i}" readonly style="width: 100%; border: none; text-align: center; font-size: 11px; padding: 3px; font-weight: bold; color: #c0392b; background: #f9f9f9;" placeholder=""></td>
+                <td style="padding: 2px; border: 1px solid #bdc3c7;"><input type="number" step="1" min="0" max="31" id="b-days-${i}" value="${rowData.days || ''}" oninput="onDaysInputChange(${i})" style="width: 100%; border: none; text-align: center; font-size: 11px; padding: 3px;" placeholder=""></td>
+                <td style="padding: 2px; border: 1px solid #bdc3c7;"><input type="number" step="0.1" id="b-start-${i}" value="${rowData.start || ''}" oninput="this.dataset.auto='false'; calculateVariantBRow(${i})" style="width: 100%; border: none; text-align: center; font-size: 11px; padding: 3px;" placeholder=""></td>
+                <td style="padding: 2px; border: 1px solid #bdc3c7;"><input type="number" step="0.1" id="b-rec-${i}" value="${rowData.rec || ''}" oninput="calculateVariantBRow(${i})" style="width: 100%; border: none; text-align: center; font-size: 11px; padding: 3px;" placeholder=""></td>
+                <td style="padding: 2px; border: 1px solid #bdc3c7;"><input type="number" step="0.1" id="b-end-${i}" value="${rowData.end || ''}" oninput="calculateVariantBRow(${i})" style="width: 100%; border: none; text-align: center; font-size: 11px; padding: 3px;" placeholder=""></td>
+                <td style="padding: 2px; border: 1px solid #bdc3c7;"><input type="number" step="0.1" id="b-spent-${i}" value="${rowData.spent || ''}" readonly style="width: 100%; border: none; text-align: center; font-size: 11px; padding: 3px; font-weight: bold; color: #c0392b; background: #f9f9f9;" placeholder=""></td>
             </tr>
         `;
     }
@@ -142,7 +272,7 @@ function renderAggregatesCalcView() {
                     <div style="background: #fef9e7; padding: 10px; border-radius: 4px; border: 1px solid #f39c12;">
                         <div style="font-weight: bold; margin-bottom: 6px; font-size: 11px; color: #d35400;">Ліміт часу на день</div>
                         <label style="display: block; margin-bottom: 3px; font-size: 10px; color: #555;" title="Максимально можлива кількість годин роботи агрегата на добу">Макс. годин на день (ліміт):</label>
-                        <input type="number" id="calc-max-daily-hours" value="12" step="0.5" min="1" max="24" oninput="triggerRecalc()" style="width: 100%; padding: 5px; border-radius: 4px; border: 1px solid #f39c12; font-size: 12px; box-sizing: border-box; background: #fff; margin-bottom: 4px;">
+                        <input type="number" id="calc-max-daily-hours" value="${maxH}" step="0.5" min="1" max="24" oninput="saveAggCalcState(); triggerRecalc();" style="width: 100%; padding: 5px; border-radius: 4px; border: 1px solid #f39c12; font-size: 12px; box-sizing: border-box; background: #fff; margin-bottom: 4px;">
                         <div style="font-size: 9px; color: #7f8c8d; font-style: italic; line-height: 1.1;">Гарантує, що жоден день не перевищить цей ліміт годин.</div>
                     </div>
 
@@ -152,7 +282,7 @@ function renderAggregatesCalcView() {
                         <div style="background: white; padding: 8px; border-radius: 4px; border: 1px solid #dcdcdc; display: flex; flex-direction: column; justify-content: space-between;">
                             <div>
                                 <div style="font-weight: bold; font-size: 10px; color: #2c3e50; margin-bottom: 3px;">Калькулятор мастила:</div>
-                                <input type="text" id="oil-calc-input" placeholder="0.3+0.3" oninput="calculateOilExpr(this.value)" style="width: 100%; padding: 4px; border: 1px solid #bdc3c7; border-radius: 3px; font-size: 11px; box-sizing: border-box; margin-bottom: 4px; outline: none;">
+                                <input type="text" id="oil-calc-input" value="${oilExpr}" placeholder="0.3+0.3" oninput="calculateOilExpr(this.value); saveAggCalcState();" style="width: 100%; padding: 4px; border: 1px solid #bdc3c7; border-radius: 3px; font-size: 11px; box-sizing: border-box; margin-bottom: 4px; outline: none;">
                             </div>
                             <div style="display: flex; justify-content: space-between; align-items: center; font-size: 10px; border-top: 1px solid #eee; padding-top: 3px;">
                                 <span style="color: #7f8c8d;">Сума:</span>
@@ -171,7 +301,7 @@ function renderAggregatesCalcView() {
                     </div>
 
                     <!-- ВІКОНЦЕ: Режим перевірки -->
-                    <div id="verification-summary-container" style="background: #fff; padding: 10px; border-radius: 4px; border: 1px solid #c0392b; text-align: center; display: none;">
+                    <div id="verification-summary-container" style="background: #fff; padding: 10px; border-radius: 4px; border: 1px solid #c0392b; text-align: center; display: ${window._isVerificationMode ? 'block' : 'none'};">
                         <div style="font-weight: bold; color: #c0392b; font-size: 11px; margin-bottom: 4px;">Режим перевірки</div>
                         <div style="display: flex; justify-content: space-around; font-size: 11px;">
                             <div>
@@ -197,20 +327,77 @@ function renderAggregatesCalcView() {
     renderAggDropdownItems(allEquipment);
     onSelectedEquipmentChange();
 
+    if (savedState) {
+        if (savedState.customCons && document.getElementById('custom-cons-input')) {
+            document.getElementById('custom-cons-input').value = savedState.customCons;
+        }
+        if (savedState.customOil && document.getElementById('custom-oil-input')) {
+            document.getElementById('custom-oil-input').value = savedState.customOil;
+        }
+    }
+
+    if (oilExpr) {
+        calculateOilExpr(oilExpr);
+    }
+
+    updateVariantBSummary();
+    triggerRecalc();
+
+    // Закриття дропдауну при кліку поза ним
     document.addEventListener('click', function closeAggDropdown(e) {
         const box = document.getElementById('agg-dropdown-box');
         if (box && !box.contains(e.target)) {
             const panel = document.getElementById('agg-dropdown-panel');
             if (panel) panel.style.display = 'none';
         }
-    }, { once: true });
+    });
 }
 
+// Очистити всі поля таблиці калькулятора
+function resetAggregatesCalc() {
+    for (let i = 1; i <= 10; i++) {
+        const daysIn = document.getElementById(`b-days-${i}`);
+        const startIn = document.getElementById(`b-start-${i}`);
+        const recIn = document.getElementById(`b-rec-${i}`);
+        const endIn = document.getElementById(`b-end-${i}`);
+        const spentIn = document.getElementById(`b-spent-${i}`);
+
+        if (daysIn) daysIn.value = '';
+        if (startIn) { 
+            startIn.value = ''; 
+            startIn.dataset.auto = 'false'; 
+        }
+        if (recIn) recIn.value = '';
+        if (endIn) endIn.value = '';
+        if (spentIn) spentIn.value = '';
+    }
+
+    window._periodRandomSeeds = {};
+    window._manualMotoHours = {};
+
+    updateVariantBSummary();
+    saveAggCalcState();
+    triggerRecalc();
+
+    // Візуальний індикатор успішного очищення на кнопці
+    const btn = document.getElementById('btn-reset-agg-calc');
+    if (btn) {
+        const origHtml = btn.innerHTML;
+        btn.innerHTML = '<span style="font-size: 13px; margin-right: 5px;">✓</span> Очищено';
+        btn.style.backgroundColor = '#27ae60';
+        setTimeout(() => {
+            btn.innerHTML = origHtml;
+            btn.style.backgroundColor = '#95a5a6';
+        }, 1200);
+    }
+}
+
+// Калькулятор виразу мастила
 function calculateOilExpr(expr) {
     const resEl = document.getElementById('oil-calc-result');
     if (!resEl) return;
 
-    if (!expr.trim()) {
+    if (!expr || !expr.trim()) {
         resEl.textContent = '0.00 л';
         return;
     }
@@ -229,7 +416,15 @@ function calculateOilExpr(expr) {
     }
 }
 
-function calculateVariantBRow(rowIdx) {
+// Обробка зміни кількості днів
+function onDaysInputChange(rowIdx) {
+    updateVariantBSummary();
+    saveAggCalcState();
+    triggerRecalc();
+}
+
+// Розрахунок рядка таблиці B
+function calculateVariantBRow(rowIdx, skipPropagate) {
     const startInput = document.getElementById(`b-start-${rowIdx}`);
     const recInput = document.getElementById(`b-rec-${rowIdx}`);
     const endInput = document.getElementById(`b-end-${rowIdx}`);
@@ -241,7 +436,7 @@ function calculateVariantBRow(rowIdx) {
     let recVal = parseFloat(recInput.value) || 0;
     let endVal = parseFloat(endInput.value);
 
-    let isIntegerHours = document.getElementById('hours-mode-toggle')?.checked || false;
+    let isIntegerHours = !!window._isIntegerHours;
 
     if (!isNaN(startVal) && !isNaN(endVal)) {
         let spent = startVal + recVal - endVal;
@@ -250,19 +445,21 @@ function calculateVariantBRow(rowIdx) {
         spentInput.value = '';
     }
 
-    if (rowIdx < 10 && !isNaN(endVal)) {
+    if (!skipPropagate && rowIdx < 10 && !isNaN(endVal)) {
         let nextStartInput = document.getElementById(`b-start-${rowIdx + 1}`);
         if (nextStartInput && (!nextStartInput.value || nextStartInput.dataset.auto === 'true')) {
             nextStartInput.value = isIntegerHours ? Math.round(endVal) : endVal.toFixed(1);
             nextStartInput.dataset.auto = 'true';
-            calculateVariantBRow(rowIdx + 1);
+            calculateVariantBRow(rowIdx + 1, false);
         }
     }
 
     updateVariantBSummary();
+    saveAggCalcState();
     triggerRecalc();
 }
 
+// Підсумок таблиці залишків
 function updateVariantBSummary() {
     let totalDays = 0;
     let firstStart = 0;
@@ -271,7 +468,7 @@ function updateVariantBSummary() {
     let totalSpent = 0;
 
     let foundFirstStart = false;
-    let isIntegerHours = document.getElementById('hours-mode-toggle')?.checked || false;
+    let isIntegerHours = !!window._isIntegerHours;
 
     for (let i = 1; i <= 10; i++) {
         const daysIn = document.getElementById(`b-days-${i}`);
@@ -323,8 +520,9 @@ function updateVariantBSummary() {
     if (spEl) spEl.textContent = isIntegerHours ? Math.round(totalSpent) : totalSpent.toFixed(1);
 }
 
+// Випадаючий список агрегатів
 function toggleAggDropdown(event) {
-    event.stopPropagation();
+    if (event) event.stopPropagation();
     const panel = document.getElementById('agg-dropdown-panel');
     if (!panel) return;
     const isOpen = panel.style.display === 'block';
@@ -354,7 +552,7 @@ function renderAggDropdownItems(items) {
 }
 
 function filterAggDropdown(query) {
-    const q = query.toLowerCase().trim();
+    const q = (query || '').toLowerCase().trim();
     const all = window._allCalculatedEquipment || [];
     
     let html = `<div onclick="selectCustomAggOption()" style="padding: 9px 12px; cursor: pointer; border-bottom: 1px solid #e0e0e0; color: #2e7d32; font-weight: bold; background: #f4f6f7;" onmouseover="this.style.background='#eaf2f8'" onmouseout="this.style.background='#f4f6f7'">➕ Свій агрегат</div>`;
@@ -392,6 +590,7 @@ function selectCustomAggOption() {
     if (panel) panel.style.display = 'none';
 
     onSelectedEquipmentChange();
+    saveAggCalcState();
 }
 
 function selectAggItem(index, titleText) {
@@ -408,6 +607,7 @@ function selectAggItem(index, titleText) {
     if (panel) panel.style.display = 'none';
 
     onSelectedEquipmentChange();
+    saveAggCalcState();
 }
 
 function selectCustomAggText(customText) {
@@ -424,12 +624,13 @@ function selectCustomAggText(customText) {
     if (panel) panel.style.display = 'none';
 
     onSelectedEquipmentChange();
+    saveAggCalcState();
 }
 
 function getSelectedEquipment() {
     if (window._selectedAggIndex === 'custom') {
-        const cons = parseFloat(document.getElementById('custom-cons-input')?.value) || 3.0;
-        const oil = parseFloat(document.getElementById('custom-oil-input')?.value) || 1.0;
+        const cons = parseFloat(document.getElementById('custom-cons-input')?.value) || 3.33;
+        const oil = parseFloat(document.getElementById('custom-oil-input')?.value) || 1.1;
         return {
             model: 'Свій агрегат',
             category: 'Власний',
@@ -443,11 +644,13 @@ function getSelectedEquipment() {
         return window._allCalculatedEquipment[window._selectedAggIndex];
     }
     if (window._customAggText) {
+        const cons = parseFloat(document.getElementById('custom-cons-input')?.value) || 3.33;
+        const oil = parseFloat(document.getElementById('custom-oil-input')?.value) || 1.1;
         return {
             model: window._customAggText,
             category: 'Власне обладнання',
-            consumption: 3.33,
-            oilNorm10Days: 1.1,
+            consumption: cons,
+            oilNorm10Days: oil,
             fuelType: 'ДП',
             subdivision: 'РМТЗ'
         };
@@ -479,12 +682,15 @@ function onSelectedEquipmentChange() {
         </div>
     `;
 
-    if (window._selectedAggIndex === 'custom') {
+    if (window._selectedAggIndex === 'custom' || window._selectedAggIndex === -1) {
+        const savedState = loadAggCalcState();
+        const savedCons = savedState?.customCons || '3.33';
+        const savedOil = savedState?.customOil || '1.1';
         infoBox.innerHTML = `
             <div style="display: flex; gap: 8px; align-items: center; width: 100%; font-size: 11px; justify-content: space-between;">
                 <div style="display: flex; gap: 8px; align-items: center;">
-                    <div><strong>Розхід:</strong> <input type="number" id="custom-cons-input" value="3.33" step="0.1" min="0.1" oninput="triggerRecalc()" style="width: 50px; padding: 3px; font-size: 11px; border: 1px solid #bdc3c7; border-radius: 3px;"> л/год</div>
-                    <div><strong>Мастило(10д):</strong> <input type="number" id="custom-oil-input" value="1.1" step="0.1" min="0" oninput="triggerRecalc()" style="width: 50px; padding: 3px; font-size: 11px; border: 1px solid #bdc3c7; border-radius: 3px;"> л</div>
+                    <div><strong>Розхід:</strong> <input type="number" id="custom-cons-input" value="${savedCons}" step="0.1" min="0.1" oninput="saveAggCalcState(); triggerRecalc();" style="width: 50px; padding: 3px; font-size: 11px; border: 1px solid #bdc3c7; border-radius: 3px;"> л/год</div>
+                    <div><strong>Мастило(10д):</strong> <input type="number" id="custom-oil-input" value="${savedOil}" step="0.1" min="0" oninput="saveAggCalcState(); triggerRecalc();" style="width: 50px; padding: 3px; font-size: 11px; border: 1px solid #bdc3c7; border-radius: 3px;"> л</div>
                 </div>
                 ${hoursBlockHtml}
             </div>
@@ -512,6 +718,49 @@ function onSelectedEquipmentChange() {
     triggerRecalc();
 }
 
+// ПЕРЕМИКАННЯ РЕЖИМІВ
+function setAggCalcMode(isVerif) {
+    window._isVerificationMode = !!isVerif;
+    saveAggCalcState();
+    triggerRecalc();
+}
+
+function toggleAggCalcMode() {
+    setAggCalcMode(!window._isVerificationMode);
+}
+
+function setAggHoursMode(isInteger) {
+    window._isIntegerHours = !!isInteger;
+
+    // Якщо перемикаємо у Цілі (0), округлюємо всі збережені ручні мото-години
+    if (window._isIntegerHours && window._manualMotoHours) {
+        Object.keys(window._manualMotoHours).forEach(k => {
+            let val = parseFloat(window._manualMotoHours[k]);
+            if (!isNaN(val)) {
+                window._manualMotoHours[k] = Math.round(val);
+            }
+        });
+    }
+
+    for (let i = 1; i <= 10; i++) {
+        calculateVariantBRow(i, true);
+    }
+    saveAggCalcState();
+    triggerRecalc();
+}
+
+function toggleAggHoursMode() {
+    setAggHoursMode(!window._isIntegerHours);
+}
+
+// ПЕРЕРАХУНОК ХАОТИЧНОГО РОЗПОДІЛУ З НОВИМИ ВАГАМИ
+function reseedChaosDistribution() {
+    window._periodRandomSeeds = {};
+    saveAggCalcState();
+    triggerRecalc();
+}
+
+// ОСНОВНА ФУНКЦІЯ РОЗРАХУНКУ
 function triggerRecalc() {
     const eq = getSelectedEquipment();
     if (!eq) return;
@@ -519,6 +768,8 @@ function triggerRecalc() {
     let maxDailyHours = parseFloat(document.getElementById('calc-max-daily-hours')?.value) || 24;
     const hourlyRate = parseFloat(eq.consumption) || 1;
     let baseOilNorm10Days = parseFloat(eq.oilNorm10Days) || 0;
+    let isIntegerHours = !!window._isIntegerHours;
+    let isVerification = !!window._isVerificationMode;
 
     let totalMotoHoursAll = 0;
     let totalFuelAll = 0;
@@ -550,19 +801,22 @@ function triggerRecalc() {
         let targetFuelToSpend = periodSpent;
         if (targetFuelToSpend < 0) targetFuelToSpend = 0;
 
-        let isVerification = document.getElementById('calc-mode-toggle')?.checked || false;
         let periodDailyFuels = [];
 
         if (isVerification) {
             let periodSpentSum = 0;
             for (let d = 0; d < periodDays; d++) {
                 let mInputKey = `${i}_${d}`;
-                let manualVal = (window._manualMotoHours && window._manualMotoHours[mInputKey] !== undefined) 
+                let rawVal = (window._manualMotoHours && window._manualMotoHours[mInputKey] !== undefined) 
                     ? window._manualMotoHours[mInputKey] 
                     : (targetFuelToSpend / periodDays / hourlyRate);
                 
-                let dHours = parseFloat(manualVal) || 0;
-                let dFuel = dHours * hourlyRate;
+                let dHours = isIntegerHours ? Math.round(parseFloat(rawVal) || 0) : (parseFloat(rawVal) || 0);
+                if (window._manualMotoHours && window._manualMotoHours[mInputKey] === undefined) {
+                    window._manualMotoHours[mInputKey] = dHours;
+                }
+
+                let dFuel = isIntegerHours ? Math.round(dHours * hourlyRate) : (dHours * hourlyRate);
                 periodDailyFuels.push(dFuel);
                 periodSpentSum += dFuel;
             }
@@ -587,23 +841,23 @@ function triggerRecalc() {
                     let rest = targetFuelToSpend - allocatedSum;
                     let maxRest = hourlyRate * maxDailyHours;
                     if (rest > maxRest) rest = maxRest;
-                    periodDailyFuels.push(Math.round(rest * 10) / 10);
+                    periodDailyFuels.push(isIntegerHours ? Math.round(rest) : (Math.round(rest * 10) / 10));
                 } else {
                     let f = (targetFuelToSpend / periodDays) * weights[d];
                     let maxDayFuel = hourlyRate * maxDailyHours;
                     if (f > maxDayFuel) f = maxDayFuel;
                     
-                    let rounded = Math.round(f * 10) / 10;
+                    let rounded = isIntegerHours ? Math.round(f) : (Math.round(f * 10) / 10);
                     periodDailyFuels.push(rounded);
                     allocatedSum += rounded;
                 }
             }
 
             let currentSum = periodDailyFuels.reduce((a, b) => a + b, 0);
-            let diff = Math.round((targetFuelToSpend - currentSum) * 10) / 10;
+            let diff = isIntegerHours ? Math.round(targetFuelToSpend - currentSum) : (Math.round((targetFuelToSpend - currentSum) * 10) / 10);
             if (diff !== 0 && periodDays > 0) {
-                periodDailyFuels[periodDays - 1] = Math.round((periodDailyFuels[periodDays - 1] + diff) * 10) / 10;
-                if (periodDailyFuels[periodDays - 1] < 0) periodDailyFuels[periodDays - 1] = 0;
+                let adjusted = isIntegerHours ? Math.round(periodDailyFuels[periodDays - 1] + diff) : (Math.round((periodDailyFuels[periodDays - 1] + diff) * 10) / 10);
+                periodDailyFuels[periodDays - 1] = Math.max(0, adjusted);
             }
         }
 
@@ -613,7 +867,10 @@ function triggerRecalc() {
             let dHours = periodDailyFuels[d] / hourlyRate;
             if (dHours > maxDailyHours && !isVerification) {
                 dHours = maxDailyHours;
-                periodDailyFuels[d] = Math.round((dHours * hourlyRate) * 10) / 10;
+                periodDailyFuels[d] = isIntegerHours ? Math.round(dHours * hourlyRate) : (Math.round((dHours * hourlyRate) * 10) / 10);
+            }
+            if (isIntegerHours && !isVerification) {
+                dHours = Math.round(dHours);
             }
             totalMotoHoursAll += dHours;
             let dOil = periodOil * (targetFuelToSpend > 0 ? (periodDailyFuels[d] / targetFuelToSpend) : 0);
@@ -633,16 +890,21 @@ function triggerRecalc() {
 
     const oilTotalEl = document.getElementById('oil-total-val');
     const oilAvgEl = document.getElementById('oil-avg-val');
-    if (oilTotalEl) oilTotalEl.textContent = totalOilAll.toFixed(2) + ' л';
-    if (oilAvgEl) oilAvgEl.textContent = `Сер. розхід: ${(totalDaysCount > 0 ? totalOilAll / totalDaysCount : 0).toFixed(2)} л/д`;
+    if (oilTotalEl) oilTotalEl.textContent = (isIntegerHours ? Math.round(totalOilAll) : totalOilAll.toFixed(2)) + ' л';
+    if (oilAvgEl) oilAvgEl.textContent = `Сер. розхід: ${(totalDaysCount > 0 ? (isIntegerHours ? Math.round(totalOilAll / totalDaysCount) : (totalOilAll / totalDaysCount).toFixed(2)) : 0)} л/д`;
 
     updateVariantBSummary();
     displayCalcResults(eq, totalMotoHoursAll, totalDaysCount, totalFuelAll, totalOilAll, allDailyFuels, allDailyHours, allDailyOils, allDayColors);
 }
 
+// ЗМІНА РУЧНИХ МОТО-ГОДИН У РЕЖИМІ ПЕРЕВІРКИ
 function onManualMotoHourChange(periodIdx, dayIdx, val) {
     if (!window._manualMotoHours) window._manualMotoHours = {};
-    window._manualMotoHours[`${periodIdx}_${dayIdx}`] = parseFloat(val) || 0;
+    let isIntegerHours = !!window._isIntegerHours;
+    let rawNum = parseFloat(val) || 0;
+    let parsedVal = isIntegerHours ? Math.round(rawNum) : parsedNumWithOneDec(rawNum);
+    window._manualMotoHours[`${periodIdx}_${dayIdx}`] = parsedVal;
+    saveAggCalcState();
     
     const eq = getSelectedEquipment();
     if (!eq) return;
@@ -669,8 +931,8 @@ function onManualMotoHourChange(periodIdx, dayIdx, val) {
                 ? window._manualMotoHours[mInputKey] 
                 : 0;
             
-            let dHours = parseFloat(manualVal) || 0;
-            let dFuel = dHours * hourlyRate;
+            let dHours = isIntegerHours ? Math.round(parseFloat(manualVal) || 0) : (parseFloat(manualVal) || 0);
+            let dFuel = isIntegerHours ? Math.round(dHours * hourlyRate) : (dHours * hourlyRate);
             periodDailyFuels.push(dFuel);
             periodSpentSum += dFuel;
         }
@@ -684,44 +946,61 @@ function onManualMotoHourChange(periodIdx, dayIdx, val) {
             let dHours = window._manualMotoHours[mInputKey] || 0;
             totalMotoHoursAll += dHours;
 
-            let adaptedFuel = dHours * hourlyRate;
+            let adaptedFuel = isIntegerHours ? Math.round(dHours * hourlyRate) : (dHours * hourlyRate);
             let adaptedOil = periodOil * (periodSpentSum > 0 ? (periodDailyFuels[d] / periodSpentSum) : 0);
 
             const fuelCell = document.getElementById(`row-fuel-${i}-${d}`);
             const oilCell = document.getElementById(`row-oil-${i}-${d}`);
-            if (fuelCell) fuelCell.textContent = adaptedFuel.toFixed(1) + ' л';
-            if (oilCell) oilCell.textContent = adaptedOil.toFixed(2) + ' л';
+            if (fuelCell) fuelCell.textContent = (isIntegerHours ? Math.round(adaptedFuel) : adaptedFuel.toFixed(1)) + ' л';
+            if (oilCell) oilCell.textContent = (isIntegerHours ? Math.round(adaptedOil) : adaptedOil.toFixed(2)) + ' л';
 
             globalDayCounter++;
         }
     }
 
-    let isIntegerHours = document.getElementById('hours-mode-toggle')?.checked || false;
     const topHoursEl = document.getElementById('top-total-hours');
     if (topHoursEl) topHoursEl.textContent = (isIntegerHours ? Math.round(totalMotoHoursAll) : totalMotoHoursAll.toFixed(1)) + ' год';
 
     const oilTotalEl = document.getElementById('oil-total-val');
     const oilAvgEl = document.getElementById('oil-avg-val');
-    if (oilTotalEl) oilTotalEl.textContent = totalOilAll.toFixed(2) + ' л';
-    if (oilAvgEl) oilAvgEl.textContent = `Сер. розхід: ${(globalDayCounter > 0 ? totalOilAll / globalDayCounter : 0).toFixed(2)} л/д`;
+    if (oilTotalEl) oilTotalEl.textContent = (isIntegerHours ? Math.round(totalOilAll) : totalOilAll.toFixed(2)) + ' л';
+    if (oilAvgEl) oilAvgEl.textContent = `Сер. розхід: ${(globalDayCounter > 0 ? (isIntegerHours ? Math.round(totalOilAll / globalDayCounter) : (totalOilAll / globalDayCounter).toFixed(2)) : 0)} л/д`;
 
     const verifHoursEl = document.getElementById('verif-total-hours');
     const verifFuelEl = document.getElementById('verif-total-fuel');
-    if (verifHoursEl) verifHoursEl.textContent = totalMotoHoursAll.toFixed(1) + ' год';
-    if (verifFuelEl) verifFuelEl.textContent = totalFuelAll.toFixed(1) + ' л';
+    if (verifHoursEl) verifHoursEl.textContent = (isIntegerHours ? Math.round(totalMotoHoursAll) : totalMotoHoursAll.toFixed(1)) + ' год';
+    if (verifFuelEl) verifFuelEl.textContent = (isIntegerHours ? Math.round(totalFuelAll) : totalFuelAll.toFixed(1)) + ' л';
 }
 
+function parsedNumWithOneDec(n) {
+    return Math.round(n * 10) / 10;
+}
+
+// ВІДОБРАЖЕННЯ РЕЗУЛЬТАТІВ РОЗРАХУНКУ
 function displayCalcResults(eq, totalMotoHours, daysCount, totalFuel, totalOil, dailyFuels, dailyHours, dailyOils, dayColors) {
     const box = document.getElementById('calc-details-box');
     if (!box) return;
 
-    let isIntegerHours = document.getElementById('hours-mode-toggle')?.checked || false;
-    let isVerification = document.getElementById('calc-mode-toggle')?.checked || false;
+    let isIntegerHours = !!window._isIntegerHours;
+    let isVerification = !!window._isVerificationMode;
     let hourlyRate = parseFloat(eq.consumption) || 1;
 
     const verifContainer = document.getElementById('verification-summary-container');
     if (verifContainer) {
         verifContainer.style.display = isVerification ? 'block' : 'none';
+    }
+
+    if (daysCount === 0) {
+        box.innerHTML = `
+            <div style="background: white; padding: 25px; border-radius: 6px; border: 1px solid #dcdcdc; text-align: center;">
+                <p style="color: #7f8c8d; font-style: italic; margin: 0; font-size: 13px;">Введіть кількість днів та залишки палива у таблиці ліворуч для формування розкладу.</p>
+            </div>
+        `;
+        const topHoursEl = document.getElementById('top-total-hours');
+        const topDaysSubEl = document.getElementById('top-total-days-sub');
+        if (topHoursEl) topHoursEl.textContent = isIntegerHours ? '0 год' : '0.0 год';
+        if (topDaysSubEl) topDaysSubEl.textContent = '(0 дн)';
+        return;
     }
 
     let displayTotalMotoHours = 0;
@@ -738,16 +1017,18 @@ function displayCalcResults(eq, totalMotoHours, daysCount, totalFuel, totalOil, 
             let dayIdx = globalDayCounter;
             let rowBg = dayColors && dayColors[dayIdx] ? dayColors[dayIdx] : '#fff';
             
-            let hVal = dailyHours[dayIdx];
+            let hVal = dailyHours[dayIdx] || 0;
             let mInputKey = `${i}_${d}`;
 
             let motoCellContent = '';
             if (isVerification) {
-                let currentVal = (window._manualMotoHours && window._manualMotoHours[mInputKey] !== undefined) 
+                let rawVal = (window._manualMotoHours && window._manualMotoHours[mInputKey] !== undefined) 
                     ? window._manualMotoHours[mInputKey] 
                     : (isIntegerHours ? Math.round(hVal) : parseFloat(hVal.toFixed(1)));
                 
-                if (window._manualMotoHours[mInputKey] === undefined) {
+                let currentVal = isIntegerHours ? Math.round(parseFloat(rawVal) || 0) : (parseFloat(Number(rawVal).toFixed(1)) || 0);
+
+                if (window._manualMotoHours[mInputKey] === undefined || (isIntegerHours && window._manualMotoHours[mInputKey] !== currentVal)) {
                     window._manualMotoHours[mInputKey] = currentVal;
                 }
 
@@ -758,19 +1039,27 @@ function displayCalcResults(eq, totalMotoHours, daysCount, totalFuel, totalOil, 
                 motoCellContent = `${formattedH} год`;
             }
 
-            let effectiveH = isVerification ? (window._manualMotoHours?.[mInputKey] !== undefined ? window._manualMotoHours[mInputKey] : hVal) : (isIntegerHours ? Math.round(hVal) : hVal);
-            displayTotalMotoHours += parseFloat(effectiveH);
+            let effectiveH = isVerification 
+                ? (isIntegerHours ? Math.round(parseFloat(window._manualMotoHours?.[mInputKey] !== undefined ? window._manualMotoHours[mInputKey] : hVal) || 0) : (parseFloat(window._manualMotoHours?.[mInputKey] !== undefined ? window._manualMotoHours[mInputKey] : hVal) || 0))
+                : (isIntegerHours ? Math.round(hVal) : hVal);
 
-            let adaptedFuel = effectiveH * hourlyRate;
+            displayTotalMotoHours += parseFloat(effectiveH) || 0;
+
+            let adaptedFuel = isIntegerHours ? Math.round(effectiveH * hourlyRate) : (effectiveH * hourlyRate);
             verificationTotalFuel += adaptedFuel;
 
-            let adaptedOil = dailyOils[dayIdx] * (dailyFuels[dayIdx] > 0 ? (adaptedFuel / dailyFuels[dayIdx]) : 1);
+            let rawOil = dailyOils[dayIdx] || 0;
+            let rawFuel = dailyFuels[dayIdx] || 0;
+            let adaptedOil = rawOil * (rawFuel > 0 ? (adaptedFuel / rawFuel) : 1);
             
+            let fuelDisplay = isIntegerHours ? `${Math.round(adaptedFuel)} л` : `${adaptedFuel.toFixed(1)} л`;
+            let oilDisplay = isIntegerHours ? `${Math.round(adaptedOil)} л` : `${adaptedOil.toFixed(2)} л`;
+
             dailyTableRows += '<tr style="background-color: ' + rowBg + ';">' +
                 '<td style="text-align: center; padding: 5px; border-bottom: 1px solid #e0e0e0;"><strong>День ' + (dayIdx + 1) + '</strong></td>' +
                 '<td style="text-align: center; padding: 5px; border-bottom: 1px solid #e0e0e0;">' + motoCellContent + '</td>' +
-                '<td id="row-fuel-' + i + '-' + d + '" style="text-align: center; padding: 5px; border-bottom: 1px solid #e0e0e0; color: #c0392b; font-weight: bold;">' + adaptedFuel.toFixed(1) + ' л</td>' +
-                '<td id="row-oil-' + i + '-' + d + '" style="text-align: center; padding: 5px; border-bottom: 1px solid #e0e0e0; color: #2980b9;">' + adaptedOil.toFixed(2) + ' л</td>' +
+                '<td id="row-fuel-' + i + '-' + d + '" style="text-align: center; padding: 5px; border-bottom: 1px solid #e0e0e0; color: #c0392b; font-weight: bold;">' + fuelDisplay + '</td>' +
+                '<td id="row-oil-' + i + '-' + d + '" style="text-align: center; padding: 5px; border-bottom: 1px solid #e0e0e0; color: #2980b9;">' + oilDisplay + '</td>' +
                 '</tr>';
 
             globalDayCounter++;
@@ -779,46 +1068,51 @@ function displayCalcResults(eq, totalMotoHours, daysCount, totalFuel, totalOil, 
 
     const topHoursEl = document.getElementById('top-total-hours');
     const topDaysSubEl = document.getElementById('top-total-days-sub');
-    if (topHoursEl) topHoursEl.textContent = (isIntegerHours && !isVerification ? Math.round(displayTotalMotoHours) : displayTotalMotoHours.toFixed(1)) + ' год';
+    if (topHoursEl) topHoursEl.textContent = (isIntegerHours ? Math.round(displayTotalMotoHours) : displayTotalMotoHours.toFixed(1)) + ' год';
     if (topDaysSubEl) topDaysSubEl.textContent = `(${daysCount} дн)`;
 
     const verifHoursEl = document.getElementById('verif-total-hours');
     const verifFuelEl = document.getElementById('verif-total-fuel');
-    if (verifHoursEl) verifHoursEl.textContent = displayTotalMotoHours.toFixed(1) + ' год';
-    if (verifFuelEl) verifFuelEl.textContent = verificationTotalFuel.toFixed(1) + ' л';
+    if (verifHoursEl) verifHoursEl.textContent = (isIntegerHours ? Math.round(displayTotalMotoHours) : displayTotalMotoHours.toFixed(1)) + ' год';
+    if (verifFuelEl) verifFuelEl.textContent = (isIntegerHours ? Math.round(verificationTotalFuel) : verificationTotalFuel.toFixed(1)) + ' л';
 
     box.innerHTML = `
         <div style="background: white; padding: 15px; border-radius: 6px; border: 1px solid #dcdcdc;">
-            <!-- ШАПКА ТАБЛИЦІ З ПЕРЕМИКАЧАМИ -->
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 8px;">
-                <h4 style="color: #2c3e50; margin: 0; font-size: 14px;">Поденний хаотичний розклад витрати (${eq.model || 'Агрегат'}):</h4>
+            <!-- ШАПКА ТАБЛИЦІ З ПЕРЕМИКАЧАМИ ТА КНОПКОЮ ПЕРЕРАХУНКУ -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <h4 style="color: #2c3e50; margin: 0; font-size: 14px;">Поденний розклад витрати (${eq.model || 'Агрегат'}):</h4>
+                    ${!isVerification ? `
+                        <button onclick="reseedChaosDistribution()" title="Згенерувати новий випадковий розподіл" style="background: #eaf2f8; border: 1px solid #2980b9; color: #2980b9; font-size: 11px; padding: 2px 8px; border-radius: 3px; cursor: pointer; font-weight: bold;">
+                            🎲 Перемішати
+                        </button>
+                    ` : ''}
+                </div>
                 
-                <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
                     <!-- Перемикач Режиму: Підрахунок / Перевірка -->
                     <div style="display: flex; align-items: center; gap: 8px; background: #f4f6f7; padding: 4px 10px; border-radius: 4px; border: 1px solid #bdc3c7;">
                         <span style="font-size: 11px; font-weight: bold; color: #2c3e50;">Режим:</span>
-                        <div style="display: flex; align-items: center; gap: 6px; cursor: pointer;" onclick="document.getElementById('calc-mode-toggle').click()">
-                            <span style="font-size: 11px; color: ${!isVerification ? '#2e7d32; font-weight: bold;' : '#7f8c8d;'}">Підрахунок</span>
-                            <label style="position: relative; display: inline-block; width: 34px; height: 18px; margin: 0; cursor: pointer;">
-                                <input type="checkbox" id="calc-mode-toggle" ${isVerification ? 'checked' : ''} onchange="triggerRecalc()" style="opacity: 0; width: 0; height: 0;">
-                                <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: ${isVerification ? '#c0392b' : '#bdc3c7'}; transition: .3s; border-radius: 18px;"></span>
-                                <span style="position: absolute; content: ''; height: 14px; width: 14px; left: ${isVerification ? '18px' : '2px'}; bottom: 2px; background-color: white; transition: .3s; border-radius: 50%;"></span>
-                            </label>
-                            <span style="font-size: 11px; color: ${isVerification ? '#c0392b; font-weight: bold;' : '#7f8c8d;'}">Перевірка</span>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <span onclick="setAggCalcMode(false)" style="font-size: 11px; cursor: pointer; color: ${!isVerification ? '#2e7d32; font-weight: bold;' : '#7f8c8d;'}">Підрахунок</span>
+                            <div onclick="toggleAggCalcMode()" style="position: relative; display: inline-block; width: 34px; height: 18px; margin: 0; cursor: pointer; user-select: none;">
+                                <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: ${isVerification ? '#c0392b' : '#bdc3c7'}; transition: .3s; border-radius: 18px;"></div>
+                                <div style="position: absolute; height: 14px; width: 14px; left: ${isVerification ? '18px' : '2px'}; bottom: 2px; background-color: white; transition: .3s; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.3);"></div>
+                            </div>
+                            <span onclick="setAggCalcMode(true)" style="font-size: 11px; cursor: pointer; color: ${isVerification ? '#c0392b; font-weight: bold;' : '#7f8c8d;'}">Перевірка</span>
                         </div>
                     </div>
 
                     <!-- Перемикач Мото-годин: Десяткові / Цілі -->
                     <div style="display: flex; align-items: center; gap: 8px; background: #f4f6f7; padding: 4px 10px; border-radius: 4px; border: 1px solid #bdc3c7;">
                         <span style="font-size: 11px; font-weight: bold; color: #2c3e50;">Формат:</span>
-                        <div style="display: flex; align-items: center; gap: 6px; cursor: pointer;" onclick="document.getElementById('hours-mode-toggle').click()">
-                            <span style="font-size: 11px; color: ${!isIntegerHours ? '#2e7d32; font-weight: bold;' : '#7f8c8d;'}">Десяткові (0.0)</span>
-                            <label style="position: relative; display: inline-block; width: 34px; height: 18px; margin: 0; cursor: pointer;">
-                                <input type="checkbox" id="hours-mode-toggle" ${isIntegerHours ? 'checked' : ''} onchange="triggerRecalc()" style="opacity: 0; width: 0; height: 0;">
-                                <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: ${isIntegerHours ? '#2e7d32' : '#bdc3c7'}; transition: .3s; border-radius: 18px;"></span>
-                                <span style="position: absolute; content: ''; height: 14px; width: 14px; left: ${isIntegerHours ? '18px' : '2px'}; bottom: 2px; background-color: white; transition: .3s; border-radius: 50%;"></span>
-                            </label>
-                            <span style="font-size: 11px; color: ${isIntegerHours ? '#2e7d32; font-weight: bold;' : '#7f8c8d;'}">Цілі (0)</span>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <span onclick="setAggHoursMode(false)" style="font-size: 11px; cursor: pointer; color: ${!isIntegerHours ? '#2e7d32; font-weight: bold;' : '#7f8c8d;'}">Десяткові (0.0)</span>
+                            <div onclick="toggleAggHoursMode()" style="position: relative; display: inline-block; width: 34px; height: 18px; margin: 0; cursor: pointer; user-select: none;">
+                                <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: ${isIntegerHours ? '#2e7d32' : '#bdc3c7'}; transition: .3s; border-radius: 18px;"></div>
+                                <div style="position: absolute; height: 14px; width: 14px; left: ${isIntegerHours ? '18px' : '2px'}; bottom: 2px; background-color: white; transition: .3s; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.3);"></div>
+                            </div>
+                            <span onclick="setAggHoursMode(true)" style="font-size: 11px; cursor: pointer; color: ${isIntegerHours ? '#2e7d32; font-weight: bold;' : '#7f8c8d;'}">Цілі (0)</span>
                         </div>
                     </div>
                 </div>
@@ -843,12 +1137,13 @@ function displayCalcResults(eq, totalMotoHours, daysCount, totalFuel, totalOil, 
     `;
 }
 
+// ДРУК ЗВІТУ
 function printAggregatesReport() {
     const box = document.getElementById('calc-details-box');
     const eq = getSelectedEquipment();
 
-    if (!box || !eq || !box.innerHTML.trim() || box.innerHTML.includes('Оберіть обладнання')) {
-        alert('Будь ласка, оберіть агрегат та виконайте розрахунок перед друком.');
+    if (!box || !eq || !box.innerHTML.trim() || box.innerHTML.includes('Оберіть обладнання') || box.innerHTML.includes('Введіть кількість днів')) {
+        alert('Будь ласка, оберіть агрегат та заповніть розрахунок перед друком.');
         return;
     }
 
@@ -858,9 +1153,16 @@ function printAggregatesReport() {
     let summaryBoxHtml = document.getElementById('variant-b-summary-box')?.outerHTML || '';
     let printContent = box.innerHTML.replace(/max-height:\s*300px;\s*overflow-y:\s*auto;/g, 'max-height: none; overflow: visible;');
     
+    // Приховуємо панель перемикачів і кнопки перемішування при друку
     printContent = printContent.replace(/<div style="display: flex; align-items: center; gap: 12px;[\s\S]*?<\/div>\s*<\/div>/, '</div>');
+    printContent = printContent.replace(/<button[\s\S]*?<\/button>/g, '');
 
     const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        alert('Не вдалося відкрити вікно друку. Дозвольте спливаючі вікна для цього сайту.');
+        return;
+    }
+
     printWindow.document.write(`
         <html>
             <head>

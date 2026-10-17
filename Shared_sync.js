@@ -48,7 +48,7 @@
     var LOCAL_ONLY_KEYS = [
         'currentrole', 'app_current_role', 'userrole', 'role', 'isdeveloperloggedin',
         'last_active_car_id', 'last_active_car_period', 'last_active_report_period',
-        'dev_role_time_stats'
+        'dev_role_time_stats', 'aggregates_calc_saved_state'
     ];
     var LOCAL_ONLY_PREFIXES = ['lastreadbroadcastid_', '__sync_'];
     var VERSION_MARKER_SUFFIX = '_data_version';
@@ -481,11 +481,12 @@
                     });
                 }
 
+                var shouldRefresh = (changed > 0) || isInitial;
                 awaitingFirstPull = false;
                 saveMeta();
                 savePending();
 
-                refreshAllViewsSafely();
+                if (shouldRefresh) refreshAllViewsSafely();
                 setStatus(Object.keys(pending).length > 0 ? 'saving' : 'ok');
                 if (Object.keys(pending).length > 0) schedulePush(200);
                 if (typeof data.filesVersion === 'number') pullDocsIfNewer(data.filesVersion);
@@ -646,7 +647,7 @@
         callIfExists('renderWebastoView');
         callIfExists('renderHeatersView');
         callIfExists('renderChainsawsView');
-        callIfExists('renderAggregatesCalcView');
+        callIfExists('refreshAggregatesEquipmentList');
         callIfExists('renderDestroyedEquipmentView');
         if (window.activeReportCarId) callIfExists('renderCarDetailsData');
         callIfExists('renderDocumentsMainView');
