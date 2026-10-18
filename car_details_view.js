@@ -68,6 +68,15 @@ function ensureCategoryDropdownsPopulated() {
 
 // Точне відкриття звіту за унікальним ID автомобіля
 window.openCarDetails = function(carId) {
+    const role = (typeof window.getCurrentAppRole === 'function')
+        ? window.getCurrentAppRole()
+        : ((typeof currentRole !== 'undefined') ? currentRole : 'user');
+    if (role !== 'developer' && typeof window.canRoleAccess === 'function' && !window.canRoleAccess(role, 'car_details')) {
+        const roleName = (typeof getRoleDisplayName === 'function') ? getRoleDisplayName(role) : role;
+        alert("⛔ Доступ до Детальної картки авто (ТТХ та Документи) заблоковано Розробником для вашої ролі (" + roleName + ")!");
+        return;
+    }
+
     window.activeReportCarId = Number(carId);
     window.currentCarId = Number(carId);
     activeDetailCarId = Number(carId);
@@ -99,6 +108,9 @@ window.openCarDetails = function(carId) {
     document.querySelectorAll('.top-nav .nav-btn, .nav-btn').forEach(btn => btn.classList.remove('active'));
 
     renderCarDetailsData();
+    if (typeof updateRoleUI === 'function') {
+        updateRoleUI();
+    }
 };
 
 function getActiveReportCar() {

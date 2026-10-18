@@ -4,9 +4,9 @@
 
 let currentDevSubTab = 'dashboard';
 
-if (typeof window.isDeveloperLoggedIn === 'undefined') {
-    window.isDeveloperLoggedIn = false;
-}
+window.isDeveloperLoggedIn = (localStorage.getItem('isDeveloperLoggedIn') === 'true') ||
+    (localStorage.getItem('app_current_role') === 'developer') ||
+    (localStorage.getItem('currentRole') === 'developer') || false;
 
 window.togglePasswordVisibility = function(inputId, btnEl) {
     const input = document.getElementById(inputId);
@@ -258,22 +258,28 @@ function saveGranularPermissions(perms) {
 }
 
 window.canRoleAccess = function(role, moduleKey) {
-    if (!role || role === 'developer') return true;
+    if (!role || role === 'developer' || role === 'dev') return true;
+    const normRole = (role === 'dev') ? 'developer' : role;
+    if (normRole === 'developer') return true;
     const matrix = getPagePermissionsMatrix();
-    return matrix[moduleKey]?.[role]?.access !== false;
+    return matrix[moduleKey]?.[normRole]?.access === true;
 };
 
 window.canRoleView = function(role, moduleKey) {
-    if (!role || role === 'developer') return true;
+    if (!role || role === 'developer' || role === 'dev') return true;
+    const normRole = (role === 'dev') ? 'developer' : role;
+    if (normRole === 'developer') return true;
     const matrix = getPagePermissionsMatrix();
-    return matrix[moduleKey]?.[role]?.view !== false;
+    return matrix[moduleKey]?.[normRole]?.view === true;
 };
 
 window.canRoleEdit = function(role, moduleKey) {
-    if (!role || role === 'developer') return true;
+    if (!role || role === 'developer' || role === 'dev') return true;
+    const normRole = (role === 'dev') ? 'developer' : role;
+    if (normRole === 'developer') return true;
     const matrix = getPagePermissionsMatrix();
-    if (matrix[moduleKey]?.[role]?.edit === true) return true;
-    if (moduleKey === 'report' && role === 'moderator') {
+    if (matrix[moduleKey]?.[normRole]?.edit === true) return true;
+    if (moduleKey === 'report' && normRole === 'moderator') {
         const secCfg = getRoleSecurityConfig();
         if (secCfg.moderatorCanEditReport) return true;
     }
@@ -281,9 +287,11 @@ window.canRoleEdit = function(role, moduleKey) {
 };
 
 window.canRoleDo = function(role, featureKey) {
-    if (!role || role === 'developer') return true;
+    if (!role || role === 'developer' || role === 'dev') return true;
+    const normRole = (role === 'dev') ? 'developer' : role;
+    if (normRole === 'developer') return true;
     const perms = getGranularPermissions();
-    return perms[featureKey]?.[role] === true;
+    return perms[featureKey]?.[normRole] === true;
 };
 
 window.canCurrentRoleAccess = function(moduleKey) {
@@ -584,15 +592,7 @@ window.updateRoleUI = function() {
         envelopeBtn.style.setProperty("display", (isDev || window.canRoleAccess(role, 'mail')) ? "inline-flex" : "none", "important");
     }
 
-    const headerSaveBtn = document.getElementById("header-direct-save-btn");
-    if (headerSaveBtn) {
-        headerSaveBtn.style.setProperty("display", (isDev || window.canRoleAccess(role, 'header_backup')) ? "inline-flex" : "none", "important");
-    }
-
-    const headerImportBtn = document.getElementById("header-direct-import-btn");
-    if (headerImportBtn) {
-        headerImportBtn.style.setProperty("display", (isDev || (window.canRoleAccess(role, 'header_backup') && window.canRoleEdit(role, 'header_backup'))) ? "inline-flex" : "none", "important");
-    }
+    // Кнопки прямого збереження/імпорту у шапці видалено на вимогу користувача
 
     // 2. Безпечне перенаправлення, якщо активний розділ заборонений для поточної ролі
     const checkRedirect = (viewId, modKey) => {
@@ -612,6 +612,7 @@ window.updateRoleUI = function() {
     checkRedirect("card-view", "card");
     checkRedirect("car-details-view", "car_details");
     checkRedirect("aggregates-calc-view", "aggregates_calc");
+    checkRedirect("documents-view", "documents");
 
     const devPanelView = document.getElementById("dev-panel-view") || document.getElementById("developer-panel-view");
     if (devPanelView && (devPanelView.classList.contains("active") || (devPanelView.style.display && devPanelView.style.display !== "none")) && !isDev) {
@@ -619,7 +620,9 @@ window.updateRoleUI = function() {
     }
 
     const docsMainSec = document.getElementById("documents-main-section");
-    if (docsMainSec && docsMainSec.style.display !== "none" && !isDev && !window.canRoleAccess(role, 'documents')) {
+    const docsViewSec = document.getElementById("documents-view");
+    const isDocsActive = (docsViewSec && docsViewSec.classList.contains("active")) || (docsMainSec && docsMainSec.style.display !== "none" && docsMainSec.style.display !== "");
+    if (isDocsActive && !isDev && !window.canRoleAccess(role, 'documents')) {
         if (typeof closeDocumentsTabView === 'function') closeDocumentsTabView();
         if (typeof switchView === "function") switchView("base");
     }
@@ -677,6 +680,50 @@ window.updateRoleUI = function() {
             }
         });
     }
+
+    const baseTableInputs = document.querySelectorAll('#cars-tbody input, #cars-tbody select');
+    baseTableInputs.forEach(inp => {
+        inp.disabled = !canEditBase;
+        inp.readOnly = !canEditBase;
+        inp.style.backgroundColor = canEditBase ? '' : '#f5f5f5';
+        inp.style.cursor = canEditBase ? '' : 'not-allowed';
+    });
+
+    // 2b. Перевірка та блокування перегляду (VIEW), якщо заборонено Розробником
+    const applyViewLockBanner = (containerId, modKey, mainElementSelector) => {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        const canView = isDev || window.canRoleView(role, modKey);
+        let banner = container.querySelector('.perm-view-lock-banner');
+        const mainEl = mainElementSelector ? container.querySelector(mainElementSelector) : null;
+        if (!canView) {
+            if (mainEl) mainEl.style.display = 'none';
+            if (!banner) {
+                banner = document.createElement('div');
+                banner.className = 'perm-view-lock-banner';
+                banner.style.cssText = 'padding: 30px; text-align: center; background: #ffffff; border-radius: 8px; border: 2px dashed #e74c3c; color: #c0392b; font-size: 15px; font-weight: bold; margin: 20px 0; box-shadow: 0 4px 12px rgba(231,76,60,0.1);';
+                const modName = (typeof window.getModuleNameUkrainian === 'function') ? window.getModuleNameUkrainian(modKey) : modKey;
+                banner.innerHTML = `⛔ Перегляд інформації у розділі «${modName}» заборонено Розробником для ролі «${getRoleDisplayName(role)}»!`;
+                container.appendChild(banner);
+            }
+            banner.style.display = 'block';
+        } else {
+            if (mainEl) mainEl.style.removeProperty('display');
+            if (banner) banner.style.display = 'none';
+        }
+    };
+
+    applyViewLockBanner('base-view', 'base', '.table-container');
+    applyViewLockBanner('card-view', 'card', '.car-card-container');
+    applyViewLockBanner('car-details-view', 'car_details', '.card-body');
+    applyViewLockBanner('report-view', 'report', '#report-table');
+    applyViewLockBanner('subdivisions-view', 'subdivisions', '#subdivisions-table');
+    applyViewLockBanner('generators-view', 'equipment', '#generators-tabs-container');
+    applyViewLockBanner('equipment-report-view', 'equipment_report', '#equipment-report-table');
+    applyViewLockBanner('aggregates-calc-view', 'aggregates_calc', '.calc-container');
+    applyViewLockBanner('destroyed-view', 'destroyed', '.destroyed-table-container');
+    applyViewLockBanner('documents-view', 'documents', '#documents-content-wrapper');
+    applyViewLockBanner('documents-main-section', 'documents', '#documents-content-wrapper');
 
     // [КАРТКА АВТО ТА МАРШРУТИ]
     const canEditCard = isDev || window.canRoleEdit(role, 'card');
@@ -778,7 +825,7 @@ window.updateRoleUI = function() {
     const canCreateA4 = isDev || (canEditDocs && window.canRoleDo(role, 'docs_create_a4'));
     const canUploadDocs = isDev || (canEditDocs && window.canRoleDo(role, 'docs_upload_file'));
 
-    const btnNewDocA4 = document.getElementById('btn-new-doc-a4');
+    const btnNewDocA4 = document.getElementById('btn-new-doc-a4') || document.querySelector('button[onclick*="createNewBlankDocument"]');
     if (btnNewDocA4) btnNewDocA4.style.setProperty('display', canCreateA4 ? 'inline-flex' : 'none', 'important');
 
     const btnNewTemplate = document.querySelector('button[onclick*="openTemplateEditor"]');
@@ -787,7 +834,7 @@ window.updateRoleUI = function() {
     const docUploadLabel = document.querySelector('label[for="doc-upload-input"]');
     if (docUploadLabel) docUploadLabel.style.setProperty('display', canUploadDocs ? 'inline-flex' : 'none', 'important');
 
-    const docDelBtns = document.querySelectorAll('#documents-main-section button[onclick*="deleteSavedDocument"]');
+    const docDelBtns = document.querySelectorAll('#documents-main-section button[onclick*="deleteSavedDocument"], #documents-main-section button[onclick*="deleteDocumentById"]');
     docDelBtns.forEach(btn => btn.style.setProperty('display', canUploadDocs ? 'inline-block' : 'none', 'important'));
 
     // Оновлення Панелі розробника, якщо відкрита
@@ -1533,13 +1580,31 @@ window.updateRolePermissionCheckbox = function(moduleKey, targetRole, action, ch
         matrix[moduleKey][targetRole].access = true;
         matrix[moduleKey][targetRole].view = true;
     }
+    // Якщо вимкнено доступ (Заходити) — обов'язково вимикаємо перегляд та редагування
+    if (action === 'access' && !checked) {
+        matrix[moduleKey][targetRole].view = false;
+        matrix[moduleKey][targetRole].edit = false;
+    }
+    // Якщо вимкнено перегляд — вимикаємо редагування
+    if (action === 'view' && !checked) {
+        matrix[moduleKey][targetRole].edit = false;
+    }
+    // Якщо увімкнено перегляд — вмикаємо доступ
+    if (action === 'view' && checked) {
+        matrix[moduleKey][targetRole].access = true;
+    }
 
     savePagePermissionsMatrix(matrix);
     const modName = matrix[moduleKey]?.name || moduleKey;
     const actionUa = action === 'access' ? 'Вхід (Заходити)' : (action === 'view' ? 'Перегляд' : 'Редагування');
     addSecurityLog('info', `Зміна прав: ${getRoleDisplayName(targetRole)}`, `Розділ «${modName}» -> ${actionUa}: ${checked ? 'ДОЗВОЛЕНО' : 'ЗАБОРОНЕНО'}`);
     showDevNotification(`🛡️ Оновлено: <b>${getRoleDisplayName(targetRole)}</b> | ${modName} → ${actionUa}: ${checked ? '✅ Дозволено' : '⛔ Заборонено'}`, checked ? '#27ae60' : '#e67e22');
+    
     updateRoleUI();
+
+    const scrollY = window.scrollY;
+    renderDeveloperPanel();
+    window.scrollTo(0, scrollY);
 };
 
 window.updateGranularPermissionCheckbox = function(featureKey, targetRole, checked) {
@@ -1550,7 +1615,12 @@ window.updateGranularPermissionCheckbox = function(featureKey, targetRole, check
     const featName = perms[featureKey]?.name || featureKey;
     addSecurityLog('info', `Функціональний дозвіл: ${getRoleDisplayName(targetRole)}`, `Дія «${featName}»: ${checked ? 'ДОЗВОЛЕНО' : 'ЗАБОРОНЕНО'}`);
     showDevNotification(`⚙️ Оновлено: <b>${getRoleDisplayName(targetRole)}</b> | ${featName}: ${checked ? '✅ Дозволено' : '⛔ Заборонено'}`, checked ? '#27ae60' : '#e67e22');
+    
     updateRoleUI();
+
+    const scrollY = window.scrollY;
+    renderDeveloperPanel();
+    window.scrollTo(0, scrollY);
 };
 
 window.applyRolePreset = function(presetType, targetRole) {
@@ -2302,6 +2372,8 @@ window.renderDeveloperPanel = function() {
 };
 
 window.renderDevPanelView = window.renderDeveloperPanel;
+window.developerPanelUpdateRoleUI = window.updateRoleUI;
+window.developerPanelSelectRole = window.selectRole;
 
 function initDevPanel() {
     ensureDevPanelHeaderButtons();

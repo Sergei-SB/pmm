@@ -15,71 +15,261 @@ document.addEventListener("mouseover", function(e) {
 // ФУНКЦІЇ ДОДАВАННЯ АВТОМОБІЛІВ З КАТЕГОРІЯМИ ТА ФОРМУЛАМИ
 // ==========================================
 
+function showToastNotification(message, bgColor = '#27ae60') {
+    let toast = document.getElementById('app-floating-toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'app-floating-toast';
+        toast.style.cssText = `
+            position: fixed;
+            bottom: 25px;
+            right: 25px;
+            z-index: 999999;
+            color: #ffffff;
+            padding: 12px 22px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            opacity: 0;
+            transform: translateY(15px);
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        `;
+        document.body.appendChild(toast);
+    }
+    toast.style.backgroundColor = bgColor;
+    toast.textContent = message;
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateY(0)';
+    clearTimeout(toast._timeout);
+    toast._timeout = setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(15px)';
+    }, 3200);
+}
+window.showToastNotification = showToastNotification;
+
 function tryAddCarRow() {
-    if (typeof currentRole !== 'undefined' && (currentRole === 'developer' || currentRole === 'admin')) {
-        promptAndAddCar();
-    } else if (typeof isAdminLoggedIn !== 'undefined' && isAdminLoggedIn) {
-        promptAndAddCar();
+    const role = (typeof window.getCurrentAppRole === 'function')
+        ? window.getCurrentAppRole()
+        : ((typeof window.currentRole !== 'undefined') ? window.currentRole : ((typeof currentRole !== 'undefined') ? currentRole : 'admin'));
+
+    const isDev = (role === 'developer' || role === 'dev');
+    const isAdmin = (role === 'admin' || (typeof isAdminLoggedIn !== 'undefined' && isAdminLoggedIn));
+    const canDo = isDev || isAdmin || (typeof window.canRoleDo === 'function' && window.canRoleDo(role, 'base_add_car'));
+
+    if (canDo) {
+        openAddCarModal();
     } else {
         if (typeof showCustomPasswordModal === 'function') {
             showCustomPasswordModal((pass) => {
                 if (pass === "02031985" || pass === "4343") {
-                    promptAndAddCar();
+                    openAddCarModal();
                 } else if (pass !== null) {
-                    alert("Неправильний пароль!");
+                    showToastNotification("Неправильний пароль!", "#c0392b");
                 }
             });
         } else {
-            promptAndAddCar();
+            openAddCarModal();
         }
     }
 }
+window.tryAddCarRow = tryAddCarRow;
 
 function promptAndAddCar() {
-    if (typeof VEHICLE_CATEGORIES === 'undefined') {
-        alert("Помилка: об'єкт категорій VEHICLE_CATEGORIES не знайдено!");
-        return;
+    openAddCarModal();
+}
+window.promptAndAddCar = promptAndAddCar;
+
+function openAddCarModal() {
+    let existingModal = document.getElementById('add-car-custom-modal');
+    if (existingModal) {
+        existingModal.remove();
     }
 
-    let catKeys = Object.keys(VEHICLE_CATEGORIES);
-    let menuText = "Оберіть категорію для нового автомобіля (введіть номер):\n\n";
-    
-    catKeys.forEach((key, index) => {
-        menuText += `${index + 1}. ${VEHICLE_CATEGORIES[key]}\n`;
+    const categories = (typeof VEHICLE_CATEGORIES !== 'undefined') ? VEHICLE_CATEGORIES : {
+        PASSENGER: "Легкові автомобілі",
+        TRUCK: "Вантажні автомобілі",
+        ADBLUE: "Вантажні автомобілі з AdBlue",
+        SUV: "Позашляховики",
+        MINIBUS: "Мікроавтобуси",
+        MILES: "Автомобілі з милями",
+        HQ: "Штабні автомобілі",
+        SPECIAL: "Спецтехніка",
+        MOTORCYCLE: "Мотоцикли",
+        QUAD: "Квадроцикли"
+    };
+
+    const nextNumber = (typeof carsData !== 'undefined' && Array.isArray(carsData) && carsData.length > 0)
+        ? Math.max(...carsData.map(i => Number(i.id) || 0)) + 1
+        : 1;
+
+    let catOptionsHtml = '';
+    for (const [key, label] of Object.entries(categories)) {
+        catOptionsHtml += `<option value="${key}">${label}</option>`;
+    }
+
+    const modal = document.createElement('div');
+    modal.id = 'add-car-custom-modal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(15, 23, 42, 0.65);
+        backdrop-filter: blur(3px);
+        z-index: 100000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        box-sizing: border-box;
+    `;
+
+    modal.innerHTML = `
+        <div style="background: white; border-radius: 10px; max-width: 520px; width: 100%; box-shadow: 0 10px 30px rgba(0,0,0,0.3); overflow: hidden; animation: popIn 0.2s ease-out; font-family: inherit;">
+            <div style="background: #2c3e50; color: white; padding: 14px 20px; display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; font-size: 16px; font-weight: bold; display: flex; align-items: center; gap: 8px;">
+                    🚗 Додати новий автомобіль у Реєстр
+                </h3>
+                <button type="button" id="close-add-car-modal-btn" style="background: transparent; border: none; color: white; font-size: 20px; cursor: pointer; line-height: 1;">&times;</button>
+            </div>
+            <form id="add-car-form" style="padding: 20px; display: flex; flex-direction: column; gap: 14px;">
+                <div>
+                    <label style="display: block; font-size: 12px; font-weight: bold; color: #34495e; margin-bottom: 5px;">Категорія транспортного засобу:</label>
+                    <select id="newcar-category" style="width: 100%; padding: 8px 10px; border: 1px solid #bdc3c7; border-radius: 5px; font-size: 13px; font-weight: bold; background: white; cursor: pointer;">
+                        ${catOptionsHtml}
+                    </select>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 12px;">
+                    <div>
+                        <label style="display: block; font-size: 12px; font-weight: bold; color: #34495e; margin-bottom: 5px;">Номерний знак:</label>
+                        <input type="text" id="newcar-plate" value="NEW ${String(nextNumber).padStart(4, '0')}" required style="width: 100%; padding: 8px 10px; border: 1px solid #bdc3c7; border-radius: 5px; font-size: 13px; font-weight: bold; box-sizing: border-box;">
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 12px; font-weight: bold; color: #34495e; margin-bottom: 5px;">Марка / Модель:</label>
+                        <input type="text" id="newcar-model" value="Новий авто" required style="width: 100%; padding: 8px 10px; border: 1px solid #bdc3c7; border-radius: 5px; font-size: 13px; box-sizing: border-box;">
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div>
+                        <label style="display: block; font-size: 12px; font-weight: bold; color: #34495e; margin-bottom: 5px;">Підрозділ:</label>
+                        <input type="text" id="newcar-subdivision" value="РМТЗ" style="width: 100%; padding: 8px 10px; border: 1px solid #bdc3c7; border-radius: 5px; font-size: 13px; box-sizing: border-box;">
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 12px; font-weight: bold; color: #34495e; margin-bottom: 5px;">Вид пального:</label>
+                        <select id="newcar-fuel" style="width: 100%; padding: 8px 10px; border: 1px solid #bdc3c7; border-radius: 5px; font-size: 13px; background: white; cursor: pointer; box-sizing: border-box;">
+                            <option value="ДП">ДП (Дизель)</option>
+                            <option value="АБ">АБ (Бензин)</option>
+                            <option value="ДП / AdBlue">ДП / AdBlue</option>
+                            <option value="АБ / AdBlue">АБ / AdBlue</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div>
+                        <label style="display: block; font-size: 12px; font-weight: bold; color: #34495e; margin-bottom: 5px;">Базова витрата (л/100км):</label>
+                        <input type="number" step="0.1" id="newcar-consumption" value="10.0" min="1" max="99" style="width: 100%; padding: 8px 10px; border: 1px solid #bdc3c7; border-radius: 5px; font-size: 13px; font-weight: bold; box-sizing: border-box;">
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 12px; font-weight: bold; color: #34495e; margin-bottom: 5px;">Водій:</label>
+                        <input type="text" id="newcar-driver" value="Водій" style="width: 100%; padding: 8px 10px; border: 1px solid #bdc3c7; border-radius: 5px; font-size: 13px; box-sizing: border-box;">
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+                    <button type="button" id="cancel-add-car-btn" style="background: #95a5a6; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: bold; cursor: pointer;">Скасувати</button>
+                    <button type="submit" id="submit-add-car-btn" style="background: #27ae60; color: white; border: none; padding: 8px 20px; border-radius: 4px; font-size: 13px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                        ➕ Додати автомобіль
+                    </button>
+                </div>
+            </form>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const catSelect = modal.querySelector('#newcar-category');
+    const fuelSelect = modal.querySelector('#newcar-fuel');
+    const consInput = modal.querySelector('#newcar-consumption');
+    const plateInput = modal.querySelector('#newcar-plate');
+
+    catSelect.addEventListener('change', () => {
+        const uKey = catSelect.value.toUpperCase();
+        if (uKey === 'TRUCK' || uKey === 'SPECIAL' || uKey === 'ADBLUE' || uKey === 'MINIBUS') {
+            consInput.value = '25.0';
+            fuelSelect.value = (uKey === 'ADBLUE') ? 'ДП / AdBlue' : 'ДП';
+        } else if (uKey === 'MOTORCYCLE' || uKey === 'QUAD') {
+            consInput.value = '4.0';
+            fuelSelect.value = 'АБ';
+        } else {
+            consInput.value = '10.0';
+            fuelSelect.value = 'ДП';
+        }
     });
 
-    let choice = prompt(menuText, "1");
-    if (choice === null) return;
+    const closeModal = () => {
+        modal.remove();
+    };
 
-    let index = parseInt(choice, 10) - 1;
-    if (isNaN(index) || index < 0 || index >= catKeys.length) {
-        alert("Невірний вибір категорії! Спробуйте ще раз.");
-        return;
-    }
+    modal.querySelector('#close-add-car-modal-btn').onclick = closeModal;
+    modal.querySelector('#cancel-add-car-btn').onclick = closeModal;
+    modal.onclick = (e) => {
+        if (e.target === modal) closeModal();
+    };
 
-    let selectedKey = catKeys[index];
-    let selectedCategoryName = VEHICLE_CATEGORIES[selectedKey];
+    setTimeout(() => {
+        plateInput.focus();
+        plateInput.select();
+    }, 50);
 
-    let vehicleTypeUA = "легковий";
-    const upperKey = selectedKey.toUpperCase();
-    if (upperKey === "TRUCK" || upperKey === "MINIBUS" || upperKey === "SPECIAL" || upperKey === "ADBLUE") {
-        vehicleTypeUA = "вантажний";
-    } else if (upperKey === "MOTORCYCLE") {
-        vehicleTypeUA = "мотоцикл";
-    } else if (upperKey === "QUAD") {
-        vehicleTypeUA = "квадроцикл";
-    }
+    const form = modal.querySelector('#add-car-form');
+    form.onsubmit = (e) => {
+        e.preventDefault();
+        const selKey = catSelect.value;
+        const selName = categories[selKey] || selKey;
+        const plateVal = plateInput.value.trim() || `NEW ${String(nextNumber).padStart(4, '0')}`;
+        const modelVal = modal.querySelector('#newcar-model').value.trim() || `Новий авто (${selName})`;
+        const subVal = modal.querySelector('#newcar-subdivision').value.trim() || 'РМТЗ';
+        const fuelVal = fuelSelect.value;
+        const consVal = parseFloat(consInput.value) || 10.0;
+        const driverVal = modal.querySelector('#newcar-driver').value.trim() || 'Водій';
 
-    executeAddCarWithCategory(selectedKey, vehicleTypeUA, selectedCategoryName);
+        let vehicleTypeUA = "легковий";
+        const upperKey = selKey.toUpperCase();
+        if (upperKey === "TRUCK" || upperKey === "MINIBUS" || upperKey === "SPECIAL" || upperKey === "ADBLUE") {
+            vehicleTypeUA = "вантажний";
+        } else if (upperKey === "MOTORCYCLE") {
+            vehicleTypeUA = "мотоцикл";
+        } else if (upperKey === "QUAD") {
+            vehicleTypeUA = "квадроцикл";
+        }
+
+        executeAddCarWithCategory(selKey, vehicleTypeUA, selName, {
+            plate: plateVal,
+            model: modelVal,
+            subdivision: subVal,
+            fuelType: fuelVal,
+            consumption: consVal,
+            driver: driverVal
+        });
+
+        closeModal();
+    };
 }
+window.openAddCarModal = openAddCarModal;
 
-function executeAddCarWithCategory(categoryKey, vehicleTypeStr, categoryDisplayName) {
+function executeAddCarWithCategory(categoryKey, vehicleTypeStr, categoryDisplayName, customDetails = {}) {
     if (typeof carsData === 'undefined') {
         window.carsData = [];
     }
 
     const newId = carsData.length > 0 ? Math.max(...carsData.map(i => Number(i.id) || 0)) + 1 : 1;
-    const upperKey = categoryKey.toUpperCase();
+    const upperKey = (categoryKey || 'PASSENGER').toUpperCase();
 
     let assignedFormulas = [1, 2, 3, 4];
     if (upperKey === 'TRUCK' || upperKey === 'SPECIAL' || upperKey === 'ADBLUE' || upperKey === 'MINIBUS') {
@@ -90,15 +280,24 @@ function executeAddCarWithCategory(categoryKey, vehicleTypeStr, categoryDisplayN
         assignedFormulas = [8];
     }
 
-    const hasAdBlueFlag = (upperKey === 'ADBLUE');
+    const hasAdBlueFlag = (upperKey === 'ADBLUE' || (customDetails.fuelType && customDetails.fuelType.includes('AdBlue')));
+
+    const finalPlate = customDetails.plate || `NEW ${String(newId).padStart(4, '0')}`;
+    const finalModel = customDetails.model || `Новий авто (${categoryDisplayName})`;
+    const finalSubdivision = customDetails.subdivision || "РМТЗ";
+    const finalFuel = customDetails.fuelType || (upperKey === 'MOTORCYCLE' || upperKey === 'QUAD' ? "АБ" : "ДП");
+    const finalConsumption = (customDetails.consumption !== undefined && !isNaN(customDetails.consumption))
+        ? Number(customDetails.consumption)
+        : ((upperKey === 'MOTORCYCLE' || upperKey === 'QUAD') ? 4.0 : (vehicleTypeStr === 'вантажний' ? 25.0 : 10.0));
+    const finalDriver = customDetails.driver || "Водій";
 
     const newCar = {
         id: newId,
-        plate: "NEW 0000",
-        model: `Новий авто (${categoryDisplayName})`,
-        subdivision: "РМТЗ",
-        consumption: (upperKey === 'MOTORCYCLE' || upperKey === 'QUAD') ? 4.0 : (vehicleTypeStr === 'вантажний' ? 25.0 : 10.0),
-        fuelType: "ДП",
+        plate: finalPlate,
+        model: finalModel,
+        subdivision: finalSubdivision,
+        consumption: finalConsumption,
+        fuelType: finalFuel,
         note: "",
         vin: "",
         year: 2024,
@@ -111,7 +310,7 @@ function executeAddCarWithCategory(categoryKey, vehicleTypeStr, categoryDisplayN
         engineVolume: 2000,
         kw: 110,
         engineNo: "",
-        driver: "Водій",
+        driver: finalDriver,
         category: categoryKey.toLowerCase(),
         vehicleType: vehicleTypeStr,     
         hasAdBlue: hasAdBlueFlag,
@@ -131,8 +330,26 @@ function executeAddCarWithCategory(categoryKey, vehicleTypeStr, categoryDisplayN
         renderCarsTable();
     }
 
-    alert(`Автомобіль успішно додано до категорії: "${categoryDisplayName}"!`);
+    showToastNotification(`✅ Автомобіль ${finalPlate} (${finalModel}) успішно додано!`, '#27ae60');
+
+    // Плавна прокрутка до нового рядка у таблиці
+    setTimeout(() => {
+        const tbody = document.getElementById('cars-tbody');
+        if (tbody && tbody.lastElementChild) {
+            tbody.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            tbody.lastElementChild.style.transition = 'background-color 0.5s ease';
+            tbody.lastElementChild.style.backgroundColor = '#d4edda';
+            setTimeout(() => {
+                if (tbody.lastElementChild) {
+                    tbody.lastElementChild.style.backgroundColor = '';
+                }
+            }, 2000);
+        }
+    }, 100);
+
+    return newCar;
 }
+window.executeAddCarWithCategory = executeAddCarWithCategory;
 
 // ==========================================
 // УПРАВЛІННЯ КАТЕГОРІЄЮ У ЗВІТАХ ТА МАРШРУТАХ

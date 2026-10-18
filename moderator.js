@@ -94,6 +94,27 @@ function applyModeratorReportLock() {
             eqNextBtn.disabled = false;
             eqNextBtn.style.cursor = 'pointer';
         }
+    } else {
+        const reportInputs = document.querySelectorAll(
+            '#report-tbody input, #report-tbody select, #report-table tbody input, #report-table tbody select, ' +
+            '#equipment-report-tbody input, #equipment-report-tbody select, #equipment-report-table tbody input, #equipment-report-table tbody select'
+        );
+        reportInputs.forEach(input => {
+            input.removeAttribute('disabled');
+            input.removeAttribute('readonly');
+            input.disabled = false;
+            input.readOnly = false;
+            input.style.backgroundColor = '';
+            input.style.color = '';
+            input.style.cursor = 'text';
+            input.title = '';
+        });
+
+        const saveBtns = document.querySelectorAll(
+            '#report-view button[onclick*="saveReportData"], #rep-save-btn, #report-view .report-save-btn, ' +
+            '#equipment-report-view button[onclick*="saveEquipmentReportData"], button[onclick*="saveEquipmentReportData"]'
+        );
+        saveBtns.forEach(btn => btn.style.removeProperty('display'));
     }
 }
 window.applyModeratorReportLock = applyModeratorReportLock;

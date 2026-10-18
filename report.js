@@ -27,7 +27,6 @@ document.addEventListener("DOMContentLoaded", () => {
         upgradeReportControlsUI();
         initPeriodDropdown();
         restoreDirectoryHandle();
-        injectSaveButtonToHeader();
         
         if (typeof renderReportTable === 'function') {
             renderReportTable();
@@ -310,23 +309,7 @@ async function restoreDirectoryHandle() {
 }
 
 function injectSaveButtonToHeader() {
-    const searchInput = document.querySelector('input[type="text"][placeholder*="Пошук"]');
-    if (searchInput && !document.getElementById('header-direct-save-btn')) {
-        const parentContainer = searchInput.parentElement;
-        if (parentContainer) {
-            parentContainer.style.display = 'flex';
-            parentContainer.style.alignItems = 'center';
-            parentContainer.style.gap = '10px';
-
-            const saveBtn = document.createElement('button');
-            saveBtn.id = 'header-direct-save-btn';
-            saveBtn.innerHTML = '💾 Зберегти';
-            saveBtn.style.cssText = 'background-color: #27ae60; color: white; border: none; padding: 6px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.1);';
-            saveBtn.onclick = saveAllDataDirectlyToDoc;
-            
-            parentContainer.insertBefore(saveBtn, searchInput);
-        }
-    }
+    // Видалено на вимогу користувача
 }
 
 async function saveAllDataDirectlyToDoc() {

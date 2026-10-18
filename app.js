@@ -348,6 +348,7 @@ function switchView(viewName) {
         if (viewName === 'destroyed-view' || viewName === 'destroyed') modKey = 'destroyed';
         if (viewName === 'aggregates-calc' || viewName === 'aggregates-calc-view') modKey = 'aggregates_calc';
         if (viewName === 'car-details') modKey = 'car_details';
+        if (viewName === 'documents' || viewName === 'documents-view') modKey = 'documents';
 
         if (viewName === 'dev-panel' || viewName === 'developer-panel' || viewName === 'dev-panel-view') {
             alert('⛔ Доступ до Панелі розробника має виключно Розробник!');
@@ -362,7 +363,10 @@ function switchView(viewName) {
         }
     }
 
-    document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active'));
+    document.querySelectorAll('.view-section').forEach(sec => {
+        sec.classList.remove('active');
+        sec.style.removeProperty('display');
+    });
     document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
 
     const topSearchBox = document.getElementById('top-search-box');
@@ -371,6 +375,7 @@ function switchView(viewName) {
     navButtons.forEach(btn => {
         const onclickAttr = btn.getAttribute('onclick') || '';
         if (onclickAttr.includes(`switchView('${viewName}')`) || onclickAttr.includes(`switchView("${viewName}")`) ||
+            ((viewName === 'documents' || viewName === 'documents-view') && (btn.id === 'nav-btn-documents' || onclickAttr.includes('documents'))) ||
             ((viewName === 'equipment-report-view' || viewName === 'equipment-report') && (btn.id === 'nav-btn-equipment-report' || onclickAttr.includes('equipment-report')))) {
             btn.classList.add('active');
         }
@@ -429,6 +434,16 @@ function switchView(viewName) {
     } else if (viewName === 'car-details') {
         document.getElementById('car-details-view').classList.add('active');
         if (topSearchBox) topSearchBox.style.display = 'none';
+    } else if (viewName === 'documents' || viewName === 'documents-view') {
+        const docsSec = document.getElementById('documents-view');
+        if (docsSec) docsSec.classList.add('active');
+        if (topSearchBox) topSearchBox.style.display = 'none';
+        if (typeof initDocumentsModule === 'function') {
+            initDocumentsModule();
+        }
+        if (typeof renderDocumentsMainView === 'function') {
+            renderDocumentsMainView();
+        }
     } else if (viewName === 'dev-panel' || viewName === 'developer-panel' || viewName === 'dev-panel-view') {
         const devSec = document.getElementById('dev-panel-view') || document.getElementById('developer-panel-view');
         if (devSec) devSec.classList.add('active');
@@ -436,6 +451,10 @@ function switchView(viewName) {
         if (typeof renderDeveloperPanel === 'function') {
             renderDeveloperPanel();
         }
+    }
+
+    if (typeof updateRoleUI === 'function') {
+        updateRoleUI();
     }
 }
 
@@ -929,6 +948,9 @@ function loadCarCard(carId) {
     renderTableHeaders(truckActive);
     initDefaultRoutes(truckActive);
     updateRouteTotals();
+    if (typeof updateRoleUI === 'function') {
+        updateRoleUI();
+    }
 }
 
 function renderTableHeaders(isTruck) {
@@ -1022,6 +1044,9 @@ function addRouteRow(routeName = 'Виконання БЗ Харків', dateVal
     tbody.appendChild(tr);
     lastActiveRow = tr;
     updateRouteTotals();
+    if (typeof updateRoleUI === 'function') {
+        updateRoleUI();
+    }
 }
 
 function applyPresetToActiveRow(text) {

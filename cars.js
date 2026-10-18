@@ -502,6 +502,15 @@ function updateCarField(carId, field, val) {
 
 if (typeof window.openCarCard !== 'function' || true) {
     window.openCarCard = function(carId) {
+        const role = (typeof window.getCurrentAppRole === 'function')
+            ? window.getCurrentAppRole()
+            : ((typeof currentRole !== 'undefined') ? currentRole : 'user');
+        if (role !== 'developer' && typeof window.canRoleAccess === 'function' && !window.canRoleAccess(role, 'card')) {
+            const roleName = (typeof getRoleDisplayName === 'function') ? getRoleDisplayName(role) : role;
+            alert("⛔ Доступ до Картки автомобіля заблоковано Розробником для вашої ролі (" + roleName + ")!");
+            return;
+        }
+
         const car = carsData.find(c => Number(c.id) === Number(carId));
         if (!car) return;
 
@@ -525,11 +534,23 @@ if (typeof window.openCarCard !== 'function' || true) {
                 cardView.style.display = 'block';
             }
         }
+        if (typeof updateRoleUI === 'function') {
+            updateRoleUI();
+        }
     };
 }
 
 if (typeof window.openCarDetails !== 'function') {
     window.openCarDetails = function(carId) {
+        const role = (typeof window.getCurrentAppRole === 'function')
+            ? window.getCurrentAppRole()
+            : ((typeof currentRole !== 'undefined') ? currentRole : 'user');
+        if (role !== 'developer' && typeof window.canRoleAccess === 'function' && !window.canRoleAccess(role, 'car_details')) {
+            const roleName = (typeof getRoleDisplayName === 'function') ? getRoleDisplayName(role) : role;
+            alert("⛔ Доступ до Детальної картки авто заблоковано Розробником для вашої ролі (" + roleName + ")!");
+            return;
+        }
+
         const car = carsData.find(c => Number(c.id) === Number(carId));
         if (!car) return;
 
@@ -548,6 +569,9 @@ if (typeof window.openCarDetails !== 'function') {
                 detailsView.classList.add('active');
                 detailsView.style.display = 'block';
             }
+        }
+        if (typeof updateRoleUI === 'function') {
+            updateRoleUI();
         }
     };
 }

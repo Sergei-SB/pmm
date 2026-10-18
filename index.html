@@ -189,16 +189,16 @@
     <!-- ВЕРХНЯ НАВІГАЦІЯ -->
     <header class="top-nav" style="background: #2c3e50; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
         <div class="nav-left" style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <button class="nav-btn active" onclick="switchView('base')">База (Реєстр)</button>
-            <button class="nav-btn" onclick="switchView('card')">Картка авто та Маршрути</button>
+            <button class="nav-btn active" id="nav-btn-base" onclick="switchView('base')">База (Реєстр)</button>
+            <button class="nav-btn" id="nav-btn-card" onclick="switchView('card')">Картка авто та Маршрути</button>
             <button class="nav-btn" id="nav-btn-report" onclick="switchView('report')" style="display: none;">Звіт (10 днів)</button>
             <button class="nav-btn" id="nav-btn-subdivisions" onclick="switchView('subdivisions')" style="display: none;">Звіт по підрозділах</button>
             <button class="nav-btn" id="nav-btn-equipment" onclick="switchView('generators')" style="display: none;">Облік обладнання</button>
             <button class="nav-btn" id="nav-btn-equipment-report" onclick="switchView('equipment-report-view')" style="display: none;">Звіт по обладнанню</button>
-            <button class="nav-btn" onclick="switchView('aggregates-calc')">Розрахунок агрегатів</button>
+            <button class="nav-btn" id="nav-btn-aggregates-calc" onclick="switchView('aggregates-calc')">Розрахунок агрегатів</button>
             <button class="nav-btn" id="nav-btn-destroyed" onclick="switchView('destroyed')" style="display: none;">Знищена техніка</button>
-            <!-- Вкладка Конструктора документів та шаблонів (тільки для Розробника та Адміна) -->
-            <button class="nav-btn" id="nav-btn-documents" onclick="openDocumentsTabView()" style="display: none;">📄 Документи та Шаблони</button>
+            <!-- Вкладка Конструктора документів та шаблонів -->
+            <button class="nav-btn" id="nav-btn-documents" onclick="switchView('documents')" style="display: none;">📄 Документи та Шаблони</button>
             <!-- Окрема вкладка Панелі розробника в шапці -->
             <button class="nav-btn" id="nav-btn-dev-panel" onclick="switchView('dev-panel')" style="display: none; background-color: #8e44ad !important; color: white !important;">⚙️ Панель розробника</button>
         </div>
@@ -206,16 +206,6 @@
             <button id="broadcast-envelope-btn" class="envelope-blinking" onclick="openBroadcastMailModal()" title="Системна пошта (Листи від керівництва)" style="background-color: #2980b9; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 15px; font-weight: bold; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                 ✉️
             </button>
-
-            <button id="header-direct-save-btn" onclick="saveAllDataDirectlyToDoc()" title="Зберегти всі дані" style="background-color: #27ae60; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 15px; font-weight: bold; display: none; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">💾</button>
-            
-            <label id="header-direct-import-btn" title="Імпортувати дані з JSON" style="background-color: #8e44ad; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; display: none; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                📂 Імпорт <input type="file" id="header-import-json-file" accept=".json" onchange="importDataFromJson(this)" style="display: none;">
-            </label>
-
-            <label id="header-favicon-upload-btn" title="Встановити фавікон (fhjnd4dd4ww11.jfif)" style="background-color: #2e7d32; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; display: none !important; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); gap: 4px;">
-                🖼️ Фавікон <input type="file" id="favicon-file-input" accept=".jfif,.jpg,.jpeg,.png,.ico,.svg" onchange="handleFaviconFileSelect(this)" style="display: none;">
-            </label>
 
             <input type="text" id="base-search-input" placeholder="Пошук по авто, номеру, водію..." oninput="filterBaseTable(this.value)" style="padding: 6px; width: 220px; border-radius: 4px; border: none;" autocomplete="off">
         </div>
@@ -474,10 +464,8 @@
                     <button class="eq-tab-btn" id="tab-webasto" onclick="switchEquipmentTab('webasto')">Webasto</button>
                     <button class="eq-tab-btn" id="tab-heaters" onclick="switchEquipmentTab('heaters')">Теплові пушки</button>
                     <button class="eq-tab-btn" id="tab-chainsaws" onclick="switchEquipmentTab('chainsaws')">Бензо пили</button>
-                    <button class="eq-tab-btn" id="tab-equipment-report" onclick="switchView('equipment-report-view')" style="border-left: 2px solid #bdc3c7; margin-left: 4px; color: #2980b9; font-weight: bold;">📊 Звіт по обладнанню</button>
                 </div>
                 <div style="display: flex; gap: 8px; align-items: center;">
-                    <button class="action-btn" id="btn-goto-equipment-report" onclick="switchView('equipment-report-view')" style="background-color: #2980b9; color: white; font-weight: bold; padding: 6px 14px; border-radius: 4px; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.15); cursor: pointer;">📊 Звіт по обладнанню</button>
                     <button class="action-btn" style="background-color: #27ae60; font-weight: bold; padding: 6px 12px;" onclick="addCurrentEquipmentRow()">+ Додати позицію</button>
                 </div>
             </div>
@@ -669,6 +657,11 @@
         <!-- РОЗДІЛ: ЗНИЩЕНА ТЕХНІКА -->
         <section id="destroyed-view" class="view-section">
             <div id="destroyed-equipment-container"></div>
+        </section>
+
+        <!-- РОЗДІЛ: ДОКУМЕНТИ ТА ШАБЛОНИ А4 -->
+        <section id="documents-view" class="view-section">
+            <div id="documents-main-section" style="padding: 10px; background: #ffffff; border-radius: 12px; margin: 0 auto; max-width: 1450px; color: #1e293b; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 1px solid #e2e8f0;"></div>
         </section>
 
         <!-- РОЗДІЛ: ПАНЕЛЬ РОЗРОБНИКА (ОКРЕМА СТОРІНКА) -->

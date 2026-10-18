@@ -79,6 +79,10 @@ setInterval(() => {
 
 // --- ПЕРЕМИКАННЯ РОЛЕЙ ---
 function selectRole(role) {
+    if (typeof window.developerPanelSelectRole === 'function') {
+        window.developerPanelSelectRole(role);
+        return;
+    }
     if (role === currentRole) return;
 
     const secCfg = getRoleSecurityConfig();
@@ -215,6 +219,10 @@ function logoutDeveloperSession() {
 }
 
 function updateRoleUI() {
+    if (typeof window.developerPanelUpdateRoleUI === 'function') {
+        window.developerPanelUpdateRoleUI();
+        return;
+    }
     const isModOrHigher = (currentRole === "moderator" || currentRole === "admin" || currentRole === "developer");
     const isAdminOrHigher = (currentRole === "admin" || currentRole === "developer");
     const isDev = (currentRole === "developer");
@@ -334,8 +342,9 @@ function updateRoleUI() {
     const addCarBtn = document.getElementById('add-car-btn') ||
         document.querySelector('#base-view .action-bar .btn-green') ||
         document.querySelector('#cars-view .action-bar .btn-green');
+    const canAddCar = isAdminOrHigher || (typeof window.canRoleDo === 'function' && window.canRoleDo(currentRole, 'base_add_car'));
     if (addCarBtn) {
-        addCarBtn.style.display = (isAdminOrHigher && typeof window.tryAddCarRow === 'function') ? "inline-block" : "none";
+        addCarBtn.style.display = canAddCar ? "inline-block" : "none";
     }
 
     const deleteActionHeader = document.getElementById("delete-action-header");

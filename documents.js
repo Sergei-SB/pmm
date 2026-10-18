@@ -1484,16 +1484,20 @@ function ensureSubdivisionsTableNarrowColumn() {
 // ==========================================
 
 function detectActiveUserRole() {
+    if (typeof window.getCurrentAppRole === 'function') {
+        const r = window.getCurrentAppRole();
+        if (r) return (r === 'dev' ? 'developer' : r);
+    }
     if (typeof currentRole !== 'undefined' && currentRole) {
         const cr = String(currentRole).toLowerCase().trim();
-        if (cr === 'developer' || cr === 'dev') return 'dev';
+        if (cr === 'developer' || cr === 'dev') return 'developer';
         if (cr === 'admin') return 'admin';
         if (cr === 'moderator') return 'moderator';
         if (cr === 'user') return 'user';
     }
 
     const roleBtns = [
-        { id: 'role-btn-developer', code: 'dev' },
+        { id: 'role-btn-developer', code: 'developer' },
         { id: 'role-btn-admin', code: 'admin' },
         { id: 'role-btn-moderator', code: 'moderator' },
         { id: 'role-btn-user', code: 'user' }
@@ -1508,17 +1512,18 @@ function detectActiveUserRole() {
         }
     }
 
-    if (trackedAppRole) return trackedAppRole;
+    if (trackedAppRole) return (trackedAppRole === 'dev' ? 'developer' : trackedAppRole);
 
     const stored = String(
         window.currentRole ||
         localStorage.getItem('currentRole') ||
+        localStorage.getItem('app_current_role') ||
         localStorage.getItem('userRole') ||
         localStorage.getItem('role') ||
         ''
     ).toLowerCase().trim();
 
-    if (stored.includes('dev') || stored.includes('розробник')) return 'dev';
+    if (stored.includes('dev') || stored.includes('розробник')) return 'developer';
     if (stored.includes('admin') || stored.includes('адмін')) return 'admin';
     if (stored.includes('mod') || stored.includes('модератор')) return 'moderator';
     if (stored.includes('user') || stored.includes('юзер')) return 'user';
@@ -1527,6 +1532,10 @@ function detectActiveUserRole() {
 }
 
 function getCurrentUserRoleForDocs() {
+    if (typeof window.getCurrentAppRole === 'function') {
+        const r = window.getCurrentAppRole();
+        if (r) return (r === 'dev' ? 'developer' : r);
+    }
     return detectActiveUserRole();
 }
 
@@ -2301,148 +2310,44 @@ async function extractDocxRichHtmlAndText(arrayBuffer) {
 // ==========================================
 
 function syncDocumentsButtonVisibility() {
-    syncAddCarButtonVisibility();
-    syncCategorySelectsAndAdBlueDOM();
-
-    const devPanelBtn = document.getElementById('nav-btn-dev-panel');
-    let navContainer = devPanelBtn ? devPanelBtn.parentElement : null;
-
-    if (!navContainer) {
-        navContainer = document.querySelector('.nav-tabs, .nav-bar, header nav, .top-nav, .tabs');
-    }
-    if (!navContainer) {
-        const allBtns = Array.from(document.querySelectorAll('button'));
-        const marshrutyBtn = allBtns.find(b => (b.textContent || '').includes('Маршрути'));
-        if (marshrutyBtn) navContainer = marshrutyBtn.parentElement;
-    }
-    if (!navContainer) return;
-
-    let docsBtn = document.getElementById('nav-btn-documents');
-    if (!docsBtn) {
-        docsBtn = document.createElement('button');
-        docsBtn.id = 'nav-btn-documents';
-
-        const sampleTabBtn = Array.from(navContainer.querySelectorAll('button')).find(
-            b => b.id !== 'nav-btn-dev-panel' && b.id !== 'nav-btn-documents'
-        );
-        docsBtn.className = sampleTabBtn ? sampleTabBtn.className.replace(/\bactive\b/g, '').trim() : 'nav-btn';
-        docsBtn.innerHTML = '📄 Документи та Шаблони';
-        docsBtn.style.display = 'none';
-        docsBtn.onclick = (e) => {
-            e.preventDefault();
-            openDocumentsTabView();
-        };
-
-        if (devPanelBtn && devPanelBtn.parentElement === navContainer) {
-            navContainer.insertBefore(docsBtn, devPanelBtn);
-        } else {
-            navContainer.appendChild(docsBtn);
-        }
-    }
-
-    if (!navContainer.dataset.docsNavHooked) {
-        navContainer.dataset.docsNavHooked = 'true';
-        Array.from(navContainer.querySelectorAll('button')).forEach(btn => {
-            if (btn.id === 'nav-btn-documents') return;
-            btn.addEventListener('click', () => {
-                closeDocumentsTabView();
-                setTimeout(() => {
-                    syncAddCarButtonVisibility();
-                    syncCategorySelectsAndAdBlueDOM();
-                }, 50);
-            });
-        });
-    }
-
-    let isDevVisible = false;
-    if (devPanelBtn) {
-        const comp = window.getComputedStyle(devPanelBtn);
-        isDevVisible = comp.display !== 'none' && comp.visibility !== 'hidden' && !devPanelBtn.hidden;
-    }
-
     const role = getCurrentUserRoleForDocs();
-    const canAccess = isDevVisible || role === 'dev' || role === 'developer' || (typeof window.canRoleAccess === 'function' ? window.canRoleAccess(role, 'documents') : (role === 'admin'));
+    const isDevUser = (role === 'developer' || role === 'dev');
+    const canAccess = isDevUser || (typeof window.canRoleAccess === 'function' ? window.canRoleAccess(role, 'documents') : (role === 'admin'));
 
-    if (canAccess) {
-        docsBtn.style.setProperty('display', 'inline-flex', 'important');
-        docsBtn.style.alignItems = 'center';
-        docsBtn.style.justifyContent = 'center';
-    } else {
-        docsBtn.style.setProperty('display', 'none', 'important');
-        const mainSec = document.getElementById('documents-main-section');
-        if (mainSec && mainSec.style.display !== 'none') {
-            closeDocumentsTabView();
-        }
+    const docsBtn = document.getElementById('nav-btn-documents');
+    if (docsBtn) {
+        docsBtn.style.setProperty('display', canAccess ? 'inline-flex' : 'none', 'important');
     }
 }
 
 function openDocumentsTabView() {
-    const role = getCurrentUserRoleForDocs();
-    const devPanelBtn = document.getElementById('nav-btn-dev-panel');
-    const isDevVisible = devPanelBtn && window.getComputedStyle(devPanelBtn).display !== 'none';
-    const canAccess = isDevVisible || role === 'dev' || role === 'developer' || (typeof window.canRoleAccess === 'function' ? window.canRoleAccess(role, 'documents') : (role === 'admin'));
-    if (!canAccess) {
-        alert('⛔ Доступ до Документів та Шаблонів заблоковано Розробником!');
-        return;
+    if (typeof switchView === 'function') {
+        switchView('documents');
+    } else {
+        initDocumentsModule();
+        const sec = document.getElementById('documents-view') || document.getElementById('documents-main-section');
+        if (sec) sec.style.display = 'block';
     }
-
-    initDocumentsModule();
-    const section = document.getElementById('documents-main-section');
-    if (!section) return;
-
-    const parent = section.parentElement;
-    if (parent) {
-        Array.from(parent.children).forEach(ch => {
-            if (ch.id === 'documents-main-section') return;
-            const tag = ch.tagName.toLowerCase();
-            if (tag === 'header' || tag === 'nav' || tag === 'script' || tag === 'style') return;
-            if (ch.querySelector && ch.querySelector('#nav-btn-documents')) return;
-
-            if (window.getComputedStyle(ch).display !== 'none') {
-                ch.dataset.hiddenByDocsTab = 'true';
-                ch.style.display = 'none';
-            }
-        });
-    }
-
-    const docsBtn = document.getElementById('nav-btn-documents');
-    if (docsBtn && docsBtn.parentElement) {
-        Array.from(docsBtn.parentElement.querySelectorAll('button')).forEach(b => {
-            if (b.id === 'nav-btn-documents') {
-                b.classList.add('active');
-            } else {
-                b.classList.remove('active');
-            }
-        });
-    }
-
-    section.style.display = 'block';
-    renderDocumentsMainView();
 }
+window.openDocumentsTabView = openDocumentsTabView;
 
 function closeDocumentsTabView() {
     hideFloatingSelectionToolbar();
+    const viewSec = document.getElementById('documents-view');
+    if (viewSec) {
+        viewSec.classList.remove('active');
+        viewSec.style.removeProperty('display');
+    }
     const section = document.getElementById('documents-main-section');
     if (section) {
         section.style.display = 'none';
     }
-
     const docsBtn = document.getElementById('nav-btn-documents');
     if (docsBtn) {
         docsBtn.classList.remove('active');
     }
-
-    if (section && section.parentElement) {
-        Array.from(section.parentElement.children).forEach(ch => {
-            if (ch.dataset && ch.dataset.hiddenByDocsTab === 'true') {
-                ch.style.display = '';
-                delete ch.dataset.hiddenByDocsTab;
-            }
-        });
-    }
-    syncAddCarButtonVisibility();
-    syncCategorySelectsAndAdBlueDOM();
 }
+window.closeDocumentsTabView = closeDocumentsTabView;
 
 function setupDocumentsRoleWatcher() {
     sanitizeCategoriesAndFormulasInStorage();
@@ -2473,7 +2378,7 @@ function setupDocumentsRoleWatcher() {
         const btn = e.target.closest('button, span, a');
         if (btn) {
             const txt = (btn.textContent || '').trim().toLowerCase();
-            if (txt === 'розробник') trackedAppRole = 'dev';
+            if (txt === 'розробник') trackedAppRole = 'developer';
             else if (txt === 'адмін') trackedAppRole = 'admin';
             else if (txt === 'модератор') trackedAppRole = 'moderator';
             else if (txt === 'юзер') trackedAppRole = 'user';
@@ -2500,22 +2405,29 @@ function setupDocumentsRoleWatcher() {
 function initDocumentsModule() {
     syncDocumentsButtonVisibility();
 
-    if (document.getElementById('documents-main-section')) return;
-
-    const section = document.createElement('div');
-    section.id = 'documents-main-section';
-    section.className = 'tab-content';
-    section.style.cssText = 'display:none; padding: 22px; background: #ffffff; border-radius: 12px; margin: 18px auto; max-width: 1450px; color: #1e293b; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 1px solid #e2e8f0;';
-
-    const existingTab = document.querySelector('.main-container, .tab-content, #baza, #registry, main, .container');
-    if (existingTab) {
-        existingTab.appendChild(section);
-    } else {
-        document.body.appendChild(section);
+    let viewSec = document.getElementById('documents-view');
+    if (!viewSec) {
+        viewSec = document.createElement('section');
+        viewSec.id = 'documents-view';
+        viewSec.className = 'view-section';
+        const main = document.querySelector('.main-container') || document.body;
+        main.appendChild(viewSec);
     }
 
+    let section = document.getElementById('documents-main-section');
+    if (!section) {
+        section = document.createElement('div');
+        section.id = 'documents-main-section';
+        section.style.cssText = 'padding: 10px; background: #ffffff; border-radius: 12px; margin: 0 auto; max-width: 1450px; color: #1e293b; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 1px solid #e2e8f0;';
+        viewSec.appendChild(section);
+    } else if (section.parentElement !== viewSec) {
+        viewSec.appendChild(section);
+    }
+
+    section.style.display = 'block';
     renderDocumentsMainView();
 }
+window.initDocumentsModule = initDocumentsModule;
 
 function renderDocumentsMainView() {
     const section = document.getElementById('documents-main-section');
@@ -2526,98 +2438,101 @@ function renderDocumentsMainView() {
     const totalTemplatesCount = Object.keys(FRAGMENT_META).reduce((acc, k) => acc + ((tplStore[k] || []).length), 0);
 
     section.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:20px; border-bottom:2px solid #e2e8f0; padding-bottom:14px;">
-            <div>
-                <h2 style="margin:0; font-size:22px; color:#0f172a; display:flex; align-items:center; gap:10px; font-weight:800;">
-                    📄 Управління документами та конструктор А4
-                </h2>
-                <p style="margin:4px 0 0 0; font-size:13px; color:#64748b;">
-                    Виділяйте будь-який фрагмент у завантаженому файлі — він автоматично вирізається з файла і зберігається як шаблон відповідного блоку А4
-                </p>
+        <div id="documents-content-wrapper">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:20px; border-bottom:2px solid #e2e8f0; padding-bottom:14px;">
+                <div>
+                    <h2 style="margin:0; font-size:22px; color:#0f172a; display:flex; align-items:center; gap:10px; font-weight:800;">
+                        📄 Управління документами та конструктор А4
+                    </h2>
+                    <p style="margin:4px 0 0 0; font-size:13px; color:#64748b;">
+                        Виділяйте будь-який фрагмент у завантаженому файлі — він автоматично вирізається з файла і зберігається як шаблон відповідного блоку А4
+                    </p>
+                </div>
+                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                    <button type="button" onclick="openAllFragmentTemplatesModal()"
+                        style="background:#7c3aed; color:#fff; border:none; padding:10px 16px; border-radius:8px; cursor:pointer; font-weight:700; font-size:14px; display:inline-flex; align-items:center; gap:8px; box-shadow:0 2px 8px rgba(124,58,237,0.25);">
+                        📚 Банк шаблонів фрагментів (${totalTemplatesCount})
+                    </button>
+                    <label for="doc-upload-input" style="background:#2563eb; color:#fff; padding:10px 18px; border-radius:8px; cursor:pointer; font-weight:700; font-size:14px; display:inline-flex; align-items:center; gap:8px; box-shadow:0 2px 8px rgba(37,99,235,0.25); margin:0;">
+                        ➕ Додати документи (З файлу)
+                    </label>
+                    <input type="file" id="doc-upload-input" multiple accept=".txt,.doc,.docx,.pdf,.rtf,.html,.xlsx,.xls,.csv,.tsv,.png,.jpg,.jpeg,.webp,.jfif,.svg,*/*" style="display:none;" onchange="handleUploadDocumentFile(event)">
+                    <button id="btn-new-doc-a4" onclick="createNewBlankDocument()" style="background:#16a34a; color:#fff; border:none; padding:10px 18px; border-radius:8px; cursor:pointer; font-weight:700; font-size:14px; display:inline-flex; align-items:center; gap:8px; box-shadow:0 2px 8px rgba(22,163,74,0.25);">
+                        📝 Створити новий документ А4
+                    </button>
+                </div>
             </div>
-            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                <button type="button" onclick="openAllFragmentTemplatesModal()"
-                    style="background:#7c3aed; color:#fff; border:none; padding:10px 16px; border-radius:8px; cursor:pointer; font-weight:700; font-size:14px; display:inline-flex; align-items:center; gap:8px; box-shadow:0 2px 8px rgba(124,58,237,0.25);">
-                    📚 Банк шаблонів фрагментів (${totalTemplatesCount})
-                </button>
-                <label for="doc-upload-input" style="background:#2563eb; color:#fff; padding:10px 18px; border-radius:8px; cursor:pointer; font-weight:700; font-size:14px; display:inline-flex; align-items:center; gap:8px; box-shadow:0 2px 8px rgba(37,99,235,0.25); margin:0;">
-                    ➕ Додати документи (З файлу)
-                </label>
-                <input type="file" id="doc-upload-input" multiple accept=".txt,.doc,.docx,.pdf,.rtf,.html,.xlsx,.xls,.csv,.tsv,.png,.jpg,.jpeg,.webp,.jfif,.svg,*/*" style="display:none;" onchange="handleUploadDocumentFile(event)">
-                <button onclick="createNewBlankDocument()" style="background:#16a34a; color:#fff; border:none; padding:10px 18px; border-radius:8px; cursor:pointer; font-weight:700; font-size:14px; display:inline-flex; align-items:center; gap:8px; box-shadow:0 2px 8px rgba(22,163,74,0.25);">
-                    📝 Створити новий документ А4
-                </button>
+
+            <div style="overflow-x:auto; background:#ffffff; border-radius:10px; border:1px solid #cbd5e1; box-shadow:0 1px 4px rgba(0,0,0,0.04);">
+                <table style="width:100%; border-collapse:collapse; text-align:left; font-size:14px; color:#1e293b;">
+                    <thead>
+                        <tr style="background:#2e7d32; color:#ffffff;">
+                            <th style="padding:12px 14px; border-right:1px solid rgba(255,255,255,0.15); width:50px; text-align:center;">№</th>
+                            <th style="padding:12px 14px; border-right:1px solid rgba(255,255,255,0.15);">Назва документа (можна редагувати)</th>
+                            <th style="padding:12px 14px; border-right:1px solid rgba(255,255,255,0.15); width:160px;">Формат / Тип</th>
+                            <th style="padding:12px 14px; border-right:1px solid rgba(255,255,255,0.15); width:110px;">Дата</th>
+                            <th style="padding:12px 14px; width:430px; text-align:center;">Дії</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${docs.length === 0 ? `
+                            <tr>
+                                <td colspan="5" style="padding:28px; text-align:center; color:#64748b; background:#f8fafc;">
+                                    Немає збережених документів. Натисніть «➕ Додати документи» або «📝 Створити новий документ А4».
+                                </td>
+                            </tr>
+                        ` : docs.map((doc, idx) => `
+                            <tr style="border-bottom:1px solid #e2e8f0; background:${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">
+                                <td style="padding:10px 14px; color:#475569; font-weight:700; text-align:center; border-right:1px solid #e2e8f0;">${idx + 1}</td>
+                                <td style="padding:10px 14px; border-right:1px solid #e2e8f0;">
+                                    <input type="text"
+                                        value="${escapeHtml(doc.name || doc.title || 'Без назви')}"
+                                        onchange="updateDocumentTitleInline('${doc.id}', this.value)"
+                                        style="width:100%; background:#ffffff; color:#0f172a; border:1px solid #cbd5e1; border-radius:6px; padding:7px 10px; font-size:14px; font-weight:600;"
+                                        title="Натисніть, щоб змінити назву документа"
+                                    />
+                                </td>
+                                <td style="padding:10px 14px; border-right:1px solid #e2e8f0;">
+                                    <span style="background:#dcfce7; color:#166534; border:1px solid #86efac; padding:4px 10px; border-radius:6px; font-size:12px; font-weight:700; display:inline-block;">
+                                        ${escapeHtml(doc.type || 'Документ А4')}
+                                    </span>
+                                </td>
+                                <td style="padding:10px 14px; color:#475569; font-weight:500; border-right:1px solid #e2e8f0;">${escapeHtml(doc.date || '—')}</td>
+                                <td style="padding:10px 14px; text-align:center;">
+                                    <div style="display:flex; gap:6px; justify-content:center; flex-wrap:wrap; align-items:center;">
+                                        <button onclick="previewDocumentInNativeFormat('${doc.id}')"
+                                            style="background:#0284c7; color:#fff; border:none; padding:7px 12px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:700; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 4px rgba(2,132,199,0.25);"
+                                            title="Переглянути оригінальний документ у його рідному форматі (${(doc.originalFormat || 'файл').toUpperCase()})">
+                                            👁️ Переглянути оригінал
+                                        </button>
+                                        <button onclick="openDocumentEditorModal('${doc.id}')"
+                                            style="background:#2563eb; color:#fff; border:none; padding:7px 12px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; display:inline-flex; align-items:center; gap:4px;"
+                                            title="Відкрити конструктор А4 (шаблони, друк А4, підписи)">
+                                            📝 Конструктор А4
+                                        </button>
+                                        <button onclick="downloadOriginalDocFile('${doc.id}')"
+                                            style="background:#059669; color:#fff; border:none; padding:7px 11px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; display:inline-flex; align-items:center; gap:4px;"
+                                            title="Завантажити у тому форматі, в якому файл був завантажений">
+                                            📥 Скачати
+                                        </button>
+                                        <button onclick="deleteDocumentById('${doc.id}')"
+                                            style="background:#ef4444; color:#fff; border:none; padding:7px 10px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600;"
+                                            title="Видалити документ">
+                                            🗑️
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
             </div>
-        </div>
 
-        <div style="overflow-x:auto; background:#ffffff; border-radius:10px; border:1px solid #cbd5e1; box-shadow:0 1px 4px rgba(0,0,0,0.04);">
-            <table style="width:100%; border-collapse:collapse; text-align:left; font-size:14px; color:#1e293b;">
-                <thead>
-                    <tr style="background:#2e7d32; color:#ffffff;">
-                        <th style="padding:12px 14px; border-right:1px solid rgba(255,255,255,0.15); width:50px; text-align:center;">№</th>
-                        <th style="padding:12px 14px; border-right:1px solid rgba(255,255,255,0.15);">Назва документа (можна редагувати)</th>
-                        <th style="padding:12px 14px; border-right:1px solid rgba(255,255,255,0.15); width:160px;">Формат / Тип</th>
-                        <th style="padding:12px 14px; border-right:1px solid rgba(255,255,255,0.15); width:110px;">Дата</th>
-                        <th style="padding:12px 14px; width:430px; text-align:center;">Дії</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${docs.length === 0 ? `
-                        <tr>
-                            <td colspan="5" style="padding:28px; text-align:center; color:#64748b; background:#f8fafc;">
-                                Немає збережених документів. Натисніть «➕ Додати документи» або «📝 Створити новий документ А4».
-                            </td>
-                        </tr>
-                    ` : docs.map((doc, idx) => `
-                        <tr style="border-bottom:1px solid #e2e8f0; background:${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">
-                            <td style="padding:10px 14px; color:#475569; font-weight:700; text-align:center; border-right:1px solid #e2e8f0;">${idx + 1}</td>
-                            <td style="padding:10px 14px; border-right:1px solid #e2e8f0;">
-                                <input type="text"
-                                    value="${escapeHtml(doc.name || doc.title || 'Без назви')}"
-                                    onchange="updateDocumentTitleInline('${doc.id}', this.value)"
-                                    style="width:100%; background:#ffffff; color:#0f172a; border:1px solid #cbd5e1; border-radius:6px; padding:7px 10px; font-size:14px; font-weight:600;"
-                                    title="Натисніть, щоб змінити назву документа"
-                                />
-                            </td>
-                            <td style="padding:10px 14px; border-right:1px solid #e2e8f0;">
-                                <span style="background:#dcfce7; color:#166534; border:1px solid #86efac; padding:4px 10px; border-radius:6px; font-size:12px; font-weight:700; display:inline-block;">
-                                    ${escapeHtml(doc.type || 'Документ А4')}
-                                </span>
-                            </td>
-                            <td style="padding:10px 14px; color:#475569; font-weight:500; border-right:1px solid #e2e8f0;">${escapeHtml(doc.date || '—')}</td>
-                            <td style="padding:10px 14px; text-align:center;">
-                                <div style="display:flex; gap:6px; justify-content:center; flex-wrap:wrap; align-items:center;">
-                                    <button onclick="previewDocumentInNativeFormat('${doc.id}')"
-                                        style="background:#0284c7; color:#fff; border:none; padding:7px 12px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:700; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 4px rgba(2,132,199,0.25);"
-                                        title="Переглянути оригінальний документ у його рідному форматі (${(doc.originalFormat || 'файл').toUpperCase()})">
-                                        👁️ Переглянути оригінал
-                                    </button>
-                                    <button onclick="openDocumentEditorModal('${doc.id}')"
-                                        style="background:#2563eb; color:#fff; border:none; padding:7px 12px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; display:inline-flex; align-items:center; gap:4px;"
-                                        title="Відкрити конструктор А4 (шаблони, друк А4, підписи)">
-                                        📝 Конструктор А4
-                                    </button>
-                                    <button onclick="downloadOriginalDocFile('${doc.id}')"
-                                        style="background:#059669; color:#fff; border:none; padding:7px 11px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; display:inline-flex; align-items:center; gap:4px;"
-                                        title="Завантажити у тому форматі, в якому файл був завантажений">
-                                        📥 Скачати
-                                    </button>
-                                    <button onclick="deleteDocumentById('${doc.id}')"
-                                        style="background:#ef4444; color:#fff; border:none; padding:7px 10px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600;"
-                                        title="Видалити документ">
-                                        🗑️
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
+            <div id="doc-editor-workspace" style="display:none; margin-top:24px;"></div>
         </div>
-
-        <div id="doc-editor-workspace" style="display:none; margin-top:24px;"></div>
     `;
 }
+window.renderDocumentsMainView = renderDocumentsMainView;
 
 // ==========================================
 // ЗАВАНТАЖЕННЯ ФАЙЛІВ ІЗ ЗБЕРЕЖЕННЯМ ОРИГІНАЛЬНОГО ФОРМАТУ

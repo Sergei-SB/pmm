@@ -225,56 +225,131 @@ function updateDestroyedItemProp(type, itemId, propName, value, storageKey) {
     }
 }
 
+function showToastNotification(message, bgColor = '#27ae60') {
+    let toast = document.getElementById('app-floating-toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'app-floating-toast';
+        toast.style.cssText = `
+            position: fixed;
+            bottom: 25px;
+            right: 25px;
+            z-index: 999999;
+            color: #ffffff;
+            padding: 12px 22px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            opacity: 0;
+            transform: translateY(15px);
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        `;
+        document.body.appendChild(toast);
+    }
+    toast.style.backgroundColor = bgColor;
+    toast.textContent = message;
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateY(0)';
+    clearTimeout(toast._timeout);
+    toast._timeout = setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(15px)';
+    }, 3200);
+}
+window.showToastNotification = showToastNotification;
+
+function stripDestroyedNote(text) {
+    if (!text) return '';
+    let str = String(text);
+    if (/^[\s\-\,\.\;\:\(\)\[\]]*знищ/i.test(str) && str.length < 60) {
+        return '';
+    }
+    str = str.replace(/\([^\)]*знищ[^\)]*\)/gi, '');
+    str = str.replace(/\[[^\]]*знищ[^\]]*\]/gi, '');
+    str = str.replace(/знищ[\wа-яіїєґ\.\-]*/gi, '');
+    str = str.replace(/\s{2,}/g, ' ').trim();
+    str = str.replace(/[\s\-\,\.\;\:\(\)\[\]]+$/g, '').trim();
+    if (/^[\s\-\,\.\;\:\(\)\[\]0-9\.\/]*$/.test(str)) {
+        str = '';
+    }
+    return str;
+}
+
 function restoreDestroyedItemFromTable(type, id, storageKey) {
-    if (!confirm("Ви впевнені, що хочете відновити цей об'єкт?")) return;
+    try {
+        if (type === 'car') {
+            const sourceCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : (window.carsData || []);
+            const car = sourceCars.find(c => String(c.id) === String(id) || Number(c.id) === Number(id));
+            if (car) {
+                car.note = stripDestroyedNote(car.note);
+                delete car.destroyDate;
+                delete car.destroyTime;
+                delete car.destroyLocation;
+                delete car.isDestroyed;
 
-    if (type === 'car') {
-        const sourceCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
-        const car = sourceCars.find(c => Number(c.id) === Number(id));
-        if (car) {
-            car.note = (car.note || '').replace(/знищ[\wа-яіїєґ]*/gi, '').trim();
-            if (typeof saveCarsModificationsToStorage === 'function') saveCarsModificationsToStorage();
-            if (typeof renderCarsTable === 'function') renderCarsTable();
-            renderDestroyedEquipmentView();
-            alert("Автомобіль успішно відновлено!");
-            return;
+                if (typeof saveCarsModificationsToStorage === 'function') saveCarsModificationsToStorage();
+                if (typeof saveCarsToStorage === 'function') saveCarsToStorage();
+                if (typeof renderCarsTable === 'function') renderCarsTable();
+                renderDestroyedEquipmentView();
+                showToastNotification("✅ Автомобіль успішно відновлено та повернуто до Бази!", "#27ae60");
+                return;
+            }
         }
-    } 
 
-    let restored = false;
-    if (storageKey) {
-        const raw = localStorage.getItem(storageKey);
-        if (raw) {
+        let restored = false;
+        const eqCategories = [
+            'generators_custom_data',
+            'webasto_custom_data',
+            'heaters_custom_data',
+            'chainsaws_custom_data'
+        ];
+
+        const keysToCheck = storageKey ? [storageKey, ...eqCategories.filter(k => k !== storageKey)] : eqCategories;
+        for (const sKey of keysToCheck) {
+            const raw = localStorage.getItem(sKey);
+            if (!raw) continue;
             try {
                 let arr = JSON.parse(raw);
+                if (!Array.isArray(arr)) continue;
                 let modified = false;
                 arr.forEach(item => {
-                    if (String(item.id) === String(id)) {
-                        if (item.note) item.note = item.note.replace(/знищ[\wа-яіїєґ]*/gi, '').trim();
-                        if (item.comment) item.comment = item.comment.replace(/знищ[\wа-яіїєґ]*/gi, '').trim();
+                    if (String(item.id) === String(id) || Number(item.id) === Number(id)) {
+                        if (item.note) {
+                            item.note = stripDestroyedNote(item.note);
+                        }
+                        if (item.comment) {
+                            item.comment = stripDestroyedNote(item.comment);
+                        }
                         delete item.destroyDate;
                         delete item.destroyTime;
                         delete item.destroyLocation;
+                        delete item.isDestroyed;
                         modified = true;
                         restored = true;
                     }
                 });
                 if (modified) {
-                    localStorage.setItem(storageKey, JSON.stringify(arr));
+                    localStorage.setItem(sKey, JSON.stringify(arr));
                 }
-            } catch(e) {}
+            } catch (e) {}
+            if (restored) break;
         }
-    }
 
-    renderDestroyedEquipmentView();
-    if (typeof renderGeneratorsView === 'function') renderGeneratorsView();
-    if (typeof renderWebastoView === 'function') renderWebastoView();
-    if (typeof renderHeatersView === 'function') renderHeatersView();
-    if (typeof renderChainsawsView === 'function') renderChainsawsView();
+        renderDestroyedEquipmentView();
+        if (typeof renderGeneratorsView === 'function') renderGeneratorsView();
+        if (typeof renderWebastoView === 'function') renderWebastoView();
+        if (typeof renderHeatersView === 'function') renderHeatersView();
+        if (typeof renderChainsawsView === 'function') renderChainsawsView();
 
-    if (restored) {
-        alert("Об'єкт успішно відновлено!");
-    } else {
-        alert("Об'єкт відновлено з таблиці знищених.");
+        showToastNotification("✅ Об'єкт успішно відновлено та повернуто до обліку!", "#27ae60");
+    } catch (err) {
+        console.error("Помилка відновлення об'єкта:", err);
+        showToastNotification("Помилка при відновленні об'єкта", "#c0392b");
     }
 }
+window.restoreDestroyedItemFromTable = restoreDestroyedItemFromTable;
