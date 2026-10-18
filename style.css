@@ -1200,3 +1200,14 @@ input[type=number] {
 .ef-btn-cancel:hover {
     background: #636e72;
 }
+
+@keyframes fadeInBan {
+    from {
+        opacity: 0;
+        transform: scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}

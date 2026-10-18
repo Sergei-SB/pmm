@@ -58,6 +58,88 @@ interface Store {
   filesChangedAt: string;
 }
 
+interface OnlineSession {
+  id: string;
+  deviceId: string;
+  ip: string;
+  role: string;
+  userName: string;
+  subdivision: string;
+  currentView: string;
+  lastSeen: number;
+}
+
+interface BanRecord {
+  id: string;
+  targetType: 'ip' | 'device' | 'user';
+  targetValue: string;
+  targetName?: string;
+  reason: string;
+  bannedAt: number;
+  bannedBy: string;
+}
+
+const BANS_FILE = path.join(DATA_DIR, 'banned_clients.json');
+let activeBans: BanRecord[] = [];
+
+function loadBansFromDisk(): void {
+  try {
+    if (fs.existsSync(BANS_FILE)) {
+      const raw = fs.readFileSync(BANS_FILE, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) activeBans = parsed;
+    }
+  } catch (e) {
+    console.error('Помилка читання файлу банів:', e);
+  }
+}
+
+function saveBansToDisk(): void {
+  try {
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(BANS_FILE, JSON.stringify(activeBans, null, 2), 'utf8');
+  } catch (e) {
+    console.error('Помилка запису файлу банів:', e);
+  }
+}
+
+loadBansFromDisk();
+
+const onlineSessions = new Map<string, OnlineSession>();
+
+function getClientIp(req: express.Request): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string') {
+    const first = forwarded.split(',')[0].trim();
+    if (first) return first;
+  }
+  const sock = req.socket?.remoteAddress;
+  if (sock) {
+    if (sock.startsWith('::ffff:')) return sock.slice(7);
+    return sock;
+  }
+  return req.ip || '127.0.0.1';
+}
+
+function isTargetBanned(ip: string, deviceId: string, userName: string): { banned: boolean; reason?: string } {
+  const cleanIp = (ip || '').trim();
+  const cleanDev = (deviceId || '').trim();
+  const cleanUser = (userName || '').trim().toLowerCase();
+
+  for (const b of activeBans) {
+    if (b.targetType === 'ip' && cleanIp && b.targetValue === cleanIp) {
+      return { banned: true, reason: b.reason || 'Вас забанив розробник зверніться до нього' };
+    }
+    if (b.targetType === 'device' && cleanDev && b.targetValue === cleanDev) {
+      return { banned: true, reason: b.reason || 'Вас забанив розробник зверніться до нього' };
+    }
+    if (b.targetType === 'user' && cleanUser && b.targetValue.toLowerCase() === cleanUser) {
+      return { banned: true, reason: b.reason || 'Вас забанив розробник зверніться до нього' };
+    }
+  }
+  return { banned: false };
+}
+
 interface NormalizedChange {
   value: string;
   baseRev: number;
@@ -560,6 +642,136 @@ async function startServer(): Promise<void> {
       console.error('Помилка збереження фавікона:', err);
       res.status(500).json({ ok: false, error: errorMessage(err) });
     }
+  });
+
+  // 7c) Відстеження онлайн-сесій та перевірка бана (Heartbeat)
+  app.post('/api/presence/heartbeat', (req, res) => {
+    try {
+      const payload = asObject(req.body);
+      const deviceId = asString(payload.deviceId, 'dev_' + Math.random().toString(36).slice(2));
+      const role = asString(payload.role, 'user');
+      const userName = asString(payload.userName, '');
+      const subdivision = asString(payload.subdivision, '');
+      const currentView = asString(payload.currentView, 'base');
+      const ip = getClientIp(req);
+
+      const banCheck = isTargetBanned(ip, deviceId, userName);
+
+      onlineSessions.set(deviceId, {
+        id: deviceId,
+        deviceId,
+        ip,
+        role,
+        userName,
+        subdivision,
+        currentView,
+        lastSeen: Date.now(),
+      });
+
+      res.json({
+        ok: true,
+        isBanned: banCheck.banned,
+        reason: banCheck.reason || 'Вас забанив розробник зверніться до нього',
+        clientIp: ip,
+        serverTime: Date.now(),
+      });
+    } catch (err: unknown) {
+      res.status(500).json({ ok: false, error: errorMessage(err) });
+    }
+  });
+
+  // 7d) Список активних онлайн-сесій на сайті
+  app.get('/api/presence/online', (_req, res) => {
+    try {
+      const now = Date.now();
+      const cutoff = now - 45000; // 45 секунд без зв'язку — сесія неактивна
+      const active: Array<OnlineSession & { isBanned: boolean; banReason: string; online: boolean }> = [];
+
+      for (const [id, sess] of onlineSessions.entries()) {
+        if (sess.lastSeen < cutoff) {
+          onlineSessions.delete(id);
+        } else {
+          const banCheck = isTargetBanned(sess.ip, sess.deviceId, sess.userName);
+          active.push({
+            ...sess,
+            isBanned: banCheck.banned,
+            banReason: banCheck.reason || '',
+            online: true,
+          });
+        }
+      }
+
+      active.sort((a, b) => b.lastSeen - a.lastSeen);
+
+      res.json({
+        ok: true,
+        onlineCount: active.length,
+        sessions: active,
+        bansCount: activeBans.length,
+      });
+    } catch (err: unknown) {
+      res.status(500).json({ ok: false, error: errorMessage(err) });
+    }
+  });
+
+  // 7e) Додавання IP, пристрою або користувача в бан
+  app.post('/api/presence/ban', (req, res) => {
+    try {
+      const payload = asObject(req.body);
+      const targetType = asString(payload.targetType, 'ip') as 'ip' | 'device' | 'user';
+      const targetValue = asString(payload.targetValue, '').trim();
+      const targetName = asString(payload.targetName, targetValue);
+      const reason = asString(payload.reason, 'Вас забанив розробник зверніться до нього');
+      const bannedBy = asString(payload.bannedBy, 'Розробник');
+
+      if (!targetValue) {
+        res.status(400).json({ ok: false, error: 'Не вказано обʼєкт для блокування' });
+        return;
+      }
+
+      const existingIndex = activeBans.findIndex(b => b.targetType === targetType && b.targetValue === targetValue);
+      if (existingIndex === -1) {
+        activeBans.push({
+          id: 'ban_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+          targetType,
+          targetValue,
+          targetName,
+          reason,
+          bannedAt: Date.now(),
+          bannedBy,
+        });
+        saveBansToDisk();
+      }
+
+      res.json({ ok: true, bansCount: activeBans.length, bans: activeBans });
+    } catch (err: unknown) {
+      res.status(500).json({ ok: false, error: errorMessage(err) });
+    }
+  });
+
+  // 7f) Зняття бану
+  app.post('/api/presence/unban', (req, res) => {
+    try {
+      const payload = asObject(req.body);
+      const targetValue = asString(payload.targetValue, '').trim();
+
+      if (!targetValue) {
+        res.status(400).json({ ok: false, error: 'Не вказано обʼєкт для розблокування' });
+        return;
+      }
+
+      activeBans = activeBans.filter(b => b.targetValue !== targetValue && b.id !== targetValue);
+      saveBansToDisk();
+
+      res.json({ ok: true, bansCount: activeBans.length, bans: activeBans });
+    } catch (err: unknown) {
+      res.status(500).json({ ok: false, error: errorMessage(err) });
+    }
+  });
+
+  // 7g) Список активних банів
+  app.get('/api/presence/bans', (_req, res) => {
+    res.json({ ok: true, bans: activeBans });
   });
 
   // 8) Роздача застосунку: Vite у dev, dist у production

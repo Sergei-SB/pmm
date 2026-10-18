@@ -27,7 +27,8 @@
 
     /* global currentRole, activeReportPeriod */
 
-    var SERVER_URL = 'https://pmm-server.onrender.com';   // за потреби змініть
+    var SERVER_URL = window.APP_SERVER_URL || 'https://pmm-server.onrender.com';
+    window.APP_SERVER_URL = SERVER_URL;
     var POLL_MS = 4000;
     var PUSH_DEBOUNCE_MS = 400;
     var BOOT_TIMEOUT_MS = 3000;

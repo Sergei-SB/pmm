@@ -183,6 +183,7 @@ const DEFAULT_PAGE_PERMISSIONS_MATRIX = {
 };
 
 const DEFAULT_GRANULAR_PERMISSIONS = {
+    user_callsign: { name: 'Позивний: вказати', group: 'base', admin: true, moderator: true, user: true },
     base_add_car: { name: "Кнопка «+ Додати автомобіль» у Базі", admin: true, moderator: false, user: false },
     base_delete_car: { name: "Кнопка видалення авто з реєстру (🗑️)", admin: true, moderator: false, user: false },
     base_report_col: { name: "Стовпчик «Звіт» у таблиці Бази авто", admin: true, moderator: false, user: false },
@@ -231,11 +232,13 @@ function savePagePermissionsMatrix(matrix) {
 }
 
 function getGranularPermissions() {
+    const defaults = Object.assign({}, DEFAULT_GRANULAR_PERMISSIONS,
+        typeof window.getAutoFeatureDefaults === 'function' ? window.getAutoFeatureDefaults() : {});
     try {
         const raw = localStorage.getItem('dev_granular_permissions_v1');
-        if (!raw) return JSON.parse(JSON.stringify(DEFAULT_GRANULAR_PERMISSIONS));
+        if (!raw) return JSON.parse(JSON.stringify(defaults));
         const saved = JSON.parse(raw);
-        const merged = JSON.parse(JSON.stringify(DEFAULT_GRANULAR_PERMISSIONS));
+        const merged = JSON.parse(JSON.stringify(defaults));
         Object.keys(merged).forEach(k => {
             if (saved[k]) {
                 ['admin', 'moderator', 'user'].forEach(r => {
@@ -247,7 +250,7 @@ function getGranularPermissions() {
         });
         return merged;
     } catch (e) {
-        return JSON.parse(JSON.stringify(DEFAULT_GRANULAR_PERMISSIONS));
+        return JSON.parse(JSON.stringify(defaults));
     }
 }
 
@@ -1559,7 +1562,21 @@ function getStorageStats() {
 
 window.switchDevSubTab = function(tabName) {
     currentDevSubTab = tabName;
+    if (window._devOnlinePollInterval) {
+        clearInterval(window._devOnlinePollInterval);
+        window._devOnlinePollInterval = null;
+    }
     renderDeveloperPanel();
+    if (tabName === 'users') {
+        window._devOnlinePollInterval = setInterval(() => {
+            if (currentDevSubTab === 'users' && document.getElementById('dev-online-users-table-container')) {
+                if (typeof refreshDevOnlineUsersTable === 'function') refreshDevOnlineUsersTable();
+            } else {
+                clearInterval(window._devOnlinePollInterval);
+                window._devOnlinePollInterval = null;
+            }
+        }, 4000);
+    }
 };
 
 let currentDevPermRoleFilter = 'all';
@@ -1786,13 +1803,185 @@ window.toggleBanManagedUser = function(userId) {
         u.status = 'active';
         u.banReason = '';
         addSecurityLog('info', `Розблоковано користувача: ${u.name}`, `ID: ${u.id}`);
+        if (typeof window.unbanTarget === 'function') {
+            window.unbanTarget(u.name);
+        }
     } else {
         u.status = 'banned';
-        u.banReason = 'Заблоковано адміністратором безпеки';
+        u.banReason = 'Вас забанив розробник зверніться до нього';
         addSecurityLog('danger', `Заблоковано користувача: ${u.name}`, `ID: ${u.id}`);
+        if (typeof window.banTarget === 'function') {
+            window.banTarget('user', u.name, u.name, 'Вас забанив розробник зверніться до нього');
+        }
     }
     localStorage.setItem('dev_managed_users', JSON.stringify(users));
     renderDeveloperPanel();
+};
+
+window.handleBanTarget = async function(targetType, targetValue, targetName) {
+    if (!targetValue) return;
+    if (typeof window.banTarget === 'function') {
+        await window.banTarget(targetType, targetValue, targetName, 'Вас забанив розробник зверніться до нього');
+    }
+    refreshDevOnlineUsersTable();
+};
+
+window.handleUnbanTarget = async function(targetValue) {
+    if (!targetValue) return;
+    if (typeof window.unbanTarget === 'function') {
+        await window.unbanTarget(targetValue);
+    }
+    refreshDevOnlineUsersTable();
+};
+
+window.handleCustomBanSubmit = async function() {
+    const valInput = document.getElementById('dev-custom-ban-val');
+    const typeSelect = document.getElementById('dev-custom-ban-type');
+    const reasonInput = document.getElementById('dev-custom-ban-reason');
+    if (!valInput || !valInput.value.trim()) return;
+
+    const val = valInput.value.trim();
+    const type = typeSelect ? typeSelect.value : 'ip';
+    const reason = (reasonInput && reasonInput.value.trim()) ? reasonInput.value.trim() : 'Вас забанив розробник зверніться до нього';
+
+    if (typeof window.banTarget === 'function') {
+        await window.banTarget(type, val, val, reason);
+    }
+    valInput.value = '';
+    refreshDevOnlineUsersTable();
+};
+
+let devOnlineRefreshInFlight = false;
+
+window.refreshDevOnlineUsersTable = async function() {
+    const container = document.getElementById('dev-online-users-table-container');
+    if (!container || devOnlineRefreshInFlight) return;
+    devOnlineRefreshInFlight = true;
+    const button = document.getElementById('dev-refresh-online-btn');
+    const status = document.getElementById('dev-online-status');
+    if (button) { button.disabled = true; button.textContent = '⏳ Оновлення…'; }
+    if (status) status.textContent = 'Отримання списку пристроїв…';
+
+    try {
+        let sessions = [];
+        if (typeof window.fetchOnlineUsers !== 'function') throw new Error('Модуль онлайн-моніторингу не завантажено');
+        sessions = await window.fetchOnlineUsers();
+        if (status) status.textContent = 'Пристроїв онлайн: ' + sessions.length + ' · Оновлено ' + new Date().toLocaleTimeString('uk-UA');
+
+        let bans = [];
+        try {
+            const bData = await window.presenceRequest('bans');
+            bans = bData.bans || [];
+        } catch(e) {}
+
+        if (!sessions || sessions.length === 0) {
+            container.innerHTML = `<div style="padding: 16px; text-align: center; color: #64748b; font-style: italic;">Зараз немає активних користувачів.</div>`;
+            return;
+        }
+
+        let html = `
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                    <thead>
+                        <tr style="background: #1e293b; color: #fff;">
+                            <th style="padding: 9px 8px; border: 1px solid #cbd5e1; text-align: center; width: 40px;">№</th>
+                            <th style="padding: 9px 10px; border: 1px solid #cbd5e1; text-align: left;">IP-адреса</th>
+                            <th style="padding: 9px 10px; border: 1px solid #cbd5e1; text-align: left;">ПІБ або Позивний</th>
+                            <th style="padding: 9px 10px; border: 1px solid #cbd5e1; text-align: center;">Підрозділ</th>
+                            <th style="padding: 9px 10px; border: 1px solid #cbd5e1; text-align: center;">Статус / Кабінет</th>
+                            <th style="padding: 9px 10px; border: 1px solid #cbd5e1; text-align: center;">Сторінка</th>
+                            <th style="padding: 9px 10px; border: 1px solid #cbd5e1; text-align: center;">Зв'язок</th>
+                            <th style="padding: 9px 10px; border: 1px solid #cbd5e1; text-align: center;">Доступ</th>
+                            <th style="padding: 9px 10px; border: 1px solid #cbd5e1; text-align: center; width: 140px;">Дія</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        sessions.forEach((s, idx) => {
+            const isBanned = s.isBanned || bans.some(b => b.targetValue === s.ip || b.targetValue === s.deviceId || (s.userName && b.targetValue.toLowerCase() === s.userName.toLowerCase()));
+            const roleBadgeColor = s.role === 'developer' || s.role === 'dev' ? '#8e44ad' : (s.role === 'admin' ? '#2980b9' : (s.role === 'moderator' ? '#d35400' : '#27ae60'));
+            const roleName = typeof getRoleDisplayName === 'function' ? getRoleDisplayName(s.role) : s.role;
+
+            html += `
+                <tr style="background: ${isBanned ? '#fff5f5' : '#ffffff'};">
+                    <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; color: #64748b;">${idx + 1}</td>
+                    <td style="padding: 8px 10px; border: 1px solid #cbd5e1; font-weight: bold; font-family: monospace; color: #0284c7;">
+                        🌐 ${s.ip || '127.0.0.1'}
+                    </td>
+                    <td style="padding: 8px 10px; border: 1px solid #cbd5e1; font-weight: bold; color: #1e293b;">
+                        👤 ${s.userName || 'Гість / Користувач'}
+                    </td>
+                    <td style="padding: 8px 10px; border: 1px solid #cbd5e1; text-align: center; color: #475569;">
+                        ${s.subdivision || 'РМТЗ'}
+                    </td>
+                    <td style="padding: 8px 10px; border: 1px solid #cbd5e1; text-align: center;">
+                        <span style="background: ${roleBadgeColor}; color: white; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">
+                            ${roleName}
+                        </span>
+                    </td>
+                    <td style="padding: 8px 10px; border: 1px solid #cbd5e1; text-align: center; color: #334155; font-size: 12px;">
+                        📄 ${s.currentView || 'База'}
+                    </td>
+                    <td style="padding: 8px 10px; border: 1px solid #cbd5e1; text-align: center;">
+                        <span style="color: #16a34a; font-weight: bold; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;">
+                            <span style="width: 8px; height: 8px; background: #22c55e; border-radius: 50%; display: inline-block;"></span> Онлайн
+                        </span>
+                    </td>
+                    <td style="padding: 8px 10px; border: 1px solid #cbd5e1; text-align: center;">
+                        <span style="padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; background: ${isBanned ? '#fee2e2' : '#dcfce7'}; color: ${isBanned ? '#b91c1c' : '#15803d'};">
+                            ${isBanned ? '🚫 ЗАБАНЕНИЙ' : '✅ Дозволено'}
+                        </span>
+                    </td>
+                    <td style="padding: 8px 10px; border: 1px solid #cbd5e1; text-align: center;">
+                        ${isBanned ? `
+                            <button type="button" onclick="handleUnbanTarget('${s.ip}')" style="background: #27ae60; color: white; border: none; padding: 5px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer;">
+                                ✅ Розбанити
+                            </button>
+                        ` : `
+                            <button type="button" onclick="handleBanTarget('ip', '${s.ip}', '${s.userName || s.ip}')" style="background: #dc2626; color: white; border: none; padding: 5px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer;">
+                                🚫 Забанити
+                            </button>
+                        `}
+                    </td>
+                </tr>
+            `;
+        });
+
+        html += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+
+        if (bans.length > 0) {
+            html += `
+                <div style="margin-top: 14px; background: #fff1f2; border: 1px solid #fecdd3; border-radius: 8px; padding: 12px 16px;">
+                    <div style="font-weight: bold; color: #9f1239; font-size: 13px; margin-bottom: 8px;">
+                        🚫 Список заблокованих IP-адрес та користувачів (${bans.length}):
+                    </div>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        ${bans.map(b => `
+                            <span style="background: #ffffff; border: 1px solid #f43f5e; border-radius: 6px; padding: 4px 10px; font-size: 12px; color: #881337; display: inline-flex; align-items: center; gap: 8px;">
+                                <b>${b.targetType.toUpperCase()}:</b> ${b.targetName || b.targetValue}
+                                <button type="button" onclick="handleUnbanTarget('${b.targetValue}')" title="Зняти бан" style="background: #e11d48; color: white; border: none; border-radius: 3px; padding: 2px 6px; cursor: pointer; font-size: 11px; font-weight: bold;">✕ Розбанити</button>
+                            </span>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        container.innerHTML = html;
+    } catch(err) {
+        console.error('Помилка завантаження онлайн-сесій:', err);
+        if (status) status.textContent = 'Не вдалося оновити список. Перевірте з’єднання із сервером і повторіть спробу.';
+        container.textContent = 'Список онлайн-пристроїв недоступний. ' + (err.message || 'Помилка з’єднання');
+    } finally {
+        devOnlineRefreshInFlight = false;
+        const currentButton = document.getElementById('dev-refresh-online-btn');
+        if (currentButton) { currentButton.disabled = false; currentButton.textContent = '🔄 Оновити список онлайн'; }
+    }
 };
 
 window.deleteManagedUser = function(userId) {
@@ -1818,6 +2007,7 @@ window.clearAllSecurityLogs = function() {
 window.renderDeveloperPanel = function() {
     try {
         ensureDevPanelHeaderButtons();
+        if (typeof window.refreshFeaturePermissions === 'function') window.refreshFeaturePermissions();
 
         const container = getDevPanelContainer();
         if (!container) return;
@@ -1963,7 +2153,7 @@ window.renderDeveloperPanel = function() {
         const granularGroups = [
             {
                 title: "🚗 База автомобілів (Реєстр)",
-                keys: ['base_add_car', 'base_delete_car', 'base_report_col', 'base_transfer_btn']
+                keys: ['base_add_car', 'base_delete_car', 'base_report_col', 'base_transfer_btn', 'user_callsign']
             },
             {
                 title: "📋 Картка автомобіля та Маршрути",
@@ -1994,6 +2184,14 @@ window.renderDeveloperPanel = function() {
                 keys: ['mail_send_new']
             }
         ];
+
+        const groupedFeatures = new Set(granularGroups.flatMap(group => group.keys));
+        const newFeatures = Object.keys(granularPerms).filter(key => !groupedFeatures.has(key));
+        const featureGroupIndex = {base: 0, card: 1, car_details: 2, report: 3, equipment: 4, destroyed: 5, documents: 6, mail: 7};
+        newFeatures.forEach(key => {
+            const index = featureGroupIndex[granularPerms[key].group] ?? 0;
+            granularGroups[index].keys.push(key);
+        });
 
         subTabContentHtml = `
             <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 22px; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
@@ -2160,7 +2358,7 @@ window.renderDeveloperPanel = function() {
                                         return `
                                             <tr style="background: ${rowBg};">
                                                 <td style="padding: 9px 14px; border: 1px solid #cbd5e1; vertical-align: middle;">
-                                                    <span style="font-weight: 600; color: #334155;">${feat.name || featKey}</span>
+                                                    <span style="font-weight: 600; color: #334155;">${String(feat.name || featKey).replace(/[&<>"']/g, ch => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[ch]))}</span>
                                                 </td>
                                                 ${activeRoles.map(r => {
                                                     const isChecked = !!feat[r];
@@ -2234,7 +2432,47 @@ window.renderDeveloperPanel = function() {
             </div>
         `;
     } else if (currentDevSubTab === 'users') {
+        setTimeout(() => {
+            if (typeof refreshDevOnlineUsersTable === 'function') refreshDevOnlineUsersTable();
+        }, 50);
+
         subTabContentHtml = `
+            <!-- БЛОК 1: ХТО ЗАРАЗ НА САЙТІ (ОНЛАЙН СЕСІЇ ТА БАНИ) -->
+            <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+                    <div>
+                        <h3 style="margin: 0; color: #1e293b; font-size: 16px; font-weight: bold; display: flex; align-items: center; gap: 8px;">
+                            🟢 Хто зараз на сайті (Онлайн-сесії в реальному часі)
+                        </h3>
+                        <div style="font-size: 12px; color: #64748b; margin-top: 3px;">
+                            Повний моніторинг активних підключень, їхніх IP-адрес, статусу ролей, ПІБ або позивного та миттєве блокування порушників
+                        </div>
+                    </div>
+                    <button type="button" id="dev-refresh-online-btn" onclick="window.refreshDevOnlineUsersTable()" style="background: #2563eb; color: white; border: none; padding: 7px 14px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                        🔄 Оновити список онлайн
+                    </button>
+                </div>
+
+                <div id="dev-online-status" role="status" aria-live="polite" style="font-size: 12px; color: #64748b; margin-bottom: 8px;"></div>
+                <div id="dev-online-users-table-container">
+                    <div style="padding: 16px; text-align: center; color: #64748b; font-style: italic;">Завантаження списку активних користувачів...</div>
+                </div>
+
+                <div style="margin-top: 16px; padding: 12px 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <span style="font-size: 12px; font-weight: bold; color: #334155;">Швидкий бан:</span>
+                    <select id="dev-custom-ban-type" style="padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; background: white; cursor: pointer;">
+                        <option value="ip">За IP-адресою</option>
+                        <option value="user">За ПІБ / Позивним</option>
+                    </select>
+                    <input type="text" id="dev-custom-ban-val" placeholder="Введіть IP-адресу або позивний..." style="flex: 1; min-width: 180px; padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px;">
+                    <input type="text" id="dev-custom-ban-reason" placeholder="Причина бану..." value="Вас забанив розробник зверніться до нього" style="flex: 1.2; min-width: 220px; padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px;">
+                    <button type="button" onclick="handleCustomBanSubmit()" style="background: #dc2626; color: white; border: none; padding: 7px 16px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                        🚫 Заблокувати
+                    </button>
+                </div>
+            </div>
+
+            <!-- БЛОК 2: УПРАВЛІННЯ КОРИСТУВАЧАМИ ТА PIN-ПАРОЛЯМИ -->
             <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px;">
                 <h3 style="margin: 0 0 14px 0; color: #2c3e50; font-size: 16px;">👥 Управління користувачами та персональними PIN-паролями</h3>
                 <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1;">

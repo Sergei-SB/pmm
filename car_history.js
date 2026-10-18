@@ -245,12 +245,8 @@ function loadCarHistoryDataIntoModal() {
                 </table>
             </div>
 
-            <!-- Блок формул та швидких пресетів -->
+            <!-- Блок формул -->
             <div style="margin-top: 15px; border-top: 1px solid #bdc3c7; padding-top: 10px; display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start;">
-                <div style="display: flex; flex-direction: column; gap: 6px; width: 220px; flex-shrink: 0;">
-                    <button type="button" class="preset-btn" onclick="applyModalPreset('Виконання БЗ Харків')" style="background: #34495e; color: white; border: none; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold;">Виконання БЗ Харків</button>
-                    <button type="button" class="preset-btn" onclick="applyModalPreset('Міста-мільйонники (Харків, Київ, Львів)')" style="background: #34495e; color: white; border: none; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold;">Міста-мільйонники (Харків, Київ, Львів)</button>
-                </div>
 
                 <div style="flex-grow: 1; font-size: 12px;">
                     <div id="hist-formulas-container" style="display: flex; flex-direction: column; gap: 4px; border-bottom: 1px solid #ddd; padding-bottom: 6px; margin-bottom: 6px;"></div>

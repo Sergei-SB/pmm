@@ -226,13 +226,20 @@
                     <button id="btn-cat-quad" class="action-btn" onclick="filterCarsByCategory('квадроцикл')">Квадроцикли</button>
                 </div>
                 
-                <!-- ПРАВА ЧАСТИНА: ПАНЕЛЬ ВИБОРУ РОЛЕЙ -->
-                <div id="admin-auth-container" style="display: flex; align-items: center; gap: 4px; background: #2c3e50; padding: 4px 8px; border-radius: 4px; border: 1px solid #34495e; white-space: nowrap;">
-                    <span style="color: #bdc3c7; font-size: 11px; font-weight: bold; margin-right: 2px;">Вхід для:</span>
-                    <button id="role-btn-developer" onclick="selectRole('developer')" style="background-color: #34495e; color: white; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; font-weight: bold; cursor: pointer;">Розробник</button>
-                    <button id="role-btn-admin" onclick="selectRole('admin')" style="background-color: #34495e; color: white; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; font-weight: bold; cursor: pointer;">Адмін</button>
-                    <button id="role-btn-moderator" onclick="selectRole('moderator')" style="background-color: #34495e; color: white; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; font-weight: bold; cursor: pointer;">Модератор</button>
-                    <button id="role-btn-user" onclick="selectRole('user')" style="background-color: #c0392b; color: white; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; font-weight: bold; cursor: pointer;">Юзер</button>
+                <!-- ПРАВА ЧАСТИНА: ПАНЕЛЬ ВИБОРУ РОЛЕЙ ТА ПОЗИВНИЙ -->
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <div id="user-callsign-badge-container" data-permission-key="user_callsign" data-permission-name="Позивний: вказати" data-permission-group="base" onclick="promptSetUserCallsign()" title="Натисніть щоб вказати або змінити свій позивний / ПІБ" style="display: flex; align-items: center; gap: 6px; background: #2c3e50; padding: 4px 10px; border-radius: 4px; border: 1px solid #34495e; color: #ecf0f1; font-size: 11px; font-weight: bold; cursor: pointer; user-select: none;">
+                        <span style="color: #bdc3c7;">👤 Позивний:</span>
+                        <strong id="user-callsign-display" style="color: #38bdf8;">Вказати ✎</strong>
+                    </div>
+
+                    <div id="admin-auth-container" style="display: flex; align-items: center; gap: 4px; background: #2c3e50; padding: 4px 8px; border-radius: 4px; border: 1px solid #34495e; white-space: nowrap;">
+                        <span style="color: #bdc3c7; font-size: 11px; font-weight: bold; margin-right: 2px;">Вхід для:</span>
+                        <button id="role-btn-developer" onclick="selectRole('developer')" style="background-color: #34495e; color: white; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; font-weight: bold; cursor: pointer;">Розробник</button>
+                        <button id="role-btn-admin" onclick="selectRole('admin')" style="background-color: #34495e; color: white; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; font-weight: bold; cursor: pointer;">Адмін</button>
+                        <button id="role-btn-moderator" onclick="selectRole('moderator')" style="background-color: #34495e; color: white; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; font-weight: bold; cursor: pointer;">Модератор</button>
+                        <button id="role-btn-user" onclick="selectRole('user')" style="background-color: #c0392b; color: white; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; font-weight: bold; cursor: pointer;">Юзер</button>
+                    </div>
                 </div>
             </div>
             
@@ -354,10 +361,7 @@
 
                         <div class="fuel-summary-footer">
                             <div class="footer-layout-flex">
-                                <div class="preset-buttons-group">
-                                    <button type="button" class="preset-btn" onclick="applyPresetToActiveRow('Виконання БЗ Харків')">Виконання БЗ Харків</button>
-                                    <button type="button" class="preset-btn" onclick="applyPresetToActiveRow('Міста-мільйонники (Харків, Київ, Львів)')">Міста-мільйонники (Харків, Київ, Львів)</button>
-                                </div>
+                                <div class="preset-buttons-group" style="display: none;"></div>
                                 <div class="footer-right-column">
                                     <div class="calc-main-row">
                                         <div class="formulas-group" id="formulas-group-container"></div>
@@ -699,6 +703,7 @@
     <script src="moderator.js"></script>
     <script src="developer_mail.js"></script>
     <script src="developer_panel.js"></script>
+    <script src="permissions_registry.js"></script>
     <script src="broadcast_mail.js"></script>
     <script src="equipment_report.js"></script>
     <script src="app.js"></script>
@@ -707,6 +712,7 @@
     <script src="destroyed_equipment.js"></script>
     <script src="documents.js"></script>
     <script src="doc_margins.js"></script>
+    <script src="presence.js"></script>
     <script src="Shared_sync.js"></script>
 </body>
 </html>
