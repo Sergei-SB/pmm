@@ -114,6 +114,56 @@
     if (typeof meta.lastRev !== 'number') meta.lastRev = 0;
 
     var pending = readJSON(PENDING_KEY, null) || {};
+    if (!meta.carBases) meta.carBases = {};
+
+    function isCarKey(key) {
+        return key === 'user_cars_database_v2' || key === 'cars_modifications_data';
+    }
+
+    // Three-way merge: retain offline additions and independent field edits;
+    // never restore a vehicle deleted remotely from an unchanged local snapshot.
+    function mergeCarValue(key, localValue, remoteValue, baseValue) {
+        try {
+            var local = JSON.parse(localValue);
+            var remote = JSON.parse(remoteValue);
+            var base = baseValue ? JSON.parse(baseValue) : null;
+            var array = key === 'user_cars_database_v2';
+            if (array && (!Array.isArray(local) || !Array.isArray(remote))) return null;
+            if (!array && (!local || !remote || Array.isArray(local) || Array.isArray(remote))) return null;
+            function map(value) {
+                var result = Object.create(null);
+                if (array) (value || []).forEach(function (car) { if (car && car.id != null) result[String(car.id)] = car; });
+                else Object.keys(value || {}).forEach(function (id) { result[id] = value[id]; });
+                return result;
+            }
+            var l = map(local), r = map(remote), b = map(base);
+            var result = map(remote);
+            Object.keys(b).forEach(function (id) {
+                if (!l[id] && JSON.stringify(r[id]) === JSON.stringify(b[id])) delete result[id];
+            });
+            Object.keys(l).forEach(function (id) {
+                if (!b[id]) {
+                    if (!r[id]) result[id] = l[id];
+                    else if (JSON.stringify(l[id]) !== JSON.stringify(r[id]) && array && l[id].plate !== r[id].plate) {
+                        throw new Error('Different vehicles share the same ID');
+                    }
+                    return;
+                }
+                if (!r[id]) return;
+                var row = Object.assign({}, r[id]);
+                Object.keys(l[id]).forEach(function (field) {
+                    var changed = JSON.stringify(l[id][field]) !== JSON.stringify(b[id][field]);
+                    var remoteUnchanged = JSON.stringify(r[id][field]) === JSON.stringify(b[id][field]);
+                    if (changed && (remoteUnchanged || JSON.stringify(l[id][field]) === JSON.stringify(r[id][field]))) row[field] = l[id][field];
+                });
+                result[id] = row;
+            });
+            if (!array) return JSON.stringify(result);
+            var order = remote.map(function (car) { return String(car.id); });
+            local.forEach(function (car) { if (order.indexOf(String(car.id)) === -1) order.push(String(car.id)); });
+            return JSON.stringify(order.filter(function (id) { return result[id]; }).map(function (id) { return result[id]; }));
+        } catch (e) { return null; }
+    }
 
     var applyingRemote = false;
     var awaitingFirstPull = true;
@@ -226,7 +276,8 @@
     }
 
     // --- Перехоплення записів у localStorage -------------------------------
-    function queueLocalChange(key, value, deleted) {
+    function queueLocalChange(key, value, deleted, previousValue) {
+        var prior = pending[key];
         if (deleted) {
             pending[key] = { deleted: true, preBoot: awaitingFirstPull };
         } else {
@@ -236,6 +287,10 @@
                 return;
             }
             pending[key] = { value: str, deleted: false, preBoot: awaitingFirstPull };
+        }
+        if (isCarKey(key) && !deleted) {
+            pending[key].baseValue = prior && prior.baseValue !== undefined ? prior.baseValue
+                : (meta.carBases[key] !== undefined ? meta.carBases[key] : previousValue);
         }
         savePending();
         schedulePush(PUSH_DEBOUNCE_MS);
@@ -254,7 +309,7 @@
             if (!isLocal || applyingRemote || !isSyncedKey(key)) return;
             var str = String(value);
             if (prev === str) return;
-            queueLocalChange(key, str, false);
+            queueLocalChange(key, str, false, prev);
 
             if (key === 'saved_documents_v2') scheduleDocPush();
         };
@@ -289,7 +344,7 @@
         var deletedKeys = [];
         Object.keys(pending).forEach(function (key) {
             var p = pending[key];
-            if (!p) return;
+            if (!p || p.blocked) return;
             if (p.deleted) deletedKeys.push(key);
             else changes[key] = { value: p.value, baseRev: getKeyRev(key) };
         });
@@ -322,12 +377,12 @@
     }
 
     function flushPending() {
-        if (pushInFlight) { schedulePush(300); return Promise.resolve(); }
+        if (pushInFlight || pullInFlight || awaitingFirstPull) { schedulePush(300); return Promise.resolve(); }
 
         var payload = buildPayload();
         var changeKeys = Object.keys(payload.changes);
         if (changeKeys.length === 0 && payload.deletedKeys.length === 0) {
-            setStatus('ok');
+            setStatus(Object.keys(pending).some(function (key) { return pending[key].blocked; }) ? 'conflict' : 'ok');
             return Promise.resolve();
         }
 
@@ -350,13 +405,13 @@
             // прибираємо з черги лише те, що не змінилося під час запиту
             changeKeys.forEach(function (key) {
                 var p = pending[key];
-                if (p && !p.deleted && payload.changes[key] && p.value === payload.changes[key].value) {
+                if (data.applied && Object.prototype.hasOwnProperty.call(data.applied, key) && p && !p.deleted && payload.changes[key] && p.value === payload.changes[key].value) {
                     delete pending[key];
                 }
             });
             payload.deletedKeys.forEach(function (key) {
                 var p = pending[key];
-                if (p && p.deleted) delete pending[key];
+                if (data.applied && Object.prototype.hasOwnProperty.call(data.applied, key) && p && p.deleted) delete pending[key];
             });
 
             var needRefresh = false;
@@ -364,6 +419,10 @@
             if (data && data.applied) {
                 Object.keys(data.applied).forEach(function (key) {
                     setKeyRev(key, data.applied[key]);
+                    if (isCarKey(key) && payload.changes[key]) {
+                        meta.carBases[key] = payload.changes[key].value;
+                        if (pending[key] && !pending[key].deleted) pending[key].baseValue = payload.changes[key].value;
+                    }
                 });
             }
 
@@ -372,25 +431,26 @@
                     var rec = data.rejected[key];
                     if (!rec) return;
 
-                    if (rec.deleted) {
-                        if (localGet(key) !== null) {
-                            applyingRemote = true;
-                            localRemove(key);
-                            applyingRemote = false;
-                            needRefresh = true;
+                    var oneKey = {};
+                    oneKey[key] = rec;
+                    if (isCarKey(key)) {
+                        if (applyRemoteKeys(oneKey, false) > 0) needRefresh = true;
+                    } else {
+                        var latest = pending[key];
+                        var sent = payload.changes[key];
+                        var hasNewerEdit = latest && !latest.deleted && sent && latest.value !== sent.value;
+                        if (!hasNewerEdit) {
+                            delete pending[key];
+                            if (applyRemoteKeys(oneKey, false) > 0) needRefresh = true;
                         }
-                    } else if (typeof rec.value === 'string' && localGet(key) !== rec.value) {
-                        applyingRemote = true;
-                        localSet(key, rec.value);
-                        applyingRemote = false;
-                        needRefresh = true;
                     }
                     setKeyRev(key, rec.rev);
                 });
                 if (Object.keys(data.rejected).length > 0) setStatus('conflict');
             }
 
-            if (data && typeof data.revision === 'number') setLastRev(data.revision);
+            // Only a completed GET advances the pull cursor. POST acknowledgements
+            // do not include other devices' changes and must never skip them.
 
             retryDelay = RETRY_MIN_MS;
             saveMeta();
@@ -420,6 +480,23 @@
                 if (!rec || !isSyncedKey(key)) return;
                 var incoming = Number(rec.rev) || 0;
 
+                if (pending[key] && !pending[key].deleted && isCarKey(key) && !rec.deleted && typeof rec.value === 'string') {
+                    var p = pending[key];
+                    var merged = mergeCarValue(key, p.value, rec.value, p.baseValue);
+                    if (merged === null) {
+                        localSet('__sync_car_conflict_' + key, p.value);
+                        p.blocked = true;
+                        setStatus('conflict');
+                        return;
+                    }
+                    if (localGet(key) !== merged) { localSet(key, merged); changedCount += 1; }
+                    meta.carBases[key] = rec.value;
+                    setKeyRev(key, incoming);
+                    if (merged === rec.value) delete pending[key];
+                    else pending[key] = {value: merged, deleted: false, preBoot: false, baseValue: rec.value};
+                    return;
+                }
+
                 if (isFirstPull && pending[key]) {
                     // Перший pull: якщо сервер знає цей ключ — перемагає сервер,
                     // якщо не знає — локальне значення залишається в черзі й піде на сервер.
@@ -440,6 +517,7 @@
                     }
                 }
                 setKeyRev(key, incoming);
+                if (isCarKey(key)) meta.carBases[key] = rec.deleted ? null : rec.value;
             });
         } finally {
             applyingRemote = false;
@@ -448,16 +526,25 @@
     }
 
     function pullServer(isInitial) {
-        if (pullInFlight) return Promise.resolve();
+        if (pullInFlight || pushInFlight) return Promise.resolve();
         pullInFlight = true;
 
-        var since = getLastRev();
+        var since = isInitial || awaitingFirstPull ? 0 : getLastRev();
         var url = SERVER_URL + '/api/shared-state' + (since > 0 ? '?since=' + since : '');
 
         return fetchWithTimeout(url, { cache: 'no-store' }, isInitial ? PULL_TIMEOUT_MS : PUSH_TIMEOUT_MS)
             .then(function (res) {
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 return res.json();
+            })
+            .then(function (data) {
+                if (typeof data.revision === 'number' && data.revision < getLastRev()) {
+                    meta.lastRev = 0;
+                    meta.keys = {};
+                    if (since > 0) return fetchWithTimeout(SERVER_URL + '/api/shared-state', {cache: 'no-store'}, PULL_TIMEOUT_MS)
+                        .then(function (response) { if (!response.ok) throw new Error('HTTP ' + response.status); return response.json(); });
+                }
+                return data;
             })
             .then(function (data) {
                 // Сумісність зі старим сервером: він повертає { version, storage },
@@ -676,7 +763,9 @@
             if (!isSyncedKey(key)) return;
             var value = localGet(key);
             if (value === null) return;
+            var previous = pending[key];
             pending[key] = { value: value, deleted: false, preBoot: false };
+            if (isCarKey(key)) pending[key].baseValue = previous && previous.baseValue !== undefined ? previous.baseValue : meta.carBases[key];
         });
         savePending();
 

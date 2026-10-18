@@ -378,7 +378,7 @@ window.reloadCarsFromStorage = function() {
         const saved = localStorage.getItem('user_cars_database_v2');
         if (saved) {
             const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed) && parsed.length > 0) {
+            if (Array.isArray(parsed)) {
                 carsData = parsed.filter(c => isValidPlate(c.plate));
                 window.carsData = carsData;
             }
