@@ -1123,14 +1123,21 @@ function updateRouteTotals() {
     const truckActive = isCarTruck(car);
     const hasAdBlue = car && car.hasAdBlue;
 
-    let presetButtonsHtml = '';
+    let presetButtonsHtml = `
+        <button type="button" class="preset-btn" onclick="applyPresetToActiveRow('Виконання БЗ Харків')">Виконання БЗ Харків</button>
+        <button type="button" class="preset-btn" onclick="applyPresetToActiveRow('Міста-мільйонники (Харків, Київ, Львів)')">Міста-мільйонники (Харків, Київ, Львів)</button>
+    `;
 
     if (group === 'мотоцикл') {
         carFormulas = [8, 9];
-        presetButtonsHtml = '';
+        presetButtonsHtml = `
+            <button type="button" class="preset-btn" onclick="applyPresetToActiveRow('Виконання БЗ Харків')">Виконання БЗ Харків</button>
+        `;
     } else if (group === 'квадроцикл') {
         carFormulas = [8];
-        presetButtonsHtml = '';
+        presetButtonsHtml = `
+            <button type="button" class="preset-btn" onclick="applyPresetToActiveRow('Виконання БЗ Харків')">Виконання БЗ Харків</button>
+        `;
     } else if (truckActive) {
         let hasMillion = false;
         rows.forEach(row => {
