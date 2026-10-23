@@ -627,7 +627,8 @@ window.openUniversalFilePreviewModal = async function(fileInfo) {
             }
         }
 
-        const bodyContent = richHtml || (extractedPlain ? extractedPlain.replace(/\n/g, '<br>') : '');
+        // Plain DOC text must never be interpreted as HTML.
+        const bodyContent = richHtml || (extractedPlain ? escapeHtml(extractedPlain).replace(/\n/g, '<br>') : '');
 
         contentHtml = `
             <div style="padding:15px; overflow-y:auto; height:100%; box-sizing:border-box;">
@@ -640,14 +641,14 @@ window.openUniversalFilePreviewModal = async function(fileInfo) {
                             <h2 style="margin:8px 0 0 0; color:#0f172a; font-size:18px; font-weight:800;">${fileName}</h2>
                         </div>
                         <div style="text-align:right;">
-                            <span style="font-size:11px; color:#64748b; display:block;">Оригінальний формат</span>
+                            <span style="font-size:11px; color:#64748b; display:block;">${ext === 'doc' ? 'Текст документа' : 'Перегляд документа'}</span>
                             <button type="button" onclick="copyDocumentBodyText()" style="background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; border-radius:4px; padding:3px 8px; font-size:11px; cursor:pointer; margin-top:4px; font-weight:600;">
                                 📋 Копіювати текст
                             </button>
                         </div>
                     </div>
-                    <div id="word-doc-body-container" style="word-break:break-word; min-height:350px;">
-                        ${bodyContent || '<p style="color:#64748b; font-style:italic;">Текстовий вміст документа відображено. Для роботи з оригінальним форматуванням у MS Word скористайтесь кнопкою «📥 Скачати» вгорі.</p>'}
+                    <div id="word-doc-body-container" style="word-break:break-word; white-space:${richHtml ? 'normal' : 'pre-wrap'}; tab-size:4; min-height:350px;">
+                        ${bodyContent || '<p style="color:#64748b; font-style:italic;">Не вдалося прочитати текст цього документа. Файл може бути захищений або мати непідтримуваний формат. Натисніть «📥 Скачати», щоб відкрити оригінал у Word.</p>'}
                     </div>
                 </div>
             </div>
@@ -1021,67 +1022,162 @@ window.filterExcelPreviewTable = function(query) {
     });
 };
 
+// Read CFB streams and the Word piece table, never raw file metadata.
+// Format: Microsoft [MS-CFB] and [MS-DOC] section 2.4.1.
 window.extractDocBinaryText = function(arrayBuffer) {
     try {
         const bytes = new Uint8Array(arrayBuffer);
-        const len = bytes.length;
-        if (len < 512) return '';
-
-        const cp1251 = [
-            'Ђ','Ѓ','‚','ѓ','„','…','†','‡','€','‰','Љ','‹','Њ','Ќ','Ћ','Џ',
-            'ђ','‘','’','“','”','•','–','—','\u0098','™','љ','›','њ','ќ','ћ','џ',
-            ' ','Ў','ў','Ј','¤','Ґ','¦','§','Ё','©','Є','«','¬','\u00AD','®','Ї',
-            '°','±','І','і','ґ','µ','¶','·','ё','№','є','»','ј','Ѕ','ѕ','ї',
-            'А','Б','В','Г','Д','Е','Ж','З','И','Й','К','Л','М','Н','О','П',
-            'Р','С','Т','У','Ф','Х','Ц','Ч','Ш','Щ','Ъ','Ы','Ь','Э','Ю','Я',
-            'а','б','в','г','д','е','ж','з','и','й','к','л','м','н','о','п',
-            'р','с','т','у','ф','х','ц','ч','ш','щ','ъ','ы','ь','э','ю','я'
-        ];
-
-        let utf16Strings = [];
-        let currUtf16 = '';
-        for (let i = 0; i < len - 1; i += 2) {
-            let code = bytes[i] | (bytes[i + 1] << 8);
-            if (code === 0x0D || code === 0x0A) {
-                if (currUtf16.trim().length >= 3) utf16Strings.push(currUtf16.trim());
-                currUtf16 = '';
-            } else if ((code >= 0x0020 && code <= 0x007E) || (code >= 0x0400 && code <= 0x04FF) || code === 0x2116) {
-                currUtf16 += String.fromCharCode(code);
-            } else {
-                if (currUtf16.trim().length >= 4) utf16Strings.push(currUtf16.trim());
-                currUtf16 = '';
-            }
+        const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+        const u16 = (offset) => view.getUint16(offset, true);
+        const u32 = (offset) => view.getUint32(offset, true);
+        const signature = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1];
+        if (bytes.length < 512 || !signature.every((b, i) => bytes[i] === b)) return '';
+        const major = u16(26);
+        const shift = u16(30);
+        if (u16(28) !== 0xfffe || !((major === 3 && shift === 9) || (major === 4 && shift === 12)) || u16(32) !== 6) return '';
+        const sectorSize = 2 ** shift;
+        const sectorCount = Math.floor(bytes.length / sectorSize) - 1;
+        const validSector = (id) => Number.isInteger(id) && id >= 0 && id < sectorCount;
+        const sector = (id) => {
+            if (!validSector(id)) throw new Error('Invalid CFB sector');
+            return bytes.subarray((id + 1) * sectorSize, (id + 2) * sectorSize);
+        };
+        const words = (data) => {
+            const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+            return Array.from({ length: data.length / 4 }, (_, i) => dv.getUint32(i * 4, true));
+        };
+        const difat = [];
+        for (let i = 0; i < 109; i++) {
+            const id = u32(76 + i * 4);
+            if (id !== 0xffffffff) difat.push(id);
         }
-        if (currUtf16.trim().length >= 4) utf16Strings.push(currUtf16.trim());
-
-        let cp1251Strings = [];
-        let currCp = '';
-        for (let i = 0; i < len; i++) {
-            let b = bytes[i];
-            if (b === 0x0D || b === 0x0A) {
-                if (currCp.trim().length >= 3) cp1251Strings.push(currCp.trim());
-                currCp = '';
-            } else if (b >= 0x20 && b <= 0x7E) {
-                currCp += String.fromCharCode(b);
-            } else if (b >= 0x80) {
-                currCp += cp1251[b - 0x80] || '';
-            } else {
-                if (currCp.trim().length >= 4) cp1251Strings.push(currCp.trim());
-                currCp = '';
-            }
+        let difatId = u32(68);
+        const difatSeen = new Set();
+        const difatCount = u32(72);
+        if (difatCount > sectorCount) return '';
+        for (let i = 0; i < difatCount; i++) {
+            if (difatSeen.has(difatId)) return '';
+            difatSeen.add(difatId);
+            const ids = words(sector(difatId));
+            difatId = ids.pop();
+            ids.forEach(id => { if (id !== 0xffffffff) difat.push(id); });
         }
-        if (currCp.trim().length >= 4) cp1251Strings.push(currCp.trim());
-
-        const filterJunk = (arr) => arr.filter(s => s.length >= 3 && !/^[0-9\s.,!?:;*+\-_=]+$/.test(s));
-        const clean16 = filterJunk(utf16Strings);
-        const clean8 = filterJunk(cp1251Strings);
-
-        const totalChars16 = clean16.reduce((acc, s) => acc + s.length, 0);
-        const totalChars8 = clean8.reduce((acc, s) => acc + s.length, 0);
-
-        const bestList = totalChars16 > totalChars8 ? clean16 : clean8;
-        return bestList.join('\n\n');
-    } catch(e) {
+        const fatCount = u32(44);
+        if (fatCount > sectorCount || difat.length < fatCount) return '';
+        const fat = [];
+        for (let i = 0; i < fatCount; i++) {
+            for (const id of words(sector(difat[i]))) fat.push(id);
+        }
+        const readChain = (first, table, unitSize, readUnit, size) => {
+            const chunks = [];
+            const seen = new Set();
+            let id = first;
+            let total = 0;
+            while (id !== 0xfffffffe && (size === undefined || total < size)) {
+                if (!Number.isInteger(id) || id < 0 || id >= table.length || seen.has(id)) throw new Error('Invalid CFB chain');
+                seen.add(id);
+                const chunk = readUnit(id);
+                if (chunk.length !== unitSize) throw new Error('Truncated CFB stream');
+                chunks.push(chunk);
+                total += unitSize;
+                if (total > bytes.length) throw new Error('Oversized CFB chain');
+                id = table[id];
+            }
+            if (size !== undefined && total < size) throw new Error('Incomplete CFB stream');
+            const result = new Uint8Array(size === undefined ? total : size);
+            chunks.forEach((chunk, i) => result.set(chunk.subarray(0, Math.max(0, Math.min(unitSize, result.length - i * unitSize))), i * unitSize));
+            return result;
+        };
+        const readRegular = (id, size) => readChain(id, fat, sectorSize, sector, size);
+        const directory = readRegular(u32(48));
+        const dirView = new DataView(directory.buffer);
+        const entries = [];
+        const utf16 = new TextDecoder('utf-16le');
+        for (let offset = 0; offset + 128 <= directory.length; offset += 128) {
+            const type = directory[offset + 66];
+            const nameLength = dirView.getUint16(offset + 64, true);
+            if (!type || nameLength < 2 || nameLength > 64 || nameLength % 2) continue;
+            const size = dirView.getUint32(offset + 120, true) + (major === 4 ? dirView.getUint32(offset + 124, true) * 4294967296 : 0);
+            if (size > bytes.length) return '';
+            entries.push({ name: utf16.decode(directory.subarray(offset, offset + nameLength - 2)), type, start: dirView.getUint32(offset + 116, true), size });
+        }
+        const root = entries.find(entry => entry.type === 5);
+        if (!root) return '';
+        let miniFat;
+        let miniStream;
+        const readStream = (name) => {
+            const entry = entries.find(item => item.type === 2 && item.name === name);
+            if (!entry) throw new Error('Missing Word stream');
+            if (!entry.size) return new Uint8Array();
+            if (entry.size >= u32(56)) return readRegular(entry.start, entry.size);
+            if (!miniFat) {
+                miniFat = words(readRegular(u32(60), u32(64) * sectorSize));
+                miniStream = readRegular(root.start, root.size);
+            }
+            return readChain(entry.start, miniFat, 64, id => miniStream.subarray(id * 64, (id + 1) * 64), entry.size);
+        };
+        const word = readStream('WordDocument');
+        const fib = new DataView(word.buffer, word.byteOffset, word.byteLength);
+        if (word.length < 34 || fib.getUint16(0, true) !== 0xa5ec || fib.getUint16(2, true) < 0xc1) return '';
+        const flags = fib.getUint16(10, true);
+        if (flags & 0x8100) return ''; // Encrypted / obfuscated documents need Word.
+        const table = readStream(flags & 0x0200 ? '1Table' : '0Table');
+        let offset = 32;
+        const csw = fib.getUint16(offset, true);
+        offset += 2 + csw * 2;
+        const cslw = fib.getUint16(offset, true);
+        const lwStart = offset + 2;
+        if (cslw < 4) return '';
+        const textLength = fib.getUint32(lwStart + 12, true);
+        offset = lwStart + cslw * 4;
+        const pairCount = fib.getUint16(offset, true);
+        if (pairCount <= 33) return '';
+        const clxOffset = fib.getUint32(offset + 2 + 33 * 8, true);
+        const clxLength = fib.getUint32(offset + 6 + 33 * 8, true);
+        const clxEnd = clxOffset + clxLength;
+        if (!clxLength || clxEnd > table.length) return '';
+        const tv = new DataView(table.buffer, table.byteOffset, table.byteLength);
+        let cursor = clxOffset;
+        while (cursor < clxEnd && table[cursor] === 1) {
+            if (cursor + 3 > clxEnd) return '';
+            cursor += 3 + tv.getUint16(cursor + 1, true);
+        }
+        if (cursor + 5 > clxEnd || table[cursor] !== 2) return '';
+        const plcLength = tv.getUint32(cursor + 1, true);
+        const plc = cursor + 5;
+        if (plcLength < 4 || (plcLength - 4) % 12 || plc + plcLength > clxEnd) return '';
+        const count = (plcLength - 4) / 12;
+        const pcdStart = plc + (count + 1) * 4;
+        const parts = [];
+        let consumed = 0;
+        for (let i = 0; i < count && consumed < textLength; i++) {
+            const cp = tv.getUint32(plc + i * 4, true);
+            const nextCp = tv.getUint32(plc + (i + 1) * 4, true);
+            if (cp !== consumed || nextCp <= cp) return '';
+            const length = Math.min(nextCp, textLength) - cp;
+            const fc = tv.getUint32(pcdStart + i * 8 + 2, true);
+            const compressed = !!(fc & 0x40000000);
+            const start = (fc & 0x3fffffff) / (compressed ? 2 : 1);
+            const end = start + length * (compressed ? 1 : 2);
+            if (!Number.isInteger(start) || end > word.length) return '';
+            // MS-DOC compressed pieces are Unicode U+00xx, not Windows-1251.
+            const special = {128:0x20ac,130:0x201a,131:0x0192,132:0x201e,133:0x2026,134:0x2020,135:0x2021,136:0x02c6,137:0x2030,138:0x0160,139:0x2039,140:0x0152,142:0x017d,145:0x2018,146:0x2019,147:0x201c,148:0x201d,149:0x2022,150:0x2013,151:0x2014,152:0x02dc,153:0x2122,154:0x0161,155:0x203a,156:0x0153,158:0x017e,159:0x0178};
+            parts.push(compressed ? Array.from(word.subarray(start, end), b => String.fromCharCode(special[b] || b)).join('') : utf16.decode(word.subarray(start, end)));
+            consumed += length;
+        }
+        if (consumed !== textLength) return '';
+        // Keep field results, omit field instructions (PAGE, REF, etc.).
+        const fields = [];
+        let text = '';
+        for (const char of parts.join('')) {
+            if (char === '\x13') { fields.push(false); continue; }
+            if (char === '\x14' && fields.length) { fields[fields.length - 1] = true; continue; }
+            if (char === '\x15' && fields.length) { fields.pop(); continue; }
+            if (fields.every(Boolean)) text += char;
+        }
+        return text.replace(/\r\x07/g, '\t').replace(/\x07/g, '\t').replace(/[\r\v\f]/g, '\n').replace(/[\x00-\x08\x0e-\x1f]/g, '').trim();
+    } catch (e) {
+        console.warn('Не вдалося прочитати структуру DOC:', e.message);
         return '';
     }
 };
