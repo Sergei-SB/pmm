@@ -345,8 +345,18 @@ function nextRev(): number {
 let writeQueue: Promise<void> = Promise.resolve();
 
 async function writeSnapshot(snapshot: string): Promise<void> {
+  if (githubStorage) {
+    // GitHub history is the backup. A full/ephemeral cache must not prevent a
+    // shared save or undo an already confirmed remote commit.
+    await githubStorage.save(snapshot);
+    try {
+      await fs.promises.mkdir(DATA_DIR, { recursive: true });
+      await fs.promises.writeFile(TMP_FILE, snapshot, 'utf8');
+      await fs.promises.rename(TMP_FILE, STORE_FILE);
+    } catch { console.warn('GitHub save confirmed; local cache unavailable'); }
+    return;
+  }
   await writeSnapshotWithBackup(STORE_FILE, TMP_FILE, BACKUP_DIR, snapshot);
-  if (githubStorage) await githubStorage.save(snapshot);
 }
 
 function persist(): Promise<void> {
@@ -621,7 +631,8 @@ async function startServer(): Promise<void> {
       }
       const operation = mutationQueue.catch(() => {}).then(async () => {
         await writeQueue;
-        const name = await archiveSnapshot(BACKUP_DIR, JSON.stringify(store, null, 2), 'manual-save');
+        const name = githubStorage ? 'shared_site_storage.json'
+          : await archiveSnapshot(BACKUP_DIR, JSON.stringify(store, null, 2), 'manual-save');
         return { ok: true, fileName: name, revision: store.revision, createdAt: new Date().toISOString(),
           persistentStorage: githubStorage ? 'github' : 'local-disk', githubRevision: githubStorage?.revisionHash };
       });

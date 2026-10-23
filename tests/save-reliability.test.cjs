@@ -22,6 +22,22 @@ function contextWith(functions, context = {}) {
 }
 const mergeContext = () => contextWith([['Shared_sync.js', 'mergeCarValue']]);
 
+test('GitHub save remains successful when the temporary disk is unavailable, and remote failure never updates the cache', async () => {
+    let commits = 0, cacheWrites = 0, failRemote = false;
+    const c = {
+        githubStorage: { save: async () => { if (failRemote) throw new Error('GitHub unavailable'); commits++; } },
+        fs: { promises: { mkdir: async () => { cacheWrites++; throw new Error('Disk full'); } } },
+        DATA_DIR: 'cache', TMP_FILE: 'temp', STORE_FILE: 'store', console: { warn() {} }
+    };
+    vm.createContext(c);
+    vm.runInContext(ts.transpile(extract('server.ts', 'writeSnapshot'), { target: ts.ScriptTarget.ES2022 }), c);
+    await c.writeSnapshot('{"revision":1}');
+    assert.equal(commits, 1); assert.equal(cacheWrites, 1);
+    failRemote = true;
+    await assert.rejects(c.writeSnapshot('{"revision":2}'), /GitHub unavailable/);
+    assert.equal(cacheWrites, 1);
+});
+
 test('Cloud save sends reports and documents to the shared server without downloading a computer JSON', async () => {
     let downloads = 0, sent = 0, files = 0, archives = 0;
     const c = contextWith([['Shared_sync.js', 'forcePushAllDataToServer']], {
