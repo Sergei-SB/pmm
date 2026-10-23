@@ -262,8 +262,8 @@
             widget.style.cssText = 'display:inline-flex;align-items:center;gap:8px;background:rgba(0,0,0,0.32);padding:4px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);font-size:11px;color:#ecf0f1;margin-right:6px;';
             widget.innerHTML =
                 '<span id="cloud-sync-status-dot" style="width:8px;height:8px;border-radius:50%;background:#95a5a6;display:inline-block;"></span>' +
-                '<span id="cloud-sync-status-text" style="font-weight:600;white-space:nowrap;">Синхронізація...</span>' +
-                '<button type="button" id="cloud-sync-push-btn" title="Завантажити резервну копію JSON та зберегти дані на сервері" style="background:#27ae60;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:11px;font-weight:bold;cursor:pointer;white-space:nowrap;display:none;">☁️ Зберегти на сайт</button>';
+                '<button type="button" id="cloud-sync-status-text" style="font:inherit;color:inherit;background:none;border:0;padding:0;font-weight:600;white-space:nowrap;">Синхронізація...</button>' +
+                '<button type="button" id="cloud-sync-push-btn" title="Зберегти спільні дані на сайті в GitHub" style="background:#27ae60;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:11px;font-weight:bold;cursor:pointer;white-space:nowrap;display:none;">☁️ Зберегти на сайт</button>';
             var searchInput = document.getElementById('base-search-input');
             if (searchInput && searchInput.parentElement === holder) {
                 holder.insertBefore(widget, searchInput);
@@ -282,7 +282,15 @@
             dot.style.backgroundColor = statusColor;
             dot.style.boxShadow = '0 0 6px ' + statusColor;
         }
-        if (label) label.textContent = statusText;
+        if (label) {
+            label.textContent = statusText;
+            label.style.cursor = 'pointer';
+            label.title = 'Переглянути незбережені зміни та конфлікти';
+            label.onclick = function () {
+                if (typeof window.showPmmSyncConflicts === 'function') window.showPmmSyncConflicts();
+                else alert('Оновіть сторінку Ctrl+F5 для перегляду конфліктів. Локальні дані не очищайте.');
+            };
+        }
 
         var pushBtn = document.getElementById('cloud-sync-push-btn');
         if (pushBtn) pushBtn.style.display = isAdminRole() ? 'inline-block' : 'none';
@@ -298,7 +306,7 @@
         }
         if (state === 'ok') { statusText = 'Синхронізовано'; statusColor = '#2ecc71'; }
         else if (state === 'saving') { statusText = 'Збереження...'; statusColor = '#f39c12'; }
-        else if (state === 'conflict') { statusText = 'Конфлікт — перевірте локальні зміни'; statusColor = '#d97706'; }
+        else if (state === 'conflict') { statusText = 'Конфлікт — натисніть для перегляду'; statusColor = '#d97706'; }
         else if (state === 'offline') {
             var n = Object.keys(pending).length;
             statusText = n > 0 ? ('Офлайн (' + n + ' у черзі)') : 'Офлайн';
@@ -559,7 +567,16 @@
                 var rec = keys[key];
                 if (!rec || !isSyncedKey(key)) return;
                 var incoming = Number(rec.rev) || 0;
-                if (pending[key] && pending[key].blocked) { setStatus('conflict'); return; }
+                if (pending[key] && pending[key].blocked) {
+                    var blocked = pending[key];
+                    if (((blocked.deleted && rec.deleted) || (!blocked.deleted && !rec.deleted && blocked.value === rec.value))
+                        && localGet(key) === (blocked.deleted ? null : blocked.value)) {
+                        delete pending[key];
+                        setKeyRev(key, incoming);
+                        if (isCarKey(key)) meta.carBases[key] = rec.deleted ? null : rec.value;
+                    } else setStatus('conflict');
+                    return;
+                }
                 if (pending[key] && !pending[key].deleted && !isCarKey(key) && incoming > getKeyRev(key) && pending[key].value !== rec.value) {
                     localSet('__sync_value_conflict_' + key, pending[key].value);
                     pending[key].blocked = true;
@@ -807,9 +824,15 @@
             var restore = [];
             (data.files || []).forEach(function (file) {
                 serverIds[file.id] = true;
-                if (documentPending[file.id]) return;
                 var existing = byId[file.id];
                 var remoteFingerprint = file.deleted ? null : fingerprintFile(file);
+                var queued = documentPending[file.id];
+                if (queued) {
+                    if (queued.blocked && ((queued.deleted && file.deleted && !existing)
+                        || (!queued.deleted && !file.deleted && existing && fingerprintFile(existing) === remoteFingerprint))) {
+                        delete documentPending[file.id];
+                    } else return;
+                }
                 if (existing && fingerprintFile(existing) !== remoteFingerprint && info.fingerprints[file.id] !== fingerprintFile(existing)) {
                     // An old / offline browser has an unacknowledged local file.
                     queueDocument(file.id, false);
@@ -936,6 +959,7 @@
             var value = localGet(key);
             if (value === null) return;
             var previous = pending[key];
+            if (previous && previous.blocked) return;
             pending[key] = { value: value, deleted: false, preBoot: false };
             if (isCarKey(key)) pending[key].baseValue = previous && previous.baseValue !== undefined ? previous.baseValue : meta.carBases[key];
         });
@@ -1010,6 +1034,95 @@
         };
         console.log('Стан синхронізації:', info);
         return info;
+    };
+
+    // A visible review is required for genuinely different versions. Never
+    // clear a blocked outbox or choose the server merely to turn the dot green.
+    window.inspectPmmSyncConflicts = async function () {
+        var response = await fetchWithTimeout(SERVER_URL + '/api/shared-state', {cache: 'no-store'}, PULL_TIMEOUT_MS);
+        if (!response.ok) throw new Error('Сервер недоступний: HTTP ' + response.status);
+        var state = await response.json();
+        var result = [];
+        Object.keys(pending).forEach(function (key) {
+            var p = pending[key];
+            if (!p.blocked) return;
+            var remote = state.keys[key] || {deleted: true, rev: 0};
+            result.push({kind: 'key', id: key, local: {value: p.value, deleted: !!p.deleted}, remote: remote});
+        });
+        if (Object.keys(documentPending).some(function (id) { return documentPending[id].blocked; })) {
+            var filesResponse = await fetchWithTimeout(SERVER_URL + '/api/shared-idb', {cache: 'no-store'}, DOCS_TIMEOUT_MS);
+            if (!filesResponse.ok) throw new Error('Не вдалося перевірити документи');
+            var files = (await filesResponse.json()).files || [];
+            var local = await window.exportAllDocsFromIndexedDB();
+            Object.keys(documentPending).forEach(function (id) {
+                var p = documentPending[id];
+                if (!p.blocked) return;
+                result.push({kind: 'file', id: id, token: p.token,
+                    local: {deleted: !!p.deleted, file: local.find(function (file) {return file.id === id;})},
+                    remote: files.find(function (file) {return file.id === id;}) || {id: id, deleted: true, rev: 0}});
+            });
+        }
+        return {conflicts: result, queued: Object.keys(pending).length + Object.keys(documentPending).length,
+            warning: lastSafetyWarning || window.localBackupFailure || '', canUpload: isAdminRole()};
+    };
+    window.resolvePmmSyncConflict = async function (item, choice) {
+        if (choice !== 'local' && choice !== 'server') throw new Error('Невідомий вибір');
+        if (choice === 'local' && !isAdminRole()) throw new Error('Для запису на сайт увійдіть як адмін або розробник');
+        function checkCurrent() {
+            var p = item.kind === 'key' ? pending[item.id] : documentPending[item.id];
+            if (!p || !p.blocked || (item.kind === 'key' ? p.value !== item.local.value || !!p.deleted !== item.local.deleted : p.token !== item.token)) {
+                throw new Error('Дані вже змінилися. Оновіть список конфліктів перед вибором.');
+            }
+            if (item.kind === 'key' && localGet(item.id) !== (p.deleted ? null : p.value)) throw new Error('Локальні дані змінилися в іншій вкладці. Оновіть список.');
+            return p;
+        }
+        checkCurrent();
+        if (typeof window.archiveLocalSiteChange !== 'function') throw new Error('Модуль історії змін недоступний');
+        await window.archiveLocalSiteChange('conflict-review', item.id, JSON.stringify(item.local), JSON.stringify(item.remote));
+        var p = checkCurrent();
+        if (item.kind === 'key') {
+            // Preserve the local candidate even when the server is selected.
+            if (!item.local.deleted) localSet('__sync_value_conflict_' + item.id, item.local.value);
+            setKeyRev(item.id, Number(item.remote.rev) || 0);
+            if (choice === 'server') {
+                if (item.remote.deleted) localRemove(item.id); else localSet(item.id, item.remote.value);
+                delete pending[item.id];
+            } else {
+                p.blocked = false;
+                if (isCarKey(item.id)) p.baseValue = item.remote.deleted ? null : item.remote.value;
+            }
+            if (isCarKey(item.id)) meta.carBases[item.id] = item.remote.deleted ? null : item.remote.value;
+            saveMeta(); savePending();
+        } else {
+            var currentFiles = await window.exportAllDocsFromIndexedDB();
+            var currentFile = currentFiles.find(function (file) { return file.id === item.id; });
+            if (!!currentFile !== !!item.local.file || (currentFile && fingerprintFile(currentFile) !== fingerprintFile(item.local.file))) throw new Error('Локальний файл уже змінився. Оновіть список.');
+            p = checkCurrent();
+            var info = readJSON(IDB_META_KEY, {}) || {};
+            if (!info.revisions) info.revisions = {};
+            if (!info.fingerprints) info.fingerprints = {};
+            if (choice === 'server') {
+                if (typeof window.restoreAllDocsToIndexedDB !== 'function') throw new Error('Переглядач документів недоступний');
+                await window.restoreAllDocsToIndexedDB([item.remote], true);
+                if (documentPending[item.id]?.token !== item.token) throw new Error('Документ змінився під час перевірки');
+                delete documentPending[item.id];
+                info.revisions[item.id] = Number(item.remote.rev) || 0;
+                if (item.remote.deleted) delete info.fingerprints[item.id]; else info.fingerprints[item.id] = fingerprintFile(item.remote);
+            } else {
+                if (!item.local.deleted && !item.local.file) throw new Error('Локальний файл відсутній');
+                p.blocked = false;
+                p.baseRev = Number(item.remote.rev) || 0;
+            }
+            info.version = 0;
+            writeJSON(IDB_META_KEY, info); saveDocumentPending();
+        }
+        lastSafetyWarning = '';
+        meta.lastRev = 0;
+        saveMeta();
+        refreshAllViewsSafely();
+        setStatus('ok');
+        pullServer(false);
+        schedulePush(0); scheduleDocPush(0);
     };
 
     // --- Старт: спершу дані з сервера, потім ініціалізація застосунку -------

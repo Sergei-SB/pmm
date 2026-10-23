@@ -22,6 +22,73 @@ function contextWith(functions, context = {}) {
 }
 const mergeContext = () => contextWith([['Shared_sync.js', 'mergeCarValue']]);
 
+test('An identical blocked key is acknowledged without overwriting either version', () => {
+    const values = { setting: 'same' };
+    let revision;
+    const c = contextWith([['Shared_sync.js', 'applyRemoteKeys']], {
+        pending: { setting: { value: 'same', blocked: true } }, applyingRemote: false,
+        isSyncedKey: () => true, isCarKey: () => false, setKeyRev: (_key, rev) => {revision = rev;},
+        localGet: key => values[key], localSet() {throw new Error('Must not overwrite');}, setStatus() {}
+    });
+    c.applyRemoteKeys({ setting: { value: 'same', rev: 12, deleted: false } }, false);
+    assert.equal(c.pending.setting, undefined); assert.equal(revision, 12); assert.equal(values.setting, 'same');
+    c.pending.setting = {value: 'different', blocked: true};
+    c.applyRemoteKeys({setting: {value: 'same', rev: 13, deleted: false}}, false);
+    assert.equal(c.pending.setting.blocked, true); assert.equal(revision, 12);
+});
+
+function conflictContext() {
+    const values = { report_data_test: 'local' }, revisions = {}, backups = [];
+    const c = contextWith([['Shared_sync.js', 'resolvePmmSyncConflict']], {
+        pending: { report_data_test: { value: 'local', blocked: true } }, documentPending: {},
+        isAdminRole: () => true, localGet: key => values[key] ?? null, localSet: (key, value) => {values[key] = value;},
+        localRemove: key => {delete values[key];}, setKeyRev: (key, rev) => {revisions[key] = rev;},
+        isCarKey: () => true, meta: {lastRev: 99, carBases: {}},
+        archiveLocalSiteChange: async (...args) => {backups.push(args);},
+        saveMeta() {}, savePending() {}, refreshAllViewsSafely() {}, setStatus() {}, pullServer() {}, schedulePush() {}, scheduleDocPush() {}
+    });
+    const item = {kind: 'key', id: 'report_data_test', local: {value: 'local', deleted: false}, remote: {value: 'server', rev: 42, deleted: false}};
+    return {c, values, revisions, backups, item};
+}
+test('Explicit conflict decisions archive both versions and recheck the server cursor', async () => {
+    let {c, values, revisions, backups, item} = conflictContext();
+    await c.resolvePmmSyncConflict(item, 'server');
+    assert.equal(backups.length, 1); assert.match(backups[0][2], /local/); assert.match(backups[0][3], /server/);
+    assert.equal(values.report_data_test, 'server'); assert.equal(values.__sync_value_conflict_report_data_test, 'local');
+    assert.equal(c.pending.report_data_test, undefined); assert.equal(revisions.report_data_test, 42); assert.equal(c.meta.lastRev, 0);
+    ({c, values, revisions, item} = conflictContext());
+    await c.resolvePmmSyncConflict(item, 'local');
+    assert.equal(values.report_data_test, 'local'); assert.equal(c.pending.report_data_test.blocked, false);
+    assert.equal(c.pending.report_data_test.baseValue, 'server'); assert.equal(revisions.report_data_test, 42);
+});
+test('A failed history write or a changed local candidate prevents conflict replacement', async () => {
+    let {c, values, item} = conflictContext();
+    c.archiveLocalSiteChange = async () => {throw new Error('history unavailable');};
+    await assert.rejects(c.resolvePmmSyncConflict(item, 'server'), /history unavailable/);
+    assert.equal(values.report_data_test, 'local'); assert.equal(c.pending.report_data_test.blocked, true);
+    c.archiveLocalSiteChange = async () => {c.pending.report_data_test.value = 'newer'; values.report_data_test = 'newer';};
+    await assert.rejects(c.resolvePmmSyncConflict(item, 'server'), /змінилися/);
+    assert.equal(values.report_data_test, 'newer');
+});
+test('A normal user cannot choose to overwrite the shared site with a local conflict', async () => {
+    const {c, item, backups} = conflictContext(); c.isAdminRole = () => false;
+    await assert.rejects(c.resolvePmmSyncConflict(item, 'local'), /адмін/);
+    assert.equal(backups.length, 0);
+});
+test('Identical blocked documents are acknowledged using server revisions without replacing files', async () => {
+    const file = {id: 'a', fileName: 'a.doc', fileDataUrl: 'data:same', rev: 10, deleted: false};
+    let info = {version: 0, fingerprints: {}, revisions: {}};
+    const c = contextWith([['Shared_sync.js', 'fingerprintFile'], ['Shared_sync.js', 'pullDocsIfNewer']], {
+        filesInFlight: false, docPushPromise: null, documentPending: {a: {blocked: true, deleted: false}},
+        readJSON: () => info, writeJSON: (_key, next) => {info = next;}, IDB_META_KEY: 'metadata', DOCS_TIMEOUT_MS: 1000, SERVER_URL: 'test',
+        exportAllDocsFromIndexedDB: async () => [file], restoreAllDocsToIndexedDB: async files => {assert.equal(files.length, 0);},
+        fetchWithTimeout: async () => ({ok: true, json: async () => ({files: [file], version: 10})}),
+        queueDocument() {throw new Error('Must not requeue identical file');}, saveDocumentPending() {}, scheduleDocPush() {}, callIfExists() {}, setStatus() {}
+    });
+    await c.pullDocsIfNewer(10, true);
+    assert.equal(c.documentPending.a, undefined); assert.equal(info.revisions.a, 10);
+});
+
 test('GitHub save remains successful when the temporary disk is unavailable, and remote failure never updates the cache', async () => {
     let commits = 0, cacheWrites = 0, failRemote = false;
     const c = {
