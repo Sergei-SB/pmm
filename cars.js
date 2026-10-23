@@ -389,6 +389,7 @@ window.reloadCarsFromStorage = function() {
         console.error("Помилка завантаження даних:", e);
     }
 };
+window.__pmmHadSavedCars = localStorage.getItem('user_cars_database_v2') !== null;
 window.reloadCarsFromStorage();
 window.carsData = carsData;
 

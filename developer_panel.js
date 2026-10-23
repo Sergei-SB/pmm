@@ -902,6 +902,9 @@ function ensureDevPanelHeaderButtons() {
         <button class="action-btn" id="btn-dev-import" onclick="triggerImportBackupFile()" style="background-color: #e67e22; color: #fff; font-weight: bold; padding: 8px 14px; border-radius: 6px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
             📤 Імпортувати Бекап (JSON)
         </button>
+        <button class="action-btn" id="btn-dev-history" onclick="downloadLocalSiteHistory()" style="background-color: #475569; color: #fff; font-weight: bold; padding: 8px 14px; border-radius: 6px; border: none; cursor: pointer;">
+            🕓 Історія змін (JSON)
+        </button>
         <input type="file" id="dev-backup-import-input" accept=".json,application/json" multiple style="display: none;" onchange="handleImportBackupFiles(event)">
     `;
 }
@@ -1188,6 +1191,32 @@ async function applyParsedJsonToStorage(parsed) {
     if (!parsed || typeof parsed !== 'object') return 0;
     let importedKeysCount = 0;
 
+    // Server archives use per-key revision records; convert to the same import
+    // map as the downloaded automatic JSON, without importing sync metadata.
+    if (parsed.schemaVersion && parsed.keys && typeof parsed.keys === 'object') {
+        const storage = {};
+        Object.keys(parsed.keys).forEach(key => {
+            const record = parsed.keys[key];
+            if (record && !record.deleted && typeof record.value === 'string' && !key.startsWith('__sync_')) storage[key] = record.value;
+        });
+        const files = Object.values(parsed.files || {}).filter(file => !file.deleted);
+        parsed = { localStorageData: storage,
+            indexedDBFiles: files.filter(file => !String(file.id).startsWith('cardoc_')),
+            carIndexedDBFiles: files.filter(file => String(file.id).startsWith('cardoc_')).map(file => ({ ...file, dataUrl: file.fileDataUrl })) };
+    }
+    // Preserve large binary attachments in their original databases before
+    // importing metadata. Existing import helpers remain supported.
+    if (Array.isArray(parsed.carIndexedDBFiles) && typeof saveCarDocBinaryToIDB === 'function') {
+        for (const file of parsed.carIndexedDBFiles) {
+            if (file && file.id && !await saveCarDocBinaryToIDB(file.id, file)) throw new Error('Не вдалося відновити файл авто: ' + file.id);
+        }
+    }
+    if (Array.isArray(parsed.indexedDBFiles) && typeof window.restoreAllDocsToIndexedDB !== 'function' && typeof saveDocBinaryToIDB === 'function') {
+        for (const file of parsed.indexedDBFiles) {
+            if (file && file.id && !await saveDocBinaryToIDB(file.id, file)) throw new Error('Не вдалося відновити документ: ' + file.id);
+        }
+    }
+
     // 0. Відновлення бінарних файлів документів у IndexedDB (якщо присутні)
     if (Array.isArray(parsed.indexedDBFiles) && parsed.indexedDBFiles.length > 0 && typeof window.restoreAllDocsToIndexedDB === 'function') {
         try {
@@ -1309,6 +1338,12 @@ async function applyParsedJsonToStorage(parsed) {
                 localStorage.setItem(key, serialized);
                 importedKeysCount++;
             } catch (err) {
+                if (key.startsWith('car_folder_') && val && Array.isArray(val.files) && Array.isArray(parsed.carIndexedDBFiles)) {
+                    const slim = { ...val, files: val.files.map(file => ({ ...file, dataUrl: '' })) };
+                    localStorage.setItem(key, JSON.stringify(slim));
+                    importedKeysCount++;
+                    return;
+                }
                 // Якщо документ занадто великий для localStorage (бо містить base64 файл), зберігаємо полегшену копію в localStorage, а повний файл вже у IndexedDB
                 if (key === 'saved_documents_v2' && Array.isArray(val)) {
                     try {

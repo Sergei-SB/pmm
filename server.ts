@@ -22,6 +22,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
+import { archiveSnapshot, writeSnapshotWithBackup, registryChangeBlocked } from './storage_backups.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -30,6 +31,7 @@ const PORT = Number(process.env.PORT) || 3000;
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.resolve(__dirname, 'data');
 const STORE_FILE = path.join(DATA_DIR, 'shared_site_storage.json');
 const TMP_FILE = path.join(DATA_DIR, 'shared_site_storage.json.tmp');
+const BACKUP_DIR = path.join(DATA_DIR, 'backups');
 const MAX_BODY = '80mb';
 
 interface KeyRecord {
@@ -46,6 +48,8 @@ interface FileRecord {
   fileDataUrl: string;
   fileName: string;
   updatedAt: number;
+  rev: number;
+  deleted: boolean;
 }
 
 interface Store {
@@ -149,6 +153,7 @@ interface RejectedRecord {
   value?: string;
   rev: number;
   deleted: boolean;
+  safetyBlocked?: boolean;
 }
 
 interface ApplyResult {
@@ -261,6 +266,8 @@ function normalizeStore(parsed: JsonObject): Store {
       fileDataUrl: rec.fileDataUrl,
       fileName: asString(rec.fileName, ''),
       updatedAt: asNumber(rec.updatedAt) || Date.now(),
+      rev: asNumber(rec.rev),
+      deleted: rec.deleted === true,
     };
   }
 
@@ -314,7 +321,8 @@ function loadStore(): Store {
 
 const store: Store = loadStore();
 
-let revCounter = store.revision || 0;
+let revCounter = Math.max(store.revision || 0, store.filesVersion || 0);
+for (const file of Object.values(store.files)) revCounter = Math.max(revCounter, file.rev || 0);
 for (const key of Object.keys(store.keys)) {
   const rev = asNumber(store.keys[key].rev);
   if (rev > revCounter) revCounter = rev;
@@ -329,20 +337,34 @@ function nextRev(): number {
 let writeQueue: Promise<void> = Promise.resolve();
 
 async function writeSnapshot(snapshot: string): Promise<void> {
-  try {
-    ensureDataDir();
-    await fs.promises.writeFile(TMP_FILE, snapshot, 'utf-8');
-    await fs.promises.rename(TMP_FILE, STORE_FILE);
-  } catch (err) {
-    console.error('Помилка запису файлу сховища:', err);
-  }
+  await writeSnapshotWithBackup(STORE_FILE, TMP_FILE, BACKUP_DIR, snapshot);
 }
 
-function persist(): void {
+function persist(): Promise<void> {
   const snapshot = JSON.stringify(store, null, 2);
-  writeQueue = writeQueue.then(() => writeSnapshot(snapshot)).catch((err: unknown) => {
-    console.error('Черга запису сховища:', err);
+  writeQueue = writeQueue.catch(() => {}).then(() => writeSnapshot(snapshot));
+  return writeQueue;
+}
+
+// Serialize mutations: acknowledge only after disk write, and roll back memory
+// on failure without undoing changes from a concurrent request.
+let mutationQueue: Promise<unknown> = Promise.resolve();
+function durableChange<T>(change: () => T): Promise<T> {
+  const operation = mutationQueue.catch(() => {}).then(async () => {
+    const previous = JSON.stringify(store);
+    const previousCounter = revCounter;
+    try {
+      const result = change();
+      await persist();
+      return result;
+    } catch (error) {
+      Object.assign(store, JSON.parse(previous));
+      revCounter = previousCounter;
+      throw error;
+    }
   });
+  mutationQueue = operation;
+  return operation;
 }
 
 // --- Застосування змін ---------------------------------------------------
@@ -378,6 +400,11 @@ function applyChanges(body: unknown, options: { seedAllowed: boolean }): ApplyRe
     if (!entry) continue;
 
     const existing = store.keys[key];
+    if (registryChangeBlocked(key, existing && !existing.deleted ? existing.value : undefined, entry.value)) {
+      rejected[key] = { value: existing && !existing.deleted ? existing.value : undefined,
+        rev: existing ? existing.rev : 0, deleted: !existing || existing.deleted, safetyBlocked: true };
+      continue;
+    }
     if (existing && !seedAllowed) {
       // Приймаємо зміну лише коли вона зроблена на основі актуальної ревізії.
       if (entry.baseRev < existing.rev) {
@@ -412,6 +439,10 @@ function applyChanges(body: unknown, options: { seedAllowed: boolean }): ApplyRe
     if (!isSyncableKey(key)) continue;
     const existing = store.keys[key];
     if (!existing) continue;
+    if (registryChangeBlocked(key, existing.value, undefined)) {
+      rejected[key] = { value: existing.value, rev: existing.rev, deleted: existing.deleted, safetyBlocked: true };
+      continue;
+    }
     if (existing.deleted) {
       applied[key] = existing.rev;
       continue;
@@ -432,7 +463,6 @@ function applyChanges(body: unknown, options: { seedAllowed: boolean }): ApplyRe
   if (changedCount > 0) {
     store.revision = nextRev();
     store.changedAt = new Date().toISOString();
-    persist();
   }
 
   return { applied, rejected, changedCount };
@@ -466,12 +496,14 @@ async function startServer(): Promise<void> {
       keysCount: Object.keys(store.keys).length,
       filesCount: Object.keys(store.files).length,
       dataDir: DATA_DIR,
+      backupEnabled: true,
       uptimeSec: Math.round(process.uptime()),
     });
   });
 
   // 3) Легке опитування версії
-  app.get('/api/shared-version', (_req, res) => {
+  app.get('/api/shared-version', async (_req, res) => {
+    await mutationQueue.catch(() => {});
     res.json({
       revision: store.revision,
       changedAt: store.changedAt,
@@ -483,7 +515,8 @@ async function startServer(): Promise<void> {
   });
 
   // 4) Стан: повний (без since) або лише зміни (?since=rev)
-  app.get('/api/shared-state', (req, res) => {
+  app.get('/api/shared-state', async (req, res) => {
+    await mutationQueue.catch(() => {});
     const since = asNumber(req.query.since);
     const keys: Record<string, RejectedRecord & { updatedAt: number }> = {};
     for (const key of Object.keys(store.keys)) {
@@ -505,11 +538,13 @@ async function startServer(): Promise<void> {
   });
 
   // 5) Збереження змін
-  app.post('/api/shared-state', (req, res) => {
+  app.post('/api/shared-state', async (req, res) => {
     try {
       const payload = asObject(req.body);
-      const bulkSeed = payload.isInitialSeed === true && Object.keys(store.keys).length === 0;
-      const result = applyChanges(payload, { seedAllowed: bulkSeed });
+      const result = await durableChange(() => {
+        const bulkSeed = payload.isInitialSeed === true && Object.keys(store.keys).length === 0;
+        return applyChanges(payload, { seedAllowed: bulkSeed });
+      });
       res.json({
         ok: true,
         applied: result.applied,
@@ -526,13 +561,16 @@ async function startServer(): Promise<void> {
   });
 
   // 6) Контрольоване стартове наповнення — лише коли сервер порожній
-  app.post('/api/shared-state/seed', (req, res) => {
+  app.post('/api/shared-state/seed', async (req, res) => {
     try {
-      if (Object.keys(store.keys).length > 0) {
+      const result = await durableChange(() => {
+        if (Object.keys(store.keys).length > 0) return null;
+        return applyChanges(req.body, { seedAllowed: true });
+      });
+      if (!result) {
         res.status(403).json({ ok: false, error: 'Сервер не порожній — стартове наповнення заборонено' });
         return;
       }
-      const result = applyChanges(req.body, { seedAllowed: true });
       res.json({
         ok: true,
         applied: result.applied,
@@ -547,8 +585,31 @@ async function startServer(): Promise<void> {
     }
   });
 
+  // Manual save creates an additional dated server JSON even if values match.
+  app.post('/api/shared-backup', async (req, res) => {
+    try {
+      const role = asString(asObject(req.body).role, '').toLowerCase();
+      if (!['admin', 'developer', 'dev'].includes(role)) {
+        res.status(403).json({ ok: false, error: 'Недостатньо прав' });
+        return;
+      }
+      const operation = mutationQueue.catch(() => {}).then(async () => {
+        await writeQueue;
+        const name = await archiveSnapshot(BACKUP_DIR, JSON.stringify(store, null, 2), 'manual-save');
+        return { ok: true, fileName: name, revision: store.revision, createdAt: new Date().toISOString() };
+      });
+      mutationQueue = operation;
+      res.json(await operation);
+    } catch (err) {
+      res.status(500).json({ ok: false, error: errorMessage(err) });
+    }
+  });
+  // Backup archives must not be served by Vite's development file handler.
+  app.use('/data/backups', (_req, res) => { res.sendStatus(404); });
+
   // 7) Файли документів (IndexedDB -> сервер)
-  app.get('/api/shared-idb', (_req, res) => {
+  app.get('/api/shared-idb', async (_req, res) => {
+    await mutationQueue.catch(() => {});
     res.json({
       version: store.filesVersion,
       updatedAt: store.filesChangedAt,
@@ -556,7 +617,7 @@ async function startServer(): Promise<void> {
     });
   });
 
-  app.post('/api/shared-idb', (req, res) => {
+  app.post('/api/shared-idb', async (req, res) => {
     try {
       const payload = asObject(req.body);
       const role = asString(payload.role, 'user').toLowerCase().trim();
@@ -573,44 +634,43 @@ async function startServer(): Promise<void> {
         return;
       }
 
-      let modifiedCount = 0;
-
-      for (const rawFile of files) {
-        const f = asObject(rawFile);
-        const id = asString(f.id, '');
-        const fileDataUrl = typeof f.fileDataUrl === 'string' ? f.fileDataUrl : '';
-        if (!id || !fileDataUrl) continue;
-
-        const rec: FileRecord = {
-          id,
-          fileDataUrl,
-          fileName: asString(f.fileName, ''),
-          updatedAt: asNumber(f.updatedAt) || Date.now(),
-        };
-        const prev = store.files[id];
-        if (!prev || prev.fileDataUrl !== rec.fileDataUrl || prev.fileName !== rec.fileName) {
-          store.files[id] = rec;
+      const result = await durableChange(() => {
+        let modifiedCount = 0;
+        const applied: Record<string, number> = {};
+        const rejected: Record<string, { rev: number; deleted: boolean }> = {};
+        for (const rawFile of files) {
+          const f = asObject(rawFile);
+          const id = asString(f.id, '');
+          const fileDataUrl = typeof f.fileDataUrl === 'string' ? f.fileDataUrl : '';
+          if (!id || !fileDataUrl) continue;
+          const prev = store.files[id];
+          const fileName = asString(f.fileName, '');
+          if (prev && !prev.deleted && prev.fileDataUrl === fileDataUrl && prev.fileName === fileName) { applied[id] = prev.rev; continue; }
+          if (prev && asNumber(f.baseRev) < prev.rev) { rejected[id] = { rev: prev.rev, deleted: prev.deleted }; continue; }
+          const rev = nextRev();
+          store.files[id] = { id, fileDataUrl, fileName, updatedAt: Date.now(), rev, deleted: false };
+          applied[id] = rev;
           modifiedCount += 1;
         }
-      }
-
-      for (const rawId of deletedFileIds) {
-        const id = String(rawId);
-        if (store.files[id]) {
-          delete store.files[id];
+        for (const rawId of deletedFileIds) {
+          const deletion = asObject(rawId);
+          const id = typeof rawId === 'string' ? rawId : asString(deletion.id, '');
+          const prev = store.files[id];
+          if (!prev) { applied[id] = 0; continue; }
+          if (prev.deleted) { applied[id] = prev.rev; continue; }
+          if (asNumber(deletion.baseRev) < prev.rev) { rejected[id] = { rev: prev.rev, deleted: false }; continue; }
+          const rev = nextRev();
+          store.files[id] = { ...prev, rev, updatedAt: Date.now(), deleted: true };
+          applied[id] = rev;
           modifiedCount += 1;
         }
-      }
-
-      if (modifiedCount > 0) {
-        store.filesVersion = nextRev();
-        store.filesChangedAt = new Date().toISOString();
-        persist();
-      }
+        if (modifiedCount > 0) { store.filesVersion = nextRev(); store.filesChangedAt = new Date().toISOString(); }
+        return { modifiedCount, applied, rejected };
+      });
 
       res.json({
         ok: true,
-        modifiedCount,
+        ...result,
         version: store.filesVersion,
         filesCount: Object.keys(store.files).length,
       });
@@ -777,7 +837,7 @@ async function startServer(): Promise<void> {
   // 8) Роздача застосунку: Vite у dev, dist у production
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, fs: { deny: ['.env', '.env.*', '*.{crt,pem}', '**/.git/**', '**/data/backups/**'] } },
       appType: 'spa',
     });
     app.use(vite.middlewares);
@@ -797,7 +857,7 @@ async function startServer(): Promise<void> {
   });
 }
 
-persist(); // одразу зберігаємо файл у форматі v2 (у т.ч. після міграції)
-startServer().catch((err: unknown) => {
+// Do not start serving writes when the initial durable save fails.
+persist().then(() => startServer()).catch((err: unknown) => {
   console.error('Не вдалося запустити сервер:', err);
 });

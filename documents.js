@@ -1984,15 +1984,22 @@ function openDocsIndexedDB() {
     });
 }
 
-async function saveDocBinaryToIDB(docId, dataObj) {
+async function saveDocBinaryToIDB(docId, dataObj, fromServer = false) {
     const db = await openDocsIndexedDB();
     if (!db) return false;
+    if (typeof window.archiveLocalSiteChange === 'function') {
+        try { await window.archiveLocalSiteChange('DocumentsFilesDB_v1', docId, await getDocBinaryFromIDB(docId), { id: docId, ...dataObj }); }
+        catch (error) { console.error(error); return false; }
+    }
     return new Promise((resolve) => {
         try {
             const tx = db.transaction(DOCS_IDB_STORE, 'readwrite');
             const store = tx.objectStore(DOCS_IDB_STORE);
             store.put({ id: docId, ...dataObj });
-            tx.oncomplete = () => resolve(true);
+            tx.oncomplete = () => {
+                if (!fromServer && typeof window.notifyPmmDocumentChange === 'function') window.notifyPmmDocumentChange(docId, false);
+                resolve(true);
+            };
             tx.onerror = () => resolve(false);
         } catch (err) {
             resolve(false);
@@ -2016,13 +2023,21 @@ async function getDocBinaryFromIDB(docId) {
     });
 }
 
-async function deleteDocBinaryFromIDB(docId) {
+async function deleteDocBinaryFromIDB(docId, fromServer = false) {
+    if (typeof window.archiveLocalSiteChange === 'function') {
+        await window.archiveLocalSiteChange('DocumentsFilesDB_v1', docId, await getDocBinaryFromIDB(docId), null);
+    }
     const db = await openDocsIndexedDB();
-    if (!db) return;
-    try {
+    if (!db) throw new Error('Сховище документів недоступне');
+    return new Promise((resolve, reject) => {
         const tx = db.transaction(DOCS_IDB_STORE, 'readwrite');
         tx.objectStore(DOCS_IDB_STORE).delete(docId);
-    } catch (e) {}
+        tx.oncomplete = () => {
+            if (!fromServer && typeof window.notifyPmmDocumentChange === 'function') window.notifyPmmDocumentChange(docId, true);
+            resolve();
+        };
+        tx.onerror = tx.onabort = () => reject(new Error('Документ не видалено зі сховища'));
+    });
 }
 
 function getSavedDocumentsList() {
@@ -2595,12 +2610,13 @@ window.handleUploadDocumentFile = async function (event) {
         let originalFormat = ext || 'a4';
         const dataUrl = await readFileAsDataURLAsync(file);
 
-        await saveDocBinaryToIDB(newDocId, {
+        const binarySaved = await saveDocBinaryToIDB(newDocId, {
             fileDataUrl: dataUrl,
             originalFileName: file.name,
             mimeType: file.type || 'application/octet-stream',
             ext: ext
         });
+        if (!binarySaved) { showDocToast('Файл не збережено. Перевірте вільне місце у браузері.', '#dc2626'); continue; }
 
         if (ext === 'txt' || ext === 'html' || ext === 'rtf' || ext === 'md' || ext === 'json' || ext === 'xml' || ext === 'log') {
             bodyText = await readFileAsTextAsync(file);
@@ -2767,11 +2783,15 @@ window.createNewBlankDocument = function () {
 // ==========================================
 
 window.openDocumentEditorModal = async function (docId) {
+    if (currentEditingDocId && currentEditingDocId !== docId && typeof window.saveDocumentEditorDraft === 'function') window.saveDocumentEditorDraft();
+    if (documentAutoSaveObserver) documentAutoSaveObserver.disconnect();
+    clearTimeout(documentAutoSaveTimer);
     const docs = getSavedDocumentsList();
     const doc = docs.find(d => d.id === docId);
     if (!doc) return;
 
     currentEditingDocId = docId;
+    documentEditorLoading = true;
 
     let binaryDataUrl = doc.fileDataUrl || '';
     if (!binaryDataUrl && doc.hasOriginalBinary) {
@@ -3257,6 +3277,8 @@ window.openDocumentEditorModal = async function (docId) {
     renderSignerRowsSidebarAndSheet();
     initDraggableLeftHeader();
     initDraggableSignature();
+    documentEditorLoading = false;
+    installDocumentAutoSave();
 };
 
 // ==========================================
@@ -3822,11 +3844,13 @@ window.removeSignatureImage = function () {
 // ЗБЕРЕЖЕННЯ, ДРУК ТА ВИДАЛЕННЯ ДОКУМЕНТА
 // ==========================================
 
-window.saveCurrentDocumentFromEditor = function () {
-    if (!currentEditingDocId) return;
+window.saveDocumentEditorDraft = function () {
+    if (!currentEditingDocId || documentEditorLoading) return false;
     const docs = getSavedDocumentsList();
     const doc = docs.find(d => d.id === currentEditingDocId);
-    if (!doc) return;
+    if (!doc) return false;
+
+    const before = JSON.stringify(doc);
 
     const nameInp = document.getElementById('doc-editor-name-input');
     const bodyEl = document.getElementById('doc-ed-body-text');
@@ -3842,15 +3866,41 @@ window.saveCurrentDocumentFromEditor = function () {
     }
 
     doc.layout = JSON.parse(JSON.stringify(docLayoutState));
+    if (before === JSON.stringify(doc)) return true;
     doc.date = new Date().toLocaleDateString('uk-UA');
+    return saveDocumentsList(docs);
+};
 
-    saveDocumentsList(docs);
+let documentAutoSaveObserver = null;
+let documentAutoSaveTimer = null;
+let documentEditorLoading = false;
+function installDocumentAutoSave() {
+    if (documentAutoSaveObserver) documentAutoSaveObserver.disconnect();
+    const sheet = document.getElementById('a4-paper-sheet');
+    if (!sheet || typeof MutationObserver === 'undefined') return;
+    documentAutoSaveObserver = new MutationObserver(() => {
+        clearTimeout(documentAutoSaveTimer);
+        documentAutoSaveTimer = setTimeout(() => window.saveDocumentEditorDraft(), 120);
+    });
+    documentAutoSaveObserver.observe(sheet, { subtree: true, childList: true, characterData: true, attributes: true });
+}
+['input', 'change', 'mouseup', 'click'].forEach(type => {
+    document.addEventListener(type, event => {
+        if (event.target.closest?.('#doc-editor-workspace')) window.saveDocumentEditorDraft();
+    });
+});
+window.addEventListener('pagehide', () => window.saveDocumentEditorDraft());
+
+window.saveCurrentDocumentFromEditor = function () {
+    if (!window.saveDocumentEditorDraft()) return;
     renderDocumentsMainView();
     openDocumentEditorModal(currentEditingDocId);
     showDocToast('💾 Документ успішно збережено!', '#16a34a');
 };
 
 window.closeDocumentEditorWorkspace = function () {
+    window.saveDocumentEditorDraft();
+    if (documentAutoSaveObserver) documentAutoSaveObserver.disconnect();
     hideFloatingSelectionToolbar();
     const ws = document.getElementById('doc-editor-workspace');
     if (ws) ws.style.display = 'none';

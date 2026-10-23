@@ -585,15 +585,22 @@ function openCarDocsIDB() {
     });
 }
 
-async function saveCarDocBinaryToIDB(docId, binaryObj) {
+async function saveCarDocBinaryToIDB(docId, binaryObj, fromServer = false) {
     const db = await openCarDocsIDB();
     if (!db) return false;
+    if (typeof window.archiveLocalSiteChange === 'function') {
+        try { await window.archiveLocalSiteChange('CarDocsFilesDB_v2', docId, await getCarDocBinaryFromIDB(docId), { id: docId, ...binaryObj }); }
+        catch (error) { console.error(error); return false; }
+    }
     return new Promise((resolve) => {
         try {
             const tx = db.transaction(CAR_DOCS_IDB_STORE, 'readwrite');
             const store = tx.objectStore(CAR_DOCS_IDB_STORE);
             store.put({ id: docId, ...binaryObj });
-            tx.oncomplete = () => resolve(true);
+            tx.oncomplete = () => {
+                if (!fromServer && typeof window.notifyPmmDocumentChange === 'function') window.notifyPmmDocumentChange(docId, false);
+                resolve(true);
+            };
             tx.onerror = () => resolve(false);
         } catch (err) {
             resolve(false);
@@ -617,13 +624,21 @@ async function getCarDocBinaryFromIDB(docId) {
     });
 }
 
-async function deleteCarDocBinaryFromIDB(docId) {
+async function deleteCarDocBinaryFromIDB(docId, fromServer = false) {
+    if (typeof window.archiveLocalSiteChange === 'function') {
+        await window.archiveLocalSiteChange('CarDocsFilesDB_v2', docId, await getCarDocBinaryFromIDB(docId), null);
+    }
     const db = await openCarDocsIDB();
-    if (!db) return;
-    try {
+    if (!db) throw new Error('Сховище файлів авто недоступне');
+    return new Promise((resolve, reject) => {
         const tx = db.transaction(CAR_DOCS_IDB_STORE, 'readwrite');
         tx.objectStore(CAR_DOCS_IDB_STORE).delete(docId);
-    } catch (e) {}
+        tx.oncomplete = () => {
+            if (!fromServer && typeof window.notifyPmmDocumentChange === 'function') window.notifyPmmDocumentChange(docId, true);
+            resolve();
+        };
+        tx.onerror = tx.onabort = () => reject(new Error('Файл авто не видалено зі сховища'));
+    });
 }
 
 function getCarFileIcon(ext) {
@@ -654,6 +669,21 @@ function uploadCarDocument(input) {
     } catch(e) {}
 
     let processedCount = 0;
+    const fileCount = files.length;
+    function finishFile() {
+        processedCount++;
+        if (processedCount === fileCount) {
+            try {
+                localStorage.setItem(storageKey, JSON.stringify(folderData));
+            } catch(quotaErr) {
+                // Якщо localStorage переповнено, очищаємо dataUrl і зберігаємо тільки посилання на IDB
+                const slimFiles = folderData.files.map(f => ({ ...f, dataUrl: '' }));
+                localStorage.setItem(storageKey, JSON.stringify({ ...folderData, files: slimFiles }));
+            }
+            input.value = '';
+            renderCarDocuments(car);
+        }
+    }
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const ext = (file.name.includes('.') ? file.name.split('.').pop() : '').toLowerCase();
@@ -664,13 +694,14 @@ function uploadCarDocument(input) {
             const dataUrl = e.target.result;
 
             // Зберігаємо повний файл у IndexedDB
-            await saveCarDocBinaryToIDB(docId, {
+            const binarySaved = await saveCarDocBinaryToIDB(docId, {
                 dataUrl: dataUrl,
                 fileName: file.name,
                 mimeType: file.type || 'application/octet-stream',
                 ext: ext,
                 size: (file.size / 1024).toFixed(1) + ' KB'
             });
+            if (!binarySaved) { alert('Файл «' + file.name + '» не збережено. Перевірте вільне місце у браузері.'); finishFile(); return; }
 
             // У localStorage зберігаємо метадані та легкий dataUrl (якщо менше 120КБ)
             folderData.files.push({
@@ -683,19 +714,9 @@ function uploadCarDocument(input) {
                 dataUrl: dataUrl.length < 120000 ? dataUrl : ''
             });
 
-            processedCount++;
-            if (processedCount === files.length) {
-                try {
-                    localStorage.setItem(storageKey, JSON.stringify(folderData));
-                } catch(quotaErr) {
-                    // Якщо localStorage переповнено, очищаємо dataUrl і зберігаємо тільки посилання на IDB
-                    const slimFiles = folderData.files.map(f => ({ ...f, dataUrl: '' }));
-                    localStorage.setItem(storageKey, JSON.stringify({ ...folderData, files: slimFiles }));
-                }
-                input.value = '';
-                renderCarDocuments(car);
-            }
+            finishFile();
         };
+        reader.onerror = function () { alert('Не вдалося прочитати файл «' + file.name + '».'); finishFile(); };
         reader.readAsDataURL(file);
     }
 }

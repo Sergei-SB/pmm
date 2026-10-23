@@ -117,7 +117,8 @@
     if (!meta.carBases) meta.carBases = {};
 
     function isCarKey(key) {
-        return key === 'user_cars_database_v2' || key === 'cars_modifications_data';
+        return key === 'user_cars_database_v2' || key === 'cars_modifications_data' || key === 'saved_documents_v2' ||
+            /^(car_folder_|report_data_|equipment_report_data_|isolated_car_routes_)/.test(key);
     }
 
     // Three-way merge: retain offline additions and independent field edits;
@@ -127,7 +128,10 @@
             var local = JSON.parse(localValue);
             var remote = JSON.parse(remoteValue);
             var base = baseValue ? JSON.parse(baseValue) : null;
-            var array = key === 'user_cars_database_v2';
+            var folder = key.indexOf('car_folder_') === 0;
+            var envelope = folder ? Object.assign({}, remote) : null;
+            if (folder) { local = local.files || []; remote = remote.files || []; base = base && base.files || []; }
+            var array = key === 'user_cars_database_v2' || key === 'saved_documents_v2' || folder;
             if (array && (!Array.isArray(local) || !Array.isArray(remote))) return null;
             if (!array && (!local || !remote || Array.isArray(local) || Array.isArray(remote))) return null;
             function map(value) {
@@ -140,20 +144,31 @@
             var result = map(remote);
             Object.keys(b).forEach(function (id) {
                 if (!l[id] && JSON.stringify(r[id]) === JSON.stringify(b[id])) delete result[id];
+                else if (!l[id] && r[id]) throw new Error('Local deletion conflicts with remote edits');
             });
             Object.keys(l).forEach(function (id) {
                 if (!b[id]) {
                     if (!r[id]) result[id] = l[id];
-                    else if (JSON.stringify(l[id]) !== JSON.stringify(r[id]) && array && l[id].plate !== r[id].plate) {
-                        throw new Error('Different vehicles share the same ID');
+                    else if (JSON.stringify(l[id]) !== JSON.stringify(r[id])) {
+                        throw new Error('Conflicting additions with the same ID');
                     }
                     return;
                 }
-                if (!r[id]) return;
+                if (!r[id]) {
+                    if (JSON.stringify(l[id]) !== JSON.stringify(b[id])) throw new Error('Remote deletion conflicts with local edits');
+                    return;
+                }
+                if (Array.isArray(l[id]) || Array.isArray(r[id])) {
+                    if (JSON.stringify(l[id]) === JSON.stringify(b[id])) return;
+                    if (JSON.stringify(r[id]) !== JSON.stringify(b[id]) && JSON.stringify(l[id]) !== JSON.stringify(r[id])) throw new Error('Conflicting row changes');
+                    result[id] = l[id];
+                    return;
+                }
                 var row = Object.assign({}, r[id]);
                 Object.keys(l[id]).forEach(function (field) {
                     var changed = JSON.stringify(l[id][field]) !== JSON.stringify(b[id][field]);
                     var remoteUnchanged = JSON.stringify(r[id][field]) === JSON.stringify(b[id][field]);
+                    if (changed && !remoteUnchanged && JSON.stringify(l[id][field]) !== JSON.stringify(r[id][field])) throw new Error('Conflicting edits');
                     if (changed && (remoteUnchanged || JSON.stringify(l[id][field]) === JSON.stringify(r[id][field]))) row[field] = l[id][field];
                 });
                 result[id] = row;
@@ -161,7 +176,9 @@
             if (!array) return JSON.stringify(result);
             var order = remote.map(function (car) { return String(car.id); });
             local.forEach(function (car) { if (order.indexOf(String(car.id)) === -1) order.push(String(car.id)); });
-            return JSON.stringify(order.filter(function (id) { return result[id]; }).map(function (id) { return result[id]; }));
+            var merged = order.filter(function (id) { return result[id]; }).map(function (id) { return result[id]; });
+            if (folder) { envelope.files = merged; return JSON.stringify(envelope); }
+            return JSON.stringify(merged);
         } catch (e) { return null; }
     }
 
@@ -171,6 +188,10 @@
     var pushInFlight = false;
     var pullInFlight = false;
     var filesInFlight = false;
+    var manualBackupInProgress = false;
+    var manualSavePromise = null;
+    var lastSafetyWarning = '';
+    var storageErrors = {};
     var retryDelay = RETRY_MIN_MS;
     var statusText = 'Синхронізація...';
     var statusColor = '#95a5a6';
@@ -235,7 +256,7 @@
             widget.innerHTML =
                 '<span id="cloud-sync-status-dot" style="width:8px;height:8px;border-radius:50%;background:#95a5a6;display:inline-block;"></span>' +
                 '<span id="cloud-sync-status-text" style="font-weight:600;white-space:nowrap;">Синхронізація...</span>' +
-                '<button type="button" id="cloud-sync-push-btn" title="Надіслати всі локальні дані на сервер" style="background:#27ae60;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:11px;font-weight:bold;cursor:pointer;white-space:nowrap;display:none;">☁️ Зберегти на сайт</button>';
+                '<button type="button" id="cloud-sync-push-btn" title="Завантажити резервну копію JSON та зберегти дані на сервері" style="background:#27ae60;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:11px;font-weight:bold;cursor:pointer;white-space:nowrap;display:none;">☁️ Зберегти на сайт</button>';
             var searchInput = document.getElementById('base-search-input');
             if (searchInput && searchInput.parentElement === holder) {
                 holder.insertBefore(widget, searchInput);
@@ -261,9 +282,16 @@
     }
 
     function setStatus(state) {
+        if (state === 'ok' && Object.keys(storageErrors).length) state = 'Браузер не зберіг частину змін';
+        if (state === 'ok') {
+            var docIds = Object.keys(documentPending || {});
+            var blocked = docIds.some(function (id) { return documentPending[id].blocked; }) || Object.keys(pending).some(function (key) { return pending[key].blocked; });
+            if (blocked) state = 'conflict';
+            else if (docIds.length || Object.keys(pending).length) state = 'saving';
+        }
         if (state === 'ok') { statusText = 'Синхронізовано'; statusColor = '#2ecc71'; }
         else if (state === 'saving') { statusText = 'Збереження...'; statusColor = '#f39c12'; }
-        else if (state === 'conflict') { statusText = 'Конфлікт — застосовано з сервера'; statusColor = '#3498db'; }
+        else if (state === 'conflict') { statusText = 'Конфлікт — перевірте локальні зміни'; statusColor = '#d97706'; }
         else if (state === 'offline') {
             var n = Object.keys(pending).length;
             statusText = n > 0 ? ('Офлайн (' + n + ' у черзі)') : 'Офлайн';
@@ -304,7 +332,20 @@
         Storage.prototype.setItem = function (key, value) {
             var isLocal = this === window.localStorage;
             var prev = isLocal ? rawGetItem.call(this, key) : null;
-            rawSetItem.call(this, key, value);
+            if (isLocal && prev !== String(value) && typeof window.archiveLocalSiteChange === 'function') {
+                window.archiveLocalSiteChange('localStorage', String(key), prev, String(value)).catch(function () {});
+            }
+            try {
+                rawSetItem.call(this, key, value);
+                if (isLocal) delete storageErrors[key];
+            } catch (error) {
+                if (isLocal) {
+                    storageErrors[key] = true;
+                    setStatus('Браузер не зберіг частину змін');
+                    callIfExists('showDevNotification', ['Не вистачає місця у браузері. Частину змін не збережено. Завантажте резервний JSON перед закриттям сторінки.', '#e74c3c']);
+                }
+                throw error;
+            }
 
             if (!isLocal || applyingRemote || !isSyncedKey(key)) return;
             var str = String(value);
@@ -319,6 +360,10 @@
             var prev = isLocal ? rawGetItem.call(this, key) : null;
             rawRemoveItem.call(this, key);
 
+            if (isLocal && prev !== null && typeof window.archiveLocalSiteChange === 'function') {
+                window.archiveLocalSiteChange('localStorage', String(key), prev, null).catch(function () {});
+            }
+
             if (!isLocal || applyingRemote || !isSyncedKey(key) || prev === null) return;
             queueLocalChange(key, undefined, true);
         };
@@ -326,6 +371,11 @@
         // clear() на одному ПК не має стирати спільні дані в усіх.
         Storage.prototype.clear = function () {
             var isLocal = this === window.localStorage;
+            if (isLocal && typeof window.archiveLocalSiteChange === 'function') {
+                localKeys().forEach(function (key) {
+                    window.archiveLocalSiteChange('localStorage', key, localGet(key), null).catch(function () {});
+                });
+            }
             rawClear.call(this);
             if (!isLocal || applyingRemote) return;
 
@@ -377,7 +427,7 @@
     }
 
     function flushPending() {
-        if (pushInFlight || pullInFlight || awaitingFirstPull) { schedulePush(300); return Promise.resolve(); }
+        if (manualBackupInProgress || pushInFlight || pullInFlight || awaitingFirstPull) { schedulePush(300); return Promise.resolve(); }
 
         var payload = buildPayload();
         var changeKeys = Object.keys(payload.changes);
@@ -431,6 +481,21 @@
                     var rec = data.rejected[key];
                     if (!rec) return;
 
+                    if (rec.safetyBlocked) {
+                        var candidate = pending[key];
+                        if (candidate && candidate.value) localSet('__sync_car_conflict_' + key, candidate.value);
+                        delete pending[key];
+                        if (typeof rec.value === 'string') {
+                            localSet(key, rec.value);
+                            if (isCarKey(key)) meta.carBases[key] = rec.value;
+                        }
+                        setKeyRev(key, rec.rev);
+                        lastSafetyWarning = 'Сервер заблокував зменшення реєстру. Попередній список авто збережено; оновіть сторінку для перевірки.';
+                        needRefresh = true;
+                        setStatus('conflict');
+                        return;
+                    }
+
                     var oneKey = {};
                     oneKey[key] = rec;
                     if (isCarKey(key)) {
@@ -439,6 +504,13 @@
                         var latest = pending[key];
                         var sent = payload.changes[key];
                         var hasNewerEdit = latest && !latest.deleted && sent && latest.value !== sent.value;
+                        if (latest && !latest.deleted && latest.value !== rec.value) {
+                            localSet('__sync_value_conflict_' + key, latest.value);
+                            latest.blocked = true;
+                            lastSafetyWarning = 'Є конфлікт змін. Ваш варіант збережений у браузері та резервній копії; серверний варіант не перезаписано.';
+                            setStatus('conflict');
+                            return;
+                        }
                         if (!hasNewerEdit) {
                             delete pending[key];
                             if (applyRemoteKeys(oneKey, false) > 0) needRefresh = true;
@@ -479,6 +551,34 @@
                 var rec = keys[key];
                 if (!rec || !isSyncedKey(key)) return;
                 var incoming = Number(rec.rev) || 0;
+                if (pending[key] && pending[key].blocked) { setStatus('conflict'); return; }
+                if (pending[key] && !pending[key].deleted && !isCarKey(key) && incoming > getKeyRev(key) && pending[key].value !== rec.value) {
+                    localSet('__sync_value_conflict_' + key, pending[key].value);
+                    pending[key].blocked = true;
+                    setStatus('conflict');
+                    return;
+                }
+
+                // A smaller server snapshot must not silently erase a previously
+                // saved local fleet on startup. Keep server edits and add the
+                // missing local vehicles, preserving their original IDs.
+                if (key === 'user_cars_database_v2' && !rec.deleted && window.__pmmHadSavedCars) {
+                    try {
+                        var localCars = JSON.parse(localGet(key) || '[]');
+                        var remoteCars = JSON.parse(rec.value);
+                        var remoteIds = new Set(remoteCars.map(function (car) { return String(car.id); }));
+                        var missingCars = localCars.filter(function (car) { return !remoteIds.has(String(car.id)); });
+                        if (localCars.length > remoteCars.length && missingCars.length > 1) {
+                            var kept = JSON.stringify(remoteCars.concat(missingCars));
+                            localSet(key, kept);
+                            pending[key] = { value: kept, deleted: false, preBoot: false, baseValue: rec.value };
+                            meta.carBases[key] = rec.value;
+                            setKeyRev(key, incoming);
+                            changedCount += 1;
+                            return;
+                        }
+                    } catch (e) { /* Normal validation / conflict handling below. */ }
+                }
 
                 if (pending[key] && !pending[key].deleted && isCarKey(key) && !rec.deleted && typeof rec.value === 'string') {
                     var p = pending[key];
@@ -526,7 +626,7 @@
     }
 
     function pullServer(isInitial) {
-        if (pullInFlight || pushInFlight) return Promise.resolve();
+        if (manualBackupInProgress || pullInFlight || pushInFlight) return Promise.resolve();
         pullInFlight = true;
 
         var since = isInitial || awaitingFirstPull ? 0 : getLastRev();
@@ -541,6 +641,7 @@
                 if (typeof data.revision === 'number' && data.revision < getLastRev()) {
                     meta.lastRev = 0;
                     meta.keys = {};
+                    awaitingFirstPull = true;
                     if (since > 0) return fetchWithTimeout(SERVER_URL + '/api/shared-state', {cache: 'no-store'}, PULL_TIMEOUT_MS)
                         .then(function (response) { if (!response.ok) throw new Error('HTTP ' + response.status); return response.json(); });
                 }
@@ -549,6 +650,7 @@
             .then(function (data) {
                 // Сумісність зі старим сервером: він повертає { version, storage },
                 // новий — { revision, keys }.
+                var wasFirstPull = awaitingFirstPull;
                 var incomingKeys = data.keys || data.storage || {};
                 var changed = applyRemoteKeys(incomingKeys, awaitingFirstPull);
                 if (typeof data.revision === 'number') setLastRev(data.revision);
@@ -577,7 +679,7 @@
                 if (shouldRefresh) refreshAllViewsSafely();
                 setStatus(Object.keys(pending).length > 0 ? 'saving' : 'ok');
                 if (Object.keys(pending).length > 0) schedulePush(200);
-                if (typeof data.filesVersion === 'number') pullDocsIfNewer(data.filesVersion);
+                if (typeof data.filesVersion === 'number') return pullDocsIfNewer(data.filesVersion, wasFirstPull);
             })
             .catch(function () {
                 setStatus('offline');
@@ -588,86 +690,137 @@
     }
 
     // --- Документи (IndexedDB) ---------------------------------------------
-    function fingerprintFile(f) {
-        var url = String(f && f.fileDataUrl ? f.fileDataUrl : '');
-        return String(f && f.id ? f.id : '') + '|' +
-            String(f && f.fileName ? f.fileName : '') + '|' +
-            url.length + '|' + url.slice(-48);
-    }
-
+    var documentPending = readJSON('__sync_doc_pending_v1', {}) || {};
     var docPushTimer = null;
-    function scheduleDocPush() {
+    var docPushPromise = null;
+    var docRetryDelay = RETRY_MIN_MS;
+    function saveDocumentPending() { writeJSON('__sync_doc_pending_v1', documentPending); }
+    function fingerprintFile(file) {
+        var value = String(file.fileName || '') + '|' + String(file.fileDataUrl || '');
+        var a = 2166136261, b = 3339675911;
+        for (var i = 0; i < value.length; i++) { a = Math.imul(a ^ value.charCodeAt(i), 16777619); b = Math.imul(b ^ value.charCodeAt(i), 2246822519); }
+        return value.length + '|' + (a >>> 0).toString(16) + (b >>> 0).toString(16);
+    }
+    function queueDocument(id, deleted) {
+        var info = readJSON(IDB_META_KEY, {}) || {};
+        var previous = documentPending[id];
+        documentPending[id] = { deleted: !!deleted, token: Date.now() + '_' + Math.random(),
+            baseRev: previous ? previous.baseRev : Number(info.revisions && info.revisions[id]) || 0 };
+        saveDocumentPending();
+        setStatus('saving');
+        scheduleDocPush();
+    }
+    window.addEventListener('pmm-document-changed', function (event) {
+        if (event.detail && event.detail.id) queueDocument(event.detail.id, event.detail.deleted);
+    });
+    function scheduleDocPush(delay) {
         if (docPushTimer) clearTimeout(docPushTimer);
-        docPushTimer = setTimeout(function () { pushChangedDocs(false); }, DOC_DEBOUNCE_MS);
+        docPushTimer = setTimeout(function () { pushChangedDocs(false); }, typeof delay === 'number' ? delay : DOC_DEBOUNCE_MS);
     }
-
     function pushChangedDocs(isFullPush) {
-        if (typeof window.exportAllDocsFromIndexedDB !== 'function') return Promise.resolve();
-        if (!isFullPush && !isAdminRole()) return Promise.resolve();
-
-        return Promise.resolve(window.exportAllDocsFromIndexedDB()).then(function (files) {
-            if (!Array.isArray(files) || files.length === 0) return;
-
-            var idbMeta = readJSON(IDB_META_KEY, null) || { version: 0, fingerprints: {} };
-            if (!idbMeta.fingerprints) idbMeta.fingerprints = {};
-
-            var changed = files.filter(function (f) {
-                return isFullPush || idbMeta.fingerprints[f.id] !== fingerprintFile(f);
+        if (docPushPromise) return docPushPromise;
+        if (manualBackupInProgress || awaitingFirstPull || filesInFlight) { scheduleDocPush(500); return Promise.resolve(); }
+        if (typeof window.exportAllDocsFromIndexedDB !== 'function' || !isAdminRole()) return Promise.resolve();
+        var metadataKeys = Object.keys(pending).filter(function (key) { return key === 'saved_documents_v2' || key.indexOf('car_folder_') === 0; });
+        if (metadataKeys.some(function (key) { return pending[key].blocked; })) return Promise.resolve();
+        if (metadataKeys.length) { scheduleDocPush(500); return Promise.resolve(); }
+        docPushPromise = Promise.resolve(window.exportAllDocsFromIndexedDB()).then(function (files) {
+            var info = readJSON(IDB_META_KEY, {}) || {};
+            if (!info.fingerprints) info.fingerprints = {};
+            if (!info.revisions) info.revisions = {};
+            if (isFullPush) files.forEach(function (file) {
+                if (!documentPending[file.id] && info.fingerprints[file.id] !== fingerprintFile(file)) queueDocument(file.id, false);
             });
-            if (changed.length === 0) return;
-
+            var batch = JSON.parse(JSON.stringify(documentPending));
+            var byId = {};
+            files.forEach(function (file) { byId[file.id] = file; });
+            var changed = [], deleted = [];
+            Object.keys(batch).forEach(function (id) {
+                if (batch[id].blocked) return;
+                if (batch[id].deleted) deleted.push({ id: id, baseRev: batch[id].baseRev });
+                else if (byId[id]) changed.push(Object.assign({}, byId[id], { baseRev: batch[id].baseRev }));
+                // A missing local file is an error, never an inferred deletion.
+            });
+            if (!changed.length && !deleted.length) return;
             return fetchWithTimeout(SERVER_URL + '/api/shared-idb', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    role: getRole(),
-                    files: changed,
-                    deletedFileIds: [],
-                    isInitialSeed: false
-                })
-            }, DOCS_TIMEOUT_MS).then(function (res) {
-                if (!res.ok) return null;
-                return res.json();
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ role: getRole(), files: changed, deletedFileIds: deleted })
+            }, DOCS_TIMEOUT_MS).then(function (response) {
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return response.json();
             }).then(function (data) {
-                changed.forEach(function (f) { idbMeta.fingerprints[f.id] = fingerprintFile(f); });
-                if (data && typeof data.version === 'number') idbMeta.version = data.version;
-                writeJSON(IDB_META_KEY, idbMeta);
+                if (!data.ok || !data.applied) throw new Error('Сервер ще не підтвердив надійне збереження файлів');
+                // Reload: a concurrent GET may have learned newer revisions.
+                info = readJSON(IDB_META_KEY, {}) || {};
+                if (!info.fingerprints) info.fingerprints = {};
+                if (!info.revisions) info.revisions = {};
+                Object.keys(data.applied).forEach(function (id) {
+                    info.revisions[id] = Math.max(Number(info.revisions[id]) || 0, Number(data.applied[id]) || 0);
+                    if (documentPending[id] && batch[id] && documentPending[id].token === batch[id].token) {
+                        if (batch[id].deleted) delete info.fingerprints[id];
+                        else if (byId[id]) info.fingerprints[id] = fingerprintFile(byId[id]);
+                        delete documentPending[id];
+                    } else if (documentPending[id]) documentPending[id].baseRev = info.revisions[id];
+                });
+                Object.keys(data.rejected || {}).forEach(function (id) {
+                    if (documentPending[id]) documentPending[id].blocked = true;
+                    lastSafetyWarning = 'Конфлікт документа: локальний файл збережено, автоматичну заміну серверного файлу зупинено.';
+                });
+                writeJSON(IDB_META_KEY, info);
+                saveDocumentPending();
+                docRetryDelay = RETRY_MIN_MS;
+                setStatus(Object.keys(data.rejected || {}).length ? 'conflict' : 'ok');
+                if (Object.keys(documentPending).some(function (id) { return !documentPending[id].blocked; })) scheduleDocPush(300);
             });
-        }).catch(function () {});
+        }).catch(function (error) {
+            setStatus('offline');
+            scheduleDocPush(docRetryDelay);
+            docRetryDelay = Math.min(docRetryDelay * 2, RETRY_MAX_MS);
+            if (isFullPush) throw error;
+        }).finally(function () { docPushPromise = null; });
+        return docPushPromise;
     }
-
-    function pullDocsIfNewer(serverFilesVersion) {
-        if (typeof window.restoreAllDocsToIndexedDB !== 'function') return Promise.resolve();
-        if (filesInFlight) return Promise.resolve();
-
-        var idbMeta = readJSON(IDB_META_KEY, null) || { version: 0, fingerprints: {} };
-        if (!idbMeta.fingerprints) idbMeta.fingerprints = {};
-
-        var serverVersion = Number(serverFilesVersion) || 0;
-        if (serverVersion <= (Number(idbMeta.version) || 0)) return Promise.resolve();
-
+    function pullDocsIfNewer(serverVersion, force) {
+        if (typeof window.restoreAllDocsToIndexedDB !== 'function' || filesInFlight || docPushPromise) return Promise.resolve();
+        var initialInfo = readJSON(IDB_META_KEY, {}) || {};
+        if (!force && serverVersion <= (Number(initialInfo.version) || 0)) return Promise.resolve();
         filesInFlight = true;
-        return fetchWithTimeout(SERVER_URL + '/api/shared-idb', { cache: 'no-store' }, DOCS_TIMEOUT_MS)
-            .then(function (res) {
-                if (!res.ok) return null;
-                return res.json();
-            })
-            .then(function (data) {
-                if (!data) return;
-                var files = Array.isArray(data.files) ? data.files : [];
-                if (files.length > 0) {
-                    return Promise.resolve(window.restoreAllDocsToIndexedDB(files)).then(function () {
-                        files.forEach(function (f) { idbMeta.fingerprints[f.id] = fingerprintFile(f); });
-                    });
+        return fetchWithTimeout(SERVER_URL + '/api/shared-idb', { cache: 'no-store' }, DOCS_TIMEOUT_MS).then(function (response) {
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return response.json();
+        }).then(async function (data) {
+            var local = await window.exportAllDocsFromIndexedDB();
+            var byId = {}, serverIds = {};
+            local.forEach(function (file) { byId[file.id] = file; });
+            var info = readJSON(IDB_META_KEY, {}) || {};
+            if (!info.fingerprints) info.fingerprints = {};
+            if (!info.revisions) info.revisions = {};
+            var restore = [];
+            (data.files || []).forEach(function (file) {
+                serverIds[file.id] = true;
+                if (documentPending[file.id]) return;
+                var existing = byId[file.id];
+                var remoteFingerprint = file.deleted ? null : fingerprintFile(file);
+                if (existing && fingerprintFile(existing) !== remoteFingerprint && info.fingerprints[file.id] !== fingerprintFile(existing)) {
+                    // An old / offline browser has an unacknowledged local file.
+                    queueDocument(file.id, false);
+                    if (!info.fingerprints[file.id]) documentPending[file.id].blocked = true;
+                    return;
                 }
-            })
-            .then(function () {
-                idbMeta.version = serverVersion;
-                writeJSON(IDB_META_KEY, idbMeta);
-                callIfExists('renderDocumentsMainView');
-            })
-            .catch(function () {})
-            .then(function () { filesInFlight = false; });
+                info.revisions[file.id] = Number(file.rev) || 0;
+                if ((!file.deleted && (!existing || fingerprintFile(existing) !== remoteFingerprint)) || (file.deleted && existing)) restore.push(file);
+                if (file.deleted) delete info.fingerprints[file.id];
+                else info.fingerprints[file.id] = remoteFingerprint;
+            });
+            await window.restoreAllDocsToIndexedDB(restore, true);
+            // Only GET advances the file cursor; POST must not skip other PCs.
+            info.version = Number(data.version) || 0;
+            writeJSON(IDB_META_KEY, info);
+            local.forEach(function (file) { if (!serverIds[file.id] && !documentPending[file.id]) queueDocument(file.id, false); });
+            saveDocumentPending();
+            if (Object.keys(documentPending).length) scheduleDocPush();
+            callIfExists('renderDocumentsMainView');
+        }).catch(function () { setStatus('offline'); }).finally(function () { filesInFlight = false; });
     }
 
     // --- Перемалювання інтерфейсу ------------------------------------------
@@ -749,6 +902,9 @@
 
     // --- Публічний API ------------------------------------------------------
     window.forcePushAllDataToServer = function (showNotification) {
+        if (manualSavePromise) return manualSavePromise;
+        manualBackupInProgress = true;
+        lastSafetyWarning = '';
         setStatus('saving');
 
         var period = null;
@@ -758,6 +914,13 @@
         callIfExists('saveCarRoutesForPeriod', period ? [period] : []);
         callIfExists('saveCarsModificationsToStorage');
         callIfExists('saveCarsToStorage');
+        callIfExists('saveDocumentEditorDraft');
+
+        [['report-view', 'saveCurrentReportSilently'], ['equipment-report-view', 'saveCurrentEquipmentReportSilently'],
+            ['aggregates-calc-view', 'saveAggCalcState']].forEach(function (entry) {
+            var section = document.getElementById(entry[0]);
+            if (section && (section.classList.contains('active') || section.style.display === 'block')) callIfExists(entry[1]);
+        });
 
         localKeys().forEach(function (key) {
             if (!isSyncedKey(key)) return;
@@ -769,19 +932,50 @@
         });
         savePending();
 
-        return flushPending()
+        // Capture and download before sending: offline changes survive a
+        // conflict, a failed server, and replacement by another device.
+        var backup;
+        var serverBackup = false;
+        manualSavePromise = Promise.resolve().then(function () {
+            if (typeof window.createAutomaticSiteBackup !== 'function') throw new Error('Модуль резервного копіювання не завантажився. Оновіть сторінку.');
+            return window.createAutomaticSiteBackup();
+        }).then(function (result) {
+            backup = result;
+            manualBackupInProgress = false;
+            return flushPending();
+        })
             .then(function () { return pushChangedDocs(true); })
             .then(function () {
-                var left = Object.keys(pending).length;
-                setStatus(left > 0 ? 'offline' : 'ok');
+                return fetchWithTimeout(SERVER_URL + '/api/shared-backup', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ role: getRole(), deviceId: deviceId })
+                }, DOCS_TIMEOUT_MS).then(function (res) {
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    return res.json();
+                }).then(function (data) { serverBackup = !!(data && data.ok); }).catch(function () {});
+            })
+            .then(function () {
+                var left = Object.keys(pending).length + Object.keys(documentPending).length;
+                var hasConflicts = Object.keys(pending).some(function (key) { return pending[key].blocked; }) || Object.keys(documentPending).some(function (id) { return documentPending[id].blocked; });
+                setStatus(lastSafetyWarning || hasConflicts ? 'conflict' : (left > 0 ? 'saving' : 'ok'));
                 if (!showNotification) return;
 
-                var msg = '☁️ Усі зміни надіслано на сервер. Вони доступні на інших комп\'ютерах.';
-                if (left > 0) {
-                    msg = '⚠️ Частину змін сервер не прийняв (є новіші дані з іншого ПК). Екран оновлено.';
-                }
-                if (!callIfExists('showDevNotification', [msg, '#27ae60'])) alert(msg);
+                var msg = 'JSON-копія (' + backup.carsCount + ' авто): ' + backup.fileName + '. Перевірте папку завантажень браузера. ';
+                msg += lastSafetyWarning || (hasConflicts ? 'Є конфлікт. Ваш варіант збережено локально; серверний варіант не перезаписано.' : left > 0 ? 'Частина змін ще у черзі — збереження на сайт не завершено.' : 'Дані збережено на сайті.');
+                msg += serverBackup ? ' Серверна резервна копія створена.' : ' Серверну резервну копію не підтверджено.';
+                if (backup.warnings.length) msg += ' Не всі вкладені документи вдалося скопіювати: ' + backup.warnings.join('; ');
+                var color = left > 0 || lastSafetyWarning || !serverBackup || backup.warnings.length ? '#d97706' : '#27ae60';
+                if (!callIfExists('showDevNotification', [msg, color])) alert(msg);
+            }).catch(function (error) {
+                setStatus('offline');
+                var msg = backup ? 'JSON-копію створено (' + backup.fileName + '), але збереження на сайт не завершено: ' + error.message
+                    : 'Резервну JSON-копію не створено: ' + error.message + '. Повторіть збереження.';
+                if (!callIfExists('showDevNotification', [msg, '#e74c3c'])) alert(msg);
+            }).finally(function () {
+                manualBackupInProgress = false;
+                manualSavePromise = null;
             });
+        return manualSavePromise;
     };
 
     window.syncDebug = function () {
