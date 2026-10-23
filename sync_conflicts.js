@@ -69,7 +69,7 @@
                         pre.style.cssText = 'max-height:260px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:#f1f5f9;padding:10px;font:13px monospace;';
                         if (item.kind === 'file') {
                             var file = side === 'local' ? item.local.file : item.remote;
-                            if (file && !file.deleted && file.fileDataUrl) {
+                            if (file && !file.deleted && /^data:/i.test(file.fileDataUrl || '')) {
                                 var download = node('a', 'Завантажити цю версію файла', column);
                                 download.href = file.fileDataUrl; download.download = file.fileName || item.id;
                             }

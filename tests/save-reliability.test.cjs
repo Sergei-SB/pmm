@@ -110,7 +110,8 @@ test('Cloud save sends reports and documents to the shared server without downlo
     const c = contextWith([['Shared_sync.js', 'forcePushAllDataToServer']], {
         manualSavePromise: null, manualBackupInProgress: false, lastSafetyWarning: '',
         setStatus() {}, callIfExists() {}, document: { getElementById: () => null },
-        localKeys: () => [], pending: {}, documentPending: {}, savePending() {},
+        localKeys: () => ['report_data_blocked'], isSyncedKey: () => true, localGet: () => 'local conflict',
+        pending: {report_data_blocked: {value: 'local conflict', blocked: true}}, documentPending: {}, savePending() {},
         flushPending: async () => { sent++; }, pushChangedDocs: async () => { files++; },
         fetchWithTimeout: async () => { archives++; return { ok: true, json: async () => ({ ok: true }) }; },
         getRole: () => 'admin', deviceId: 'test', SERVER_URL: 'https://test.invalid', DOCS_TIMEOUT_MS: 1000,
@@ -119,6 +120,7 @@ test('Cloud save sends reports and documents to the shared server without downlo
     await c.forcePushAllDataToServer(false);
     assert.equal(downloads, 0); assert.equal(sent, 1); assert.equal(files, 1); assert.equal(archives, 1);
     assert.equal(c.manualSavePromise, null);
+    assert.equal(c.pending.report_data_blocked.blocked, true, 'ordinary Save cannot silently unblock a conflict');
 });
 test('Independent report fields from two computers merge without losing either edit', () => {
     const c = mergeContext();
