@@ -21,6 +21,22 @@ function contextWith(functions, context = {}) {
     return context;
 }
 const mergeContext = () => contextWith([['Shared_sync.js', 'mergeCarValue']]);
+
+test('Cloud save sends reports and documents to the shared server without downloading a computer JSON', async () => {
+    let downloads = 0, sent = 0, files = 0, archives = 0;
+    const c = contextWith([['Shared_sync.js', 'forcePushAllDataToServer']], {
+        manualSavePromise: null, manualBackupInProgress: false, lastSafetyWarning: '',
+        setStatus() {}, callIfExists() {}, document: { getElementById: () => null },
+        localKeys: () => [], pending: {}, documentPending: {}, savePending() {},
+        flushPending: async () => { sent++; }, pushChangedDocs: async () => { files++; },
+        fetchWithTimeout: async () => { archives++; return { ok: true, json: async () => ({ ok: true }) }; },
+        getRole: () => 'admin', deviceId: 'test', SERVER_URL: 'https://test.invalid', DOCS_TIMEOUT_MS: 1000,
+        createAutomaticSiteBackup: () => { downloads++; throw new Error('Must not download'); }
+    });
+    await c.forcePushAllDataToServer(false);
+    assert.equal(downloads, 0); assert.equal(sent, 1); assert.equal(files, 1); assert.equal(archives, 1);
+    assert.equal(c.manualSavePromise, null);
+});
 test('Independent report fields from two computers merge without losing either edit', () => {
     const c = mergeContext();
     const base = { 1: { refuelFuel: '10', note: 'old' } };

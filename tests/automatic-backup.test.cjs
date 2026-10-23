@@ -129,8 +129,16 @@ test('Server acknowledges durable writes, creates manual JSONs, blocks loss, and
     assert.ok(ready, output);
     async function post(endpoint, payload) { const r = await fetch(base + endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); return { status: r.status, body: await r.json() }; }
     const cars = JSON.stringify(Array.from({ length: 108 }, (_, i) => ({ id: i + 1, plate: 'TEST ' + i })));
+    const eventsResponse = await fetch(base + '/api/shared-events');
+    assert.equal(eventsResponse.headers.get('content-type'), 'text/event-stream');
+    const events = eventsResponse.body.getReader();
+    await events.read(); // Initial connection state.
+    const eventUpdate = events.read();
     let result = await post('/api/shared-state', { changes: { user_cars_database_v2: { value: cars, baseRev: 0 }, report_data_period: { value: 'report before', baseRev: 0 } } });
     assert.equal(result.status, 200);
+    const nextEvent = await Promise.race([eventUpdate, new Promise((_, reject) => setTimeout(() => reject(new Error('No immediate shared update')), 3000))]);
+    assert.match(new TextDecoder().decode(nextEvent.value), new RegExp('"revision":' + result.body.revision));
+    await events.cancel();
     let disk = JSON.parse(await fs.readFile(path.join(dir, 'shared_site_storage.json'), 'utf8'));
     assert.equal(JSON.parse(disk.keys.user_cars_database_v2.value).length, 108);
     result = await post('/api/shared-state', { changes: { user_cars_database_v2: { value: JSON.stringify(JSON.parse(cars).slice(0, 68)), baseRev: disk.keys.user_cars_database_v2.rev } } });
@@ -158,6 +166,7 @@ test('Server acknowledges durable writes, creates manual JSONs, blocks loss, and
     const filesState = await (await fetch(base + '/api/shared-idb')).json();
     assert.equal(filesState.files.find(file => file.id === 'cardoc_test').deleted, true);
     assert.equal(filesState.files.find(file => file.id === 'cardoc_test').fileDataUrl, 'data:new');
+    assert.equal((await post('/api/presence/ban', { targetType: 'device', targetValue: 'test-banned-device' })).status, 200);
     await new Promise(resolve => { child.once('close', resolve); child.kill(); });
     child = spawn(process.execPath, ['--experimental-strip-types', 'server.ts'], options);
     child.stdout.on('data', d => { output += d; }); child.stderr.on('data', d => { output += d; });
@@ -171,6 +180,9 @@ test('Server acknowledges durable writes, creates manual JSONs, blocks loss, and
     assert.equal(JSON.parse(restarted.keys.user_cars_database_v2.value).length, 108);
     assert.equal(restarted.keys.report_data_period.value, 'report before');
     assert.equal((await (await fetch(base + '/api/shared-idb')).json()).files.find(file => file.id === 'cardoc_test').deleted, true);
+    assert.equal((await (await fetch(base + '/api/presence/bans')).json()).bans[0].targetValue, 'test-banned-device');
+    assert.equal((await post('/api/presence/unban', { targetValue: 'test-banned-device' })).status, 200);
+    assert.equal((await (await fetch(base + '/api/presence/bans')).json()).bans.length, 0);
     const filesBefore = await fs.readdir(path.join(dir, 'backups'));
     result = await post('/api/shared-state', { changes: { report_data_period: { value: 'report after', baseRev: disk.keys.report_data_period.rev } } });
     assert.equal(result.status, 200);

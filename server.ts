@@ -9,8 +9,8 @@
 // Потрібні типи (один раз у папці проєкту):
 //     npm i -D @types/node @types/express
 //
-// Render: щоб дані не зникали при сні/передеплої, створіть Persistent Disk
-// і задайте змінну середовища DATA_DIR (напр. /var/data).
+// Persistent storage: private GitHub repository (PMM_GITHUB_REPOSITORY,
+// PMM_GITHUB_TOKEN), or a hosting persistent disk through DATA_DIR.
 //
 // Сумісність: новий клієнт Shared_sync.js працює і зі старим сервером
 // (він читає поле storage), але повноцінна робота (ревізії, tombstones)
@@ -23,6 +23,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { archiveSnapshot, writeSnapshotWithBackup, registryChangeBlocked } from './storage_backups.ts';
+import { configuredGitHubStorage } from './github_storage.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -60,6 +61,7 @@ interface Store {
   files: Record<string, FileRecord>;
   filesVersion: number;
   filesChangedAt: string;
+  bans: BanRecord[];
 }
 
 interface OnlineSession {
@@ -95,15 +97,6 @@ function loadBansFromDisk(): void {
     }
   } catch (e) {
     console.error('Помилка читання файлу банів:', e);
-  }
-}
-
-function saveBansToDisk(): void {
-  try {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    fs.writeFileSync(BANS_FILE, JSON.stringify(activeBans, null, 2), 'utf8');
-  } catch (e) {
-    console.error('Помилка запису файлу банів:', e);
   }
 }
 
@@ -224,6 +217,7 @@ function emptyStore(): Store {
     files: {},
     filesVersion: 0,
     filesChangedAt: new Date().toISOString(),
+    bans: activeBans.map(ban => ({ ...ban })),
   };
 }
 
@@ -241,6 +235,11 @@ function normalizeStore(parsed: JsonObject): Store {
   store.changedAt = asString(parsed.changedAt, store.changedAt);
   store.filesVersion = asNumber(parsed.filesVersion);
   store.filesChangedAt = asString(parsed.filesChangedAt, store.filesChangedAt);
+  if (Array.isArray(parsed.bans)) store.bans = parsed.bans.filter((ban): ban is BanRecord => {
+    const record = asObject(ban);
+    return typeof record.id === 'string' && typeof record.targetValue === 'string'
+      && ['ip', 'device', 'user'].includes(asString(record.targetType, ''));
+  });
 
   const rawKeys = asObject(parsed.keys);
   for (const key of Object.keys(rawKeys)) {
@@ -320,6 +319,15 @@ function loadStore(): Store {
 }
 
 const store: Store = loadStore();
+const githubStorage = configuredGitHubStorage();
+const updateClients = new Set<express.Response>();
+
+function notifySharedUpdate(): void {
+  const event = 'data: ' + JSON.stringify({ revision: store.revision, filesVersion: store.filesVersion }) + '\n\n';
+  for (const client of updateClients) {
+    try { client.write(event); } catch { updateClients.delete(client); }
+  }
+}
 
 let revCounter = Math.max(store.revision || 0, store.filesVersion || 0);
 for (const file of Object.values(store.files)) revCounter = Math.max(revCounter, file.rev || 0);
@@ -338,6 +346,7 @@ let writeQueue: Promise<void> = Promise.resolve();
 
 async function writeSnapshot(snapshot: string): Promise<void> {
   await writeSnapshotWithBackup(STORE_FILE, TMP_FILE, BACKUP_DIR, snapshot);
+  if (githubStorage) await githubStorage.save(snapshot);
 }
 
 function persist(): Promise<void> {
@@ -356,6 +365,7 @@ function durableChange<T>(change: () => T): Promise<T> {
     try {
       const result = change();
       await persist();
+      if (previous !== JSON.stringify(store)) notifySharedUpdate();
       return result;
     } catch (error) {
       Object.assign(store, JSON.parse(previous));
@@ -497,8 +507,24 @@ async function startServer(): Promise<void> {
       filesCount: Object.keys(store.files).length,
       dataDir: DATA_DIR,
       backupEnabled: true,
+      persistentStorage: githubStorage ? 'github' : 'local-disk',
+      githubRevision: githubStorage?.revisionHash,
       uptimeSec: Math.round(process.uptime()),
     });
+  });
+
+  // Notify connected users immediately after the shared save is confirmed.
+  // Existing polling remains available if a proxy or browser blocks SSE.
+  app.get('/api/shared-events', (_req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+    updateClients.add(res);
+    res.write('retry: 4000\n\ndata: ' + JSON.stringify({ revision: store.revision, filesVersion: store.filesVersion }) + '\n\n');
+    const heartbeat = setInterval(() => res.write(': keepalive\n\n'), 20000);
+    res.on('close', () => { clearInterval(heartbeat); updateClients.delete(res); });
   });
 
   // 3) Легке опитування версії
@@ -596,7 +622,8 @@ async function startServer(): Promise<void> {
       const operation = mutationQueue.catch(() => {}).then(async () => {
         await writeQueue;
         const name = await archiveSnapshot(BACKUP_DIR, JSON.stringify(store, null, 2), 'manual-save');
-        return { ok: true, fileName: name, revision: store.revision, createdAt: new Date().toISOString() };
+        return { ok: true, fileName: name, revision: store.revision, createdAt: new Date().toISOString(),
+          persistentStorage: githubStorage ? 'github' : 'local-disk', githubRevision: githubStorage?.revisionHash };
       });
       mutationQueue = operation;
       res.json(await operation);
@@ -775,7 +802,7 @@ async function startServer(): Promise<void> {
   });
 
   // 7e) Додавання IP, пристрою або користувача в бан
-  app.post('/api/presence/ban', (req, res) => {
+  app.post('/api/presence/ban', async (req, res) => {
     try {
       const payload = asObject(req.body);
       const targetType = asString(payload.targetType, 'ip') as 'ip' | 'device' | 'user';
@@ -789,9 +816,10 @@ async function startServer(): Promise<void> {
         return;
       }
 
-      const existingIndex = activeBans.findIndex(b => b.targetType === targetType && b.targetValue === targetValue);
-      if (existingIndex === -1) {
-        activeBans.push({
+      await durableChange(() => {
+        const existingIndex = store.bans.findIndex(b => b.targetType === targetType && b.targetValue === targetValue);
+        if (existingIndex !== -1) return;
+        store.bans = store.bans.concat({
           id: 'ban_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
           targetType,
           targetValue,
@@ -800,8 +828,10 @@ async function startServer(): Promise<void> {
           bannedAt: Date.now(),
           bannedBy,
         });
-        saveBansToDisk();
-      }
+        store.revision = nextRev();
+        store.changedAt = new Date().toISOString();
+      });
+      activeBans = store.bans;
 
       res.json({ ok: true, bansCount: activeBans.length, bans: activeBans });
     } catch (err: unknown) {
@@ -810,7 +840,7 @@ async function startServer(): Promise<void> {
   });
 
   // 7f) Зняття бану
-  app.post('/api/presence/unban', (req, res) => {
+  app.post('/api/presence/unban', async (req, res) => {
     try {
       const payload = asObject(req.body);
       const targetValue = asString(payload.targetValue, '').trim();
@@ -820,8 +850,14 @@ async function startServer(): Promise<void> {
         return;
       }
 
-      activeBans = activeBans.filter(b => b.targetValue !== targetValue && b.id !== targetValue);
-      saveBansToDisk();
+      await durableChange(() => {
+        const remaining = store.bans.filter(b => b.targetValue !== targetValue && b.id !== targetValue);
+        if (remaining.length === store.bans.length) return;
+        store.bans = remaining;
+        store.revision = nextRev();
+        store.changedAt = new Date().toISOString();
+      });
+      activeBans = store.bans;
 
       res.json({ ok: true, bansCount: activeBans.length, bans: activeBans });
     } catch (err: unknown) {
@@ -857,7 +893,20 @@ async function startServer(): Promise<void> {
   });
 }
 
-// Do not start serving writes when the initial durable save fails.
-persist().then(() => startServer()).catch((err: unknown) => {
+// GitHub is authoritative after a restart; an unavailable remote must never
+// silently fall back to empty/default data or acknowledge uncommitted saves.
+async function initializeStorage(): Promise<void> {
+  if (githubStorage) {
+    const snapshot = await githubStorage.load();
+    if (snapshot === null) throw new Error('Initialize private GitHub storage with the verified shared_site_storage.json before starting');
+    Object.assign(store, normalizeStore(asObject(JSON.parse(snapshot))));
+    revCounter = Math.max(store.revision, store.filesVersion,
+      ...Object.values(store.keys).map(record => record.rev), ...Object.values(store.files).map(record => record.rev));
+  }
+  activeBans = store.bans;
+  await persist();
+}
+initializeStorage().then(() => startServer()).catch((err: unknown) => {
   console.error('Не вдалося запустити сервер:', err);
+  process.exitCode = 1;
 });

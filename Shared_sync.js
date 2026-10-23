@@ -49,7 +49,7 @@
     var LOCAL_ONLY_KEYS = [
         'currentrole', 'app_current_role', 'userrole', 'role', 'isdeveloperloggedin',
         'last_active_car_id', 'last_active_car_period', 'last_active_report_period',
-        'dev_role_time_stats', 'aggregates_calc_saved_state'
+        'dev_role_time_stats'
     ];
     var LOCAL_ONLY_PREFIXES = ['lastreadbroadcastid_', '__sync_'];
     var VERSION_MARKER_SUFFIX = '_data_version';
@@ -187,6 +187,13 @@
     var pushTimer = null;
     var pushInFlight = false;
     var pullInFlight = false;
+    var sharedEventPending = false;
+
+    function pullSharedEvent() {
+        if (!sharedEventPending || manualBackupInProgress || pullInFlight || pushInFlight) return;
+        sharedEventPending = false;
+        pullServer(false);
+    }
     var filesInFlight = false;
     var manualBackupInProgress = false;
     var manualSavePromise = null;
@@ -539,6 +546,7 @@
             console.warn('Синхронізація недоступна, повтор через ' + Math.round(retryDelay / 1000) + ' с', err && err.message);
         }).then(function () {
             pushInFlight = false;
+            pullSharedEvent();
         });
     }
 
@@ -686,6 +694,7 @@
             })
             .then(function () {
                 pullInFlight = false;
+                pullSharedEvent();
             });
     }
 
@@ -932,15 +941,10 @@
         });
         savePending();
 
-        // Capture and download before sending: offline changes survive a
-        // conflict, a failed server, and replacement by another device.
-        var backup;
+        // Saving to the shared site does not download files onto the computer.
+        // Local history remains a recovery aid; GitHub is server-side persistence.
         var serverBackup = false;
         manualSavePromise = Promise.resolve().then(function () {
-            if (typeof window.createAutomaticSiteBackup !== 'function') throw new Error('Модуль резервного копіювання не завантажився. Оновіть сторінку.');
-            return window.createAutomaticSiteBackup();
-        }).then(function (result) {
-            backup = result;
             manualBackupInProgress = false;
             return flushPending();
         })
@@ -960,16 +964,13 @@
                 setStatus(lastSafetyWarning || hasConflicts ? 'conflict' : (left > 0 ? 'saving' : 'ok'));
                 if (!showNotification) return;
 
-                var msg = 'JSON-копія (' + backup.carsCount + ' авто): ' + backup.fileName + '. Перевірте папку завантажень браузера. ';
-                msg += lastSafetyWarning || (hasConflicts ? 'Є конфлікт. Ваш варіант збережено локально; серверний варіант не перезаписано.' : left > 0 ? 'Частина змін ще у черзі — збереження на сайт не завершено.' : 'Дані збережено на сайті.');
+                var msg = lastSafetyWarning || (hasConflicts ? 'Є конфлікт. Ваш варіант збережено локально; серверний варіант не перезаписано.' : left > 0 ? 'Частина змін ще у черзі — збереження на сайт не завершено.' : 'Дані збережено на сайті та доступні всім користувачам.');
                 msg += serverBackup ? ' Серверна резервна копія створена.' : ' Серверну резервну копію не підтверджено.';
-                if (backup.warnings.length) msg += ' Не всі вкладені документи вдалося скопіювати: ' + backup.warnings.join('; ');
-                var color = left > 0 || lastSafetyWarning || !serverBackup || backup.warnings.length ? '#d97706' : '#27ae60';
+                var color = left > 0 || lastSafetyWarning || !serverBackup ? '#d97706' : '#27ae60';
                 if (!callIfExists('showDevNotification', [msg, color])) alert(msg);
             }).catch(function (error) {
                 setStatus('offline');
-                var msg = backup ? 'JSON-копію створено (' + backup.fileName + '), але збереження на сайт не завершено: ' + error.message
-                    : 'Резервну JSON-копію не створено: ' + error.message + '. Повторіть збереження.';
+                var msg = 'Збереження на сайт не завершено: ' + error.message + '. Зміни залишилися в черзі для повторного надсилання.';
                 if (!callIfExists('showDevNotification', [msg, '#e74c3c'])) alert(msg);
             }).finally(function () {
                 manualBackupInProgress = false;
@@ -1103,6 +1104,10 @@
     });
 
     setInterval(function () { pullServer(false); }, POLL_MS);
+    if (typeof EventSource === 'function') {
+        var sharedEvents = new EventSource(SERVER_URL + '/api/shared-events');
+        sharedEvents.onmessage = function () { sharedEventPending = true; pullSharedEvent(); };
+    }
     setInterval(function () { ensureHeaderWidget(); }, ROLE_REFRESH_MS);
 
     document.addEventListener('visibilitychange', function () {
