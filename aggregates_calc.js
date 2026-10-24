@@ -107,6 +107,13 @@ function getAllEquipmentList() {
         }
     } catch(e) {}
 
+    // 5. Помпи — та сама схема норм і розрахунку, окремі збережені записи.
+    try {
+        const pumps = typeof getPumpsList === 'function' ? getPumpsList()
+            : JSON.parse(localStorage.getItem('pumps_custom_data') || '[]');
+        if (Array.isArray(pumps)) pumps.filter(item => !/знищ/ui.test(String(item.note || item.comment || '')))
+            .forEach(item => allEquipment.push({...item, category: 'Помпа'}));
+    } catch(e) {}
     return allEquipment;
 }
 

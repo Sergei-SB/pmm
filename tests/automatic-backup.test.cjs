@@ -46,6 +46,7 @@ function browserFixture() {
         report_data_period: JSON.stringify({ 1: { refuelFuel: '20' } }),
         dev_system_passwords: JSON.stringify({ admin: 'test-only' }),
         aggregates_calc_saved_state: JSON.stringify({ rows: [1, 2] }),
+        pumps_custom_data: JSON.stringify([{id: 1, model: 'PUMP', consumption: '1.5'}]),
         car_folder_1: JSON.stringify({ files: [{ id: 'carfile' }] }),
         saved_documents_v2: JSON.stringify([{ id: 'docfile' }]),
         __sync_meta_v1: '{}'
@@ -85,6 +86,7 @@ test('Automatic JSON contains every site section and attached documents, in exis
     const json = JSON.parse(await downloads[0].blob.text());
     for (const key of ['user_cars_database_v2', 'report_data_period', 'dev_system_passwords', 'aggregates_calc_saved_state']) assert.ok(json.localStorageData[key]);
     assert.equal(json.localStorageData.__sync_meta_v1, undefined);
+    assert.equal(json.localStorageData.pumps_custom_data[0].model, 'PUMP');
     assert.equal(json.localStorageData.car_folder_1.files[0].dataUrl, 'data:car');
     assert.equal(json.localStorageData.saved_documents_v2[0].fileDataUrl, 'data:doc');
     assert.equal(json.indexedDBFiles[0].id, 'docfile');

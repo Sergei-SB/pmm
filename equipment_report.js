@@ -313,11 +313,15 @@ function getAllEquipmentItemsUnified() {
     try { if (typeof getChainsawsList === 'function') chains = getChainsawsList(); } catch(e) {}
     if (!chains || chains.length === 0) chains = window.chainsawsData || window.chainsaws || [];
 
+    let pumps = [];
+    try { if (typeof getPumpsList === 'function') pumps = getPumpsList(); } catch(e) {}
+
     const sources = [
         { type: 'Генератор', data: gens },
         { type: 'Webasto', data: webs },
         { type: 'Теплова пушка', data: heats },
-        { type: 'Бензопила', data: chains }
+        { type: 'Бензопила', data: chains },
+        { type: 'Помпа', data: pumps }
     ];
 
     sources.forEach(src => {

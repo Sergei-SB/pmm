@@ -75,7 +75,8 @@ function getDestroyedEquipmentList() {
             { key: 'generators_custom_data', cat: 'Генератор' },
             { key: 'webasto_custom_data', cat: 'Webasto' },
             { key: 'heaters_custom_data', cat: 'Теплова пушка' },
-            { key: 'chainsaws_custom_data', cat: 'Бензопила' }
+            { key: 'chainsaws_custom_data', cat: 'Бензопила' },
+            { key: 'pumps_custom_data', cat: 'Помпа' }
         ];
 
         eqCategories.forEach(source => {
@@ -306,7 +307,8 @@ function restoreDestroyedItemFromTable(type, id, storageKey) {
             'generators_custom_data',
             'webasto_custom_data',
             'heaters_custom_data',
-            'chainsaws_custom_data'
+            'chainsaws_custom_data',
+            'pumps_custom_data'
         ];
 
         const keysToCheck = storageKey ? [storageKey, ...eqCategories.filter(k => k !== storageKey)] : eqCategories;
@@ -341,10 +343,9 @@ function restoreDestroyedItemFromTable(type, id, storageKey) {
         }
 
         renderDestroyedEquipmentView();
-        if (typeof renderGeneratorsView === 'function') renderGeneratorsView();
-        if (typeof renderWebastoView === 'function') renderWebastoView();
-        if (typeof renderHeatersView === 'function') renderHeatersView();
-        if (typeof renderChainsawsView === 'function') renderChainsawsView();
+        if (typeof switchEquipmentTab === 'function') {
+            switchEquipmentTab(typeof currentEquipmentTabName !== 'undefined' ? currentEquipmentTabName : 'generators');
+        }
 
         showToastNotification("✅ Об'єкт успішно відновлено та повернуто до обліку!", "#27ae60");
     } catch (err) {

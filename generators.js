@@ -76,6 +76,7 @@ function switchEquipmentTab(tabName) {
     else if (tabName === 'webasto' && typeof renderWebastoView === 'function') renderWebastoView();
     else if (tabName === 'heaters' && typeof renderHeatersView === 'function') renderHeatersView();
     else if (tabName === 'chainsaws' && typeof renderChainsawsView === 'function') renderChainsawsView();
+    else if (tabName === 'pumps' && typeof renderPumpsView === 'function') renderPumpsView();
 }
 
 function addCurrentEquipmentRow() {
@@ -83,6 +84,7 @@ function addCurrentEquipmentRow() {
     else if (currentEquipmentTabName === 'webasto' && typeof addWebastoRow === 'function') addWebastoRow();
     else if (currentEquipmentTabName === 'heaters' && typeof addHeatersRow === 'function') addHeatersRow();
     else if (currentEquipmentTabName === 'chainsaws' && typeof addChainsawsRow === 'function') addChainsawsRow();
+    else if (currentEquipmentTabName === 'pumps' && typeof addPumpsRow === 'function') addPumpsRow();
 }
 
 function printCurrentEquipmentTable() {
@@ -94,6 +96,8 @@ function printCurrentEquipmentTable() {
         printHeatersTable();
     } else if (currentEquipmentTabName === 'chainsaws' && typeof printChainsawsTable === 'function') {
         printChainsawsTable();
+    } else if (currentEquipmentTabName === 'pumps' && typeof printPumpsTable === 'function') {
+        printPumpsTable();
     }
 }
 

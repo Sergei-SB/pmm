@@ -120,7 +120,7 @@ const DEFAULT_PAGE_PERMISSIONS_MATRIX = {
     equipment: {
         id: "equipment",
         name: "Облік обладнання",
-        desc: "Генератори, Webasto, обігрівачі, мотопили, мотогодини",
+        desc: "Генератори, Webasto, обігрівачі, мотопили, помпи, мотогодини",
         icon: "⚡",
         admin: { access: true, view: true, edit: true },
         moderator: { access: false, view: false, edit: false },
@@ -991,6 +991,7 @@ function flushAllActiveSiteChangesToStorage() {
         if (typeof getWebastoList === 'function') getWebastoList();
         if (typeof getHeatersList === 'function') getHeatersList();
         if (typeof getChainsawsList === 'function') getChainsawsList();
+        if (typeof getPumpsList === 'function') getPumpsList();
 
         // 6. Якщо відкритий конструктор документа А4 — синхронізуємо поточні блоки
         const docModal = document.getElementById('doc-editor-modal');
@@ -1114,6 +1115,7 @@ window.exportFullDatabaseBackup = async function() {
                     webasto: allStorage['webasto_custom_data'] || [],
                     heaters: allStorage['heaters_custom_data'] || [],
                     chainsaws: allStorage['chainsaws_custom_data'] || [],
+                    pumps: allStorage['pumps_custom_data'] || [],
                     equipmentPeriods: allStorage['eq_saved_periods_list'] || []
                 },
                 aggregatesCalculatorState: allStorage['aggregates_calc_saved_state'] || null,
@@ -1305,6 +1307,7 @@ async function applyParsedJsonToStorage(parsed) {
             if (Array.isArray(eq.webasto)) localStorage.setItem('webasto_custom_data', JSON.stringify(eq.webasto));
             if (Array.isArray(eq.heaters)) localStorage.setItem('heaters_custom_data', JSON.stringify(eq.heaters));
             if (Array.isArray(eq.chainsaws)) localStorage.setItem('chainsaws_custom_data', JSON.stringify(eq.chainsaws));
+            if (Array.isArray(eq.pumps)) localStorage.setItem('pumps_custom_data', JSON.stringify(eq.pumps));
             if (Array.isArray(eq.equipmentPeriods)) localStorage.setItem('eq_saved_periods_list', JSON.stringify(eq.equipmentPeriods));
         }
         if (snap.aggregatesCalculatorState) {
@@ -1442,6 +1445,7 @@ function refreshAllModulesAfterImport() {
         if (typeof renderWebastoView === 'function' && typeof currentEquipmentTabName !== 'undefined' && currentEquipmentTabName === 'webasto') renderWebastoView();
         if (typeof renderHeatersView === 'function' && typeof currentEquipmentTabName !== 'undefined' && currentEquipmentTabName === 'heaters') renderHeatersView();
         if (typeof renderChainsawsView === 'function' && typeof currentEquipmentTabName !== 'undefined' && currentEquipmentTabName === 'chainsaws') renderChainsawsView();
+        if (typeof renderPumpsView === 'function' && typeof currentEquipmentTabName !== 'undefined' && currentEquipmentTabName === 'pumps') renderPumpsView();
         if (typeof renderAggregatesCalcView === 'function') renderAggregatesCalcView();
         if (typeof renderDestroyedEquipmentView === 'function') renderDestroyedEquipmentView();
         if (typeof renderCarDetailsData === 'function' && window.activeReportCarId) renderCarDetailsData();

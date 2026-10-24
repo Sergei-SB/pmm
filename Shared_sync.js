@@ -1048,10 +1048,10 @@
         callIfExists('renderEquipmentReportView');
         callIfExists('updateEquipmentReportTotals');
         callIfExists('renderSubdivisionsView');
-        callIfExists('renderGeneratorsView');
-        callIfExists('renderWebastoView');
-        callIfExists('renderHeatersView');
-        callIfExists('renderChainsawsView');
+        // All categories share a wrapper; redraw only the selected one.
+        if (!callIfExists('switchEquipmentTab', [typeof currentEquipmentTabName !== 'undefined' ? currentEquipmentTabName : 'generators'])) {
+            callIfExists('renderGeneratorsView');
+        }
         callIfExists('refreshAggregatesEquipmentList');
         callIfExists('renderDestroyedEquipmentView');
         if (window.activeReportCarId) callIfExists('renderCarDetailsData');

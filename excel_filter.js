@@ -6,14 +6,16 @@ window.excelFiltersState = {
     generators: {},
     webasto: {},
     heaters: {},
-    chainsaws: {}
+    chainsaws: {},
+    pumps: {}
 };
 
 window.excelSortState = {
     generators: null,
     webasto: null,
     heaters: null,
-    chainsaws: null
+    chainsaws: null,
+    pumps: null
 };
 
 // Отримання даних за категорією
@@ -22,6 +24,7 @@ function getCategoryItemsList(cat) {
     if (cat === 'webasto' && typeof getWebastoList === 'function') return getWebastoList();
     if (cat === 'heaters' && typeof getHeatersList === 'function') return getHeatersList();
     if (cat === 'chainsaws' && typeof getChainsawsList === 'function') return getChainsawsList();
+    if (cat === 'pumps' && typeof getPumpsList === 'function') return getPumpsList();
     return [];
 }
 
@@ -93,6 +96,7 @@ function triggerCategoryRerender(cat) {
     else if (cat === 'webasto' && typeof renderWebastoView === 'function') renderWebastoView();
     else if (cat === 'heaters' && typeof renderHeatersView === 'function') renderHeatersView();
     else if (cat === 'chainsaws' && typeof renderChainsawsView === 'function') renderChainsawsView();
+    else if (cat === 'pumps' && typeof renderPumpsView === 'function') renderPumpsView();
 }
 
 // Відкриття спливаючого вікна Excel-фільтра

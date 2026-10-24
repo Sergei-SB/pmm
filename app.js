@@ -551,6 +551,15 @@ function getAllEquipmentItemsUnified() {
         });
     }
 
+    let pumpArr = [];
+    try { if (typeof getPumpsList === 'function') pumpArr = getPumpsList(); } catch(e) {}
+    if (Array.isArray(pumpArr)) pumpArr.filter(item => !/знищ/ui.test(String(item.note || item.comment || '')))
+        .forEach((item, index) => items.push({
+            uniqueId: 'pump_' + (item.id !== undefined ? item.id : index),
+            category: 'Помпа', model: item.model || 'Помпа #' + (index + 1),
+            subdivision: item.locationSubdivision || item.subdivision || '',
+            fuelType: item.fuelType || 'АБ', note: item.note || '', rawItem: item, arrayType: 'pumps'
+        }));
     return items;
 }
 
