@@ -182,6 +182,50 @@
         } catch (e) { return null; }
     }
 
+    // This map is an overlay of vehicle properties, not the fleet itself.
+    // Missing entries in an older browser must not delete properties retained
+    // on the server. Still refuse different edits of the same field.
+    function mergeCarModifications(localValue, remoteValue, baseValue) {
+        try {
+            var local = JSON.parse(localValue), remote = JSON.parse(remoteValue);
+            var base = baseValue ? JSON.parse(baseValue) : {};
+            if (![local, remote, base].every(function (value) {
+                return value && typeof value === 'object' && !Array.isArray(value);
+            })) return null;
+            var complete = Object.assign({}, local);
+            Object.keys(base).forEach(function (id) {
+                if (!Object.prototype.hasOwnProperty.call(complete, id)) complete[id] = base[id];
+            });
+            var result = mergeCarValue('cars_modifications_data', JSON.stringify(complete), remoteValue, JSON.stringify(base));
+            if (result === null) return null;
+            var merged = JSON.parse(result);
+            // Retain every server entry; omission from an overlay is not an
+            // explicit registry deletion, even when the base contains it.
+            Object.keys(remote).forEach(function (id) {
+                if (!Object.prototype.hasOwnProperty.call(merged, id)) merged[id] = remote[id];
+            });
+            return JSON.stringify(merged);
+        } catch (_) { return null; }
+    }
+
+    function conflictMergeValue(item, candidate) {
+        if (item.kind !== 'key' || item.id !== 'cars_modifications_data' || item.local.deleted || item.remote.deleted) return null;
+        return mergeCarModifications(item.local.value, item.remote.value, candidate.baseValue);
+    }
+
+    function retainServerModifications(localValue, remoteValue) {
+        var local = JSON.parse(localValue), remote = JSON.parse(remoteValue);
+        if (![local, remote].every(function (value) {return value && typeof value === 'object' && !Array.isArray(value);})) {
+            throw new Error('Неправильний формат характеристик авто');
+        }
+        var merged = Object.assign(Object.create(null), remote);
+        Object.keys(local).forEach(function (id) {
+            if (!local[id] || typeof local[id] !== 'object' || Array.isArray(local[id])) throw new Error('Неправильний запис авто');
+            merged[id] = Object.assign({}, remote[id] || {}, local[id]);
+        });
+        return JSON.stringify(merged);
+    }
+
     var applyingRemote = false;
     var awaitingFirstPull = true;
     var pushTimer = null;
@@ -335,6 +379,9 @@
             pending[key].baseValue = prior && prior.baseValue !== undefined ? prior.baseValue
                 : (meta.carBases[key] !== undefined ? meta.carBases[key] : previousValue);
         }
+        // Module save hooks may rewrite a blocked key during a cloud save.
+        // Keep it blocked until an archived reconciliation or explicit choice.
+        if (prior && prior.blocked) pending[key].blocked = true;
         savePending();
         schedulePush(PUSH_DEBOUNCE_MS);
     }
@@ -603,7 +650,9 @@
 
                 if (pending[key] && !pending[key].deleted && isCarKey(key) && !rec.deleted && typeof rec.value === 'string') {
                     var p = pending[key];
-                    var merged = mergeCarValue(key, p.value, rec.value, p.baseValue);
+                    var merged = key === 'cars_modifications_data'
+                        ? mergeCarModifications(p.value, rec.value, p.baseValue)
+                        : mergeCarValue(key, p.value, rec.value, p.baseValue);
                     if (merged === null) {
                         localSet('__sync_car_conflict_' + key, p.value);
                         p.blocked = true;
@@ -966,6 +1015,11 @@
         var serverBackup = false;
         manualSavePromise = Promise.resolve().then(function () {
             manualBackupInProgress = false;
+            // Only independent property edits can be reconciled here. Genuine
+            // field collisions, registry deletions and file conflicts stay blocked.
+            return typeof window.reconcilePmmModificationsConflict === 'function'
+                ? window.reconcilePmmModificationsConflict() : undefined;
+        }).then(function () {
             return flushPending();
         })
             .then(function () { return pushChangedDocs(true); })
@@ -1043,7 +1097,9 @@
             var p = pending[key];
             if (!p.blocked) return;
             var remote = state.keys[key] || {deleted: true, rev: 0};
-            result.push({kind: 'key', id: key, local: {value: p.value, deleted: !!p.deleted}, remote: remote});
+            var item = {kind: 'key', id: key, local: {value: p.value, deleted: !!p.deleted}, remote: remote};
+            item.canMerge = conflictMergeValue(item, p) !== null;
+            result.push(item);
         });
         if (Object.keys(documentPending).some(function (id) { return documentPending[id].blocked; })) {
             var filesResponse = await fetchWithTimeout(SERVER_URL + '/api/shared-idb', {cache: 'no-store'}, DOCS_TIMEOUT_MS);
@@ -1061,9 +1117,16 @@
         return {conflicts: result, queued: Object.keys(pending).length + Object.keys(documentPending).length,
             warning: lastSafetyWarning || window.localBackupFailure || '', canUpload: isAdminRole()};
     };
+    window.reconcilePmmModificationsConflict = async function () {
+        var p = pending.cars_modifications_data;
+        if (!p || !p.blocked || !isAdminRole()) return;
+        var report = await window.inspectPmmSyncConflicts();
+        var item = report.conflicts.find(function (entry) { return entry.id === 'cars_modifications_data' && entry.canMerge; });
+        if (item) await window.resolvePmmSyncConflict(item, 'merge');
+    };
     window.resolvePmmSyncConflict = async function (item, choice) {
-        if (choice !== 'local' && choice !== 'server') throw new Error('Невідомий вибір');
-        if (choice === 'local' && !isAdminRole()) throw new Error('Для запису на сайт увійдіть як адмін або розробник');
+        if (choice !== 'local' && choice !== 'server' && choice !== 'merge') throw new Error('Невідомий вибір');
+        if (choice !== 'server' && !isAdminRole()) throw new Error('Для запису на сайт увійдіть як адмін або розробник');
         function checkCurrent() {
             var p = item.kind === 'key' ? pending[item.id] : documentPending[item.id];
             if (!p || !p.blocked || (item.kind === 'key' ? p.value !== item.local.value || !!p.deleted !== item.local.deleted : p.token !== item.token)) {
@@ -1072,7 +1135,12 @@
             if (item.kind === 'key' && localGet(item.id) !== (p.deleted ? null : p.value)) throw new Error('Локальні дані змінилися в іншій вкладці. Оновіть список.');
             return p;
         }
-        checkCurrent();
+        var current = checkCurrent();
+        var mergedValue = choice === 'merge' ? conflictMergeValue(item, current) : null;
+        if (choice === 'merge' && mergedValue === null) throw new Error('Є різні зміни одного поля. Потрібна перевірка обох версій.');
+        if (choice === 'local' && item.kind === 'key' && item.id === 'cars_modifications_data' && !item.local.deleted && !item.remote.deleted) {
+            mergedValue = retainServerModifications(item.local.value, item.remote.value);
+        }
         if (typeof window.archiveLocalSiteChange !== 'function') throw new Error('Модуль історії змін недоступний');
         await window.archiveLocalSiteChange('conflict-review', item.id, JSON.stringify(item.local), JSON.stringify(item.remote));
         var p = checkCurrent();
@@ -1084,6 +1152,12 @@
                 if (item.remote.deleted) localRemove(item.id); else localSet(item.id, item.remote.value);
                 delete pending[item.id];
             } else {
+                if (mergedValue !== null) {
+                    // Archive above completed before replacing the local overlay.
+                    localSet(item.id, mergedValue);
+                    if (localGet(item.id) !== mergedValue) throw new Error('Браузер не зберіг об’єднані дані. Конфлікт залишено для перевірки.');
+                    p.value = mergedValue;
+                }
                 p.blocked = false;
                 if (isCarKey(item.id)) p.baseValue = item.remote.deleted ? null : item.remote.value;
             }

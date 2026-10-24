@@ -22,6 +22,50 @@ function contextWith(functions, context = {}) {
 }
 const mergeContext = () => contextWith([['Shared_sync.js', 'mergeCarValue']]);
 
+function modificationsContext() {
+    return contextWith([['Shared_sync.js', 'mergeCarValue'], ['Shared_sync.js', 'mergeCarModifications'], ['Shared_sync.js', 'retainServerModifications']]);
+}
+
+test('A shorter property overlay retains server vehicles and independently changed fields', () => {
+    const c = modificationsContext();
+    const base = {1: {id: 1, note: 'old', driver: 'A'}, 2: {id: 2}, 3: {id: 3}};
+    const local = {1: {id: 1, note: 'new', driver: 'A'}};
+    const remote = {...base, 1: {...base[1], driver: 'B'}, 4: {id: 4}};
+    const merged = JSON.parse(c.mergeCarModifications(JSON.stringify(local), JSON.stringify(remote), JSON.stringify(base)));
+    assert.deepEqual(merged, {...remote, 1: {id: 1, note: 'new', driver: 'B'}});
+});
+
+test('Property reconciliation refuses same-field collisions, unknown bases and edited remote deletions', () => {
+    const c = modificationsContext();
+    const base = '{"1":{"note":"old"}}', local = '{"1":{"note":"local"}}', remote = '{"1":{"note":"remote"}}';
+    assert.equal(c.mergeCarModifications(local, remote, base), null);
+    assert.equal(c.mergeCarModifications(local, remote, undefined), null);
+    assert.equal(c.mergeCarModifications(local, '{}', base), null);
+    assert.equal(c.mergeCarModifications('[]', remote, base), null);
+    assert.equal(c.mergeCarModifications('invalid', remote, base), null);
+});
+
+test('Module save hooks retain blocked overlay status and its original merge base', () => {
+    const c = contextWith([['Shared_sync.js', 'queueLocalChange']], {
+        pending: {cars_modifications_data: {value: 'old local', baseValue: 'original server', blocked: true}},
+        isCarKey: () => true, meta: {carBases: {cars_modifications_data: 'new server'}},
+        awaitingFirstPull: false, MAX_VALUE_BYTES: 10000, PUSH_DEBOUNCE_MS: 400,
+        savePending() {}, schedulePush() {}
+    });
+    c.queueLocalChange('cars_modifications_data', 'edited local', false, 'old local');
+    assert.equal(c.pending.cars_modifications_data.blocked, true);
+    assert.equal(c.pending.cars_modifications_data.baseValue, 'original server');
+    assert.equal(c.pending.cars_modifications_data.value, 'edited local');
+});
+
+test('An explicitly chosen local property version retains other server records and fields', async () => {
+    const c = modificationsContext();
+    const merged = c.retainServerModifications('{"1":{"note":"local"}}', '{"1":{"note":"remote","vin":"KEEP"},"2":{"id":2},"3":{"id":3}}');
+    assert.deepEqual(JSON.parse(merged), {1: {note: 'local', vin: 'KEEP'}, 2: {id: 2}, 3: {id: 3}});
+    const {registryChangeBlocked} = await import('../storage_backups.ts');
+    assert.equal(registryChangeBlocked('cars_modifications_data', '{"1":{},"2":{},"3":{}}', merged), false);
+});
+
 test('Registry safety rejection preserves typed notes and blocks retries until resolved', async () => {
     for (const key of ['user_cars_database_v2', 'cars_modifications_data']) {
         const typed = JSON.stringify([{ id: 1, note: 'Нова примітка' }]);
@@ -85,6 +129,44 @@ function conflictContext() {
     const item = {kind: 'key', id: 'report_data_test', local: {value: 'local', deleted: false}, remote: {value: 'server', rev: 42, deleted: false}};
     return {c, values, revisions, backups, item};
 }
+
+function modificationsConflict() {
+    const fixture = conflictContext(), {c, values, item} = fixture;
+    for (const name of ['mergeCarValue', 'mergeCarModifications', 'conflictMergeValue', 'retainServerModifications']) {
+        vm.runInContext(extract('Shared_sync.js', name), c);
+    }
+    const base = '{"1":{"note":"old","driver":"A"},"2":{"id":2},"3":{"id":3}}';
+    const local = '{"1":{"note":"local","driver":"A"}}';
+    const remote = '{"1":{"note":"old","driver":"B"},"2":{"id":2},"3":{"id":3}}';
+    delete c.pending.report_data_test;
+    c.pending.cars_modifications_data = {value: local, baseValue: base, blocked: true};
+    values.cars_modifications_data = local;
+    Object.assign(item, {id: 'cars_modifications_data', local: {value: local, deleted: false}, remote: {value: remote, rev: 42, deleted: false}});
+    return fixture;
+}
+
+test('Safe overlay conflict resolution archives both originals before writing the combined version', async () => {
+    const {c, values, backups, item} = modificationsConflict();
+    await c.resolvePmmSyncConflict(item, 'merge');
+    assert.equal(backups.length, 1);
+    assert.equal(JSON.parse(backups[0][2]).value, item.local.value);
+    assert.equal(JSON.parse(backups[0][3]).value, item.remote.value);
+    assert.deepEqual(JSON.parse(values.cars_modifications_data), {1: {note: 'local', driver: 'B'}, 2: {id: 2}, 3: {id: 3}});
+    assert.equal(c.pending.cars_modifications_data.blocked, false);
+    assert.equal(c.pending.cars_modifications_data.baseValue, item.remote.value);
+});
+
+test('A failed archive or a genuine field collision cannot unblock a property conflict', async () => {
+    const {c, values, item} = modificationsConflict();
+    c.archiveLocalSiteChange = async () => {throw new Error('archive failed');};
+    await assert.rejects(c.resolvePmmSyncConflict(item, 'merge'), /archive failed/);
+    assert.equal(c.pending.cars_modifications_data.blocked, true);
+    assert.equal(values.cars_modifications_data, item.local.value);
+    item.remote.value = '{"1":{"note":"another edit","driver":"A"}}';
+    await assert.rejects(c.resolvePmmSyncConflict(item, 'merge'), /різні зміни/);
+    c.isAdminRole = () => false;
+    await assert.rejects(c.resolvePmmSyncConflict(item, 'merge'), /адмін/);
+});
 test('Explicit conflict decisions archive both versions and recheck the server cursor', async () => {
     let {c, values, revisions, backups, item} = conflictContext();
     await c.resolvePmmSyncConflict(item, 'server');

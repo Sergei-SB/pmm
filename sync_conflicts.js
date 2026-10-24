@@ -29,6 +29,44 @@
             }, 2);
         } catch (_) { return String(data.value || ''); }
     }
+    function describeDifferences(item, section) {
+        if (item.kind !== 'key' || item.local.deleted || item.remote.deleted) return;
+        try {
+            var local = JSON.parse(item.local.value), remote = JSON.parse(item.remote.value);
+            if (!local || !remote || typeof local !== 'object' || typeof remote !== 'object') return;
+            var left = Object.keys(local), right = Object.keys(remote);
+            var remoteOnly = right.filter(function (id) {return !Object.prototype.hasOwnProperty.call(local, id);});
+            var localOnly = left.filter(function (id) {return !Object.prototype.hasOwnProperty.call(remote, id);});
+            var changed = left.filter(function (id) {return Object.prototype.hasOwnProperty.call(remote, id) && JSON.stringify(local[id]) !== JSON.stringify(remote[id]);});
+            node('p', 'Записів у браузері: ' + left.length + '; на сайті: ' + right.length +
+                '. Лише у браузері: ' + localOnly.length + '; лише на сайті: ' + remoteOnly.length + '; різних записів: ' + changed.length + '.', section);
+            if (item.id === 'cars_modifications_data' && remoteOnly.length) {
+                node('p', 'Відсутні у браузері характеристики інших авто будуть збережені при об’єднанні або записі вашої версії.', section).style.color = '#166534';
+            }
+            var fields = {note:'Примітка', driver:'Водій', year:'Рік', plate:'Номер', model:'Модель', consumption:'Норма витрати', subdivision:'Підрозділ'};
+            var differences = [];
+            changed.forEach(function (id) {
+                var l = local[id], r = remote[id];
+                if (!l || !r || typeof l !== 'object' || typeof r !== 'object') return;
+                Object.keys(Object.assign({}, l, r)).forEach(function (field) {
+                    if (JSON.stringify(l[field]) === JSON.stringify(r[field])) return;
+                    function text(value) {
+                        var str = value === undefined ? '(відсутнє)' : typeof value === 'string' ? value : JSON.stringify(value);
+                        return str.length > 160 ? str.slice(0, 160) + '…' : str;
+                    }
+                    differences.push((l.plate || r.plate || 'ID ' + id) + ' · ' + (fields[field] || field) + ': браузер «' + text(l[field]) + '» / сайт «' + text(r[field]) + '»');
+                });
+            });
+            if (differences.length) {
+                var details = node('details', undefined, section);
+                details.open = true;
+                node('summary', 'Відмінності полів: ' + differences.length, details);
+                var list = node('ul', undefined, details);
+                differences.slice(0, 60).forEach(function (line) {node('li', line, list);});
+                if (differences.length > 60) node('li', 'Решта відмінностей доступна в повних версіях нижче.', list);
+            }
+        } catch (_) { /* Non-JSON values remain available in the full preview. */ }
+    }
     window.showPmmSyncConflicts = async function () {
         document.getElementById('pmm-sync-conflicts')?.remove();
         var dialog = node('dialog');
@@ -59,6 +97,7 @@
                     var section = node('section', undefined, content);
                     section.style.cssText = 'border:1px solid #cbd5e1;border-radius:7px;margin:15px 0;padding:15px;';
                     node('h3', label(item), section).style.marginTop = '0';
+                    describeDifferences(item, section);
                     var columns = node('div', undefined, section);
                     columns.style.cssText = 'display:flex;gap:14px;flex-wrap:wrap;';
                     ['local', 'server'].forEach(function (side) {
@@ -77,17 +116,18 @@
                     });
                     var actions = node('div', undefined, section);
                     actions.style.cssText = 'display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;';
-                    ['local', 'server'].forEach(function (choice) {
-                        var button = node('button', choice === 'local' ? 'Зберегти мою версію на сайт' : 'Використати версію із сайту', actions);
+                    (item.canMerge ? ['merge', 'local', 'server'] : ['local', 'server']).forEach(function (choice) {
+                        var button = node('button', choice === 'merge' ? 'Об’єднати без втрати змін' : choice === 'local' ? 'Зберегти мою версію на сайт' : 'Використати версію із сайту', actions);
                         button.type = 'button';
                         button.style.cssText = 'padding:9px 12px;border-radius:5px;border:1px solid #64748b;cursor:pointer;';
-                        button.disabled = choice === 'local' && !report.canUpload;
+                        button.disabled = choice !== 'server' && !report.canUpload;
+                        button.dataset.requiresUpload = choice !== 'server' ? 'true' : 'false';
                         button.onclick = async function () {
                             actions.querySelectorAll('button').forEach(function (b) {b.disabled = true;});
                             try { await window.resolvePmmSyncConflict(item, choice); await load(); }
                             catch (error) {
                                 message.style.color = '#b91c1c'; message.textContent = error.message;
-                                actions.querySelectorAll('button').forEach(function (b) {b.disabled = !report.canUpload && b.textContent === 'Зберегти мою версію на сайт';});
+                                actions.querySelectorAll('button').forEach(function (b) {b.disabled = !report.canUpload && b.dataset.requiresUpload === 'true';});
                             }
                         };
                     });
