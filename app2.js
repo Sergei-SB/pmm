@@ -432,6 +432,29 @@ loadCarDataForActivePeriod = function () {
     }
 };
 
+function writeCarRouteSnapshot(dataKey, topFields, rowsData) {
+    const snapshot = {topFields: topFields, rows: rowsData};
+    function content(value) {
+        if (!value || !value.topFields || !Array.isArray(value.rows)) return null;
+        const copy = {...value, topFields: {...value.topFields}};
+        delete copy.topFields.updatedAt;
+        function ordered(item) {
+            if (Array.isArray(item)) return item.map(ordered);
+            if (!item || typeof item !== 'object') return item;
+            const result = Object.create(null);
+            Object.keys(item).sort().forEach(key => {result[key] = ordered(item[key]);});
+            return result;
+        }
+        return JSON.stringify(ordered(copy));
+    }
+    try {
+        const previous = JSON.parse(localStorage.getItem(dataKey) || 'null');
+        if (previous && content(previous) === content(snapshot)) return false;
+    } catch (_) { /* Keep the normal write path for a missing/invalid old record. */ }
+    localStorage.setItem(dataKey, JSON.stringify(snapshot));
+    return true;
+}
+
 function saveCarRoutesForPeriod(periodToSave, carIdToSave, isManualSave = false) {
     if (isRestoringState) return;
     const targetCarId = carIdToSave || (typeof currentCarId !== 'undefined' ? currentCarId : null);
@@ -481,10 +504,7 @@ function saveCarRoutesForPeriod(periodToSave, carIdToSave, isManualSave = false)
         updatedAt: new Date().toISOString()
     };
 
-    localStorage.setItem(dataKey, JSON.stringify({
-        topFields: topFields,
-        rows: rowsData
-    }));
+    writeCarRouteSnapshot(dataKey, topFields, rowsData);
 
     const periods = getSortedPeriods();
     const curIdx = periods.indexOf(period);

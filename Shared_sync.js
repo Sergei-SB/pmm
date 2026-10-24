@@ -128,6 +128,35 @@
             var local = JSON.parse(localValue);
             var remote = JSON.parse(remoteValue);
             var base = baseValue ? JSON.parse(baseValue) : null;
+            var route = /^isolated_car_routes_/.test(key);
+            var routeTimestamp;
+            if (route) {
+                function routeContent(value) {
+                    if (!value || typeof value !== 'object' || Array.isArray(value) ||
+                        !value.topFields || typeof value.topFields !== 'object' || Array.isArray(value.topFields) || !Array.isArray(value.rows)) {
+                        throw new Error('Invalid route snapshot');
+                    }
+                    var copy = Object.assign({}, value, {topFields: Object.assign({}, value.topFields)});
+                    delete copy.topFields.updatedAt;
+                    function ordered(item) {
+                        if (Array.isArray(item)) return item.map(ordered);
+                        if (!item || typeof item !== 'object') return item;
+                        var result = Object.create(null);
+                        Object.keys(item).sort().forEach(function (field) {result[field] = ordered(item[field]);});
+                        return result;
+                    }
+                    return ordered(copy);
+                }
+                var localContent = routeContent(local), remoteContent = routeContent(remote);
+                // Only the service timestamp is ignored. Row dates, order,
+                // entered fuel and odometers still participate in comparison.
+                if (JSON.stringify(localContent) === JSON.stringify(remoteContent)) return remoteValue;
+                routeTimestamp = remote.topFields.updatedAt;
+                if (typeof local.topFields.updatedAt === 'string' &&
+                    (!routeTimestamp || local.topFields.updatedAt > routeTimestamp)) routeTimestamp = local.topFields.updatedAt;
+                local = localContent; remote = remoteContent;
+                if (base) base = routeContent(base);
+            }
             var folder = key.indexOf('car_folder_') === 0;
             var envelope = folder ? Object.assign({}, remote) : null;
             if (folder) { local = local.files || []; remote = remote.files || []; base = base && base.files || []; }
@@ -173,7 +202,10 @@
                 });
                 result[id] = row;
             });
-            if (!array) return JSON.stringify(result);
+            if (!array) {
+                if (route && routeTimestamp !== undefined) result.topFields.updatedAt = routeTimestamp;
+                return JSON.stringify(result);
+            }
             var order = remote.map(function (car) { return String(car.id); });
             local.forEach(function (car) { if (order.indexOf(String(car.id)) === -1) order.push(String(car.id)); });
             var merged = order.filter(function (id) { return result[id]; }).map(function (id) { return result[id]; });
@@ -224,6 +256,54 @@
             merged[id] = Object.assign({}, remote[id] || {}, local[id]);
         });
         return JSON.stringify(merged);
+    }
+
+    // Reconcile only provably independent changes, including old blocked queues.
+    // No version is chosen for differing edits of the same field. This also runs
+    // on normal polling, so a harmless overlay mismatch needs no repeated clicks.
+    async function reconcileSafeModificationsRecord(remote) {
+        var key = 'cars_modifications_data', p = pending[key];
+        if (!p || !p.blocked || p.deleted || !remote || remote.deleted || typeof remote.value !== 'string') return false;
+        var original = p.value, base = p.baseValue;
+        if (localGet(key) !== original) return false;
+        var merged = mergeCarModifications(original, remote.value, base);
+        if (merged === null) return false;
+        if (typeof window.archiveLocalSiteChange !== 'function') return false;
+        await window.archiveLocalSiteChange('safe-properties-reconciliation', key, original, remote.value);
+        if (pending[key] !== p || p.value !== original || p.baseValue !== base || localGet(key) !== original) return false;
+        localSet(key, merged);
+        if (localGet(key) !== merged) return false;
+        setKeyRev(key, Number(remote.rev) || 0);
+        meta.carBases[key] = remote.value;
+        if (merged === remote.value) delete pending[key];
+        else {p.value = merged; p.baseValue = remote.value; p.blocked = false; p.preBoot = false;}
+        saveMeta(); savePending();
+        if (!Object.keys(pending).some(function (id) {return pending[id].blocked;})) lastSafetyWarning = '';
+        return true;
+    }
+
+    async function reconcileSafeRouteRecords(records) {
+        var changed = false;
+        for (var key of Object.keys(records || {})) {
+            if (!/^isolated_car_routes_/.test(key)) continue;
+            var p = pending[key], remote = records[key];
+            if (!p || !p.blocked || p.deleted || !remote || remote.deleted || typeof remote.value !== 'string') continue;
+            var original = p.value, base = p.baseValue;
+            if (localGet(key) !== original) continue;
+            var merged = mergeCarValue(key, original, remote.value, base);
+            if (merged === null || typeof window.archiveLocalSiteChange !== 'function') continue;
+            await window.archiveLocalSiteChange('safe-route-reconciliation', key, original, remote.value);
+            if (pending[key] !== p || p.value !== original || p.baseValue !== base || localGet(key) !== original) continue;
+            localSet(key, merged);
+            if (localGet(key) !== merged) continue;
+            setKeyRev(key, Number(remote.rev) || 0);
+            meta.carBases[key] = remote.value;
+            if (merged === remote.value) delete pending[key];
+            else {p.value = merged; p.baseValue = remote.value; p.blocked = false; p.preBoot = false;}
+            saveMeta(); savePending(); changed = true;
+        }
+        if (changed && !Object.keys(pending).some(function (id) {return pending[id].blocked;})) lastSafetyWarning = '';
+        return changed;
     }
 
     var applyingRemote = false;
@@ -513,7 +593,7 @@
         }, PUSH_TIMEOUT_MS).then(function (res) {
             if (!res.ok) throw new Error('HTTP ' + res.status);
             return res.json();
-        }).then(function (data) {
+        }).then(async function (data) {
             // прибираємо з черги лише те, що не змінилося під час запиту
             changeKeys.forEach(function (key) {
                 var p = pending[key];
@@ -578,6 +658,11 @@
                 });
                 if (Object.keys(data.rejected).length > 0) setStatus('conflict');
             }
+
+            if (data.rejected && data.rejected.cars_modifications_data &&
+                typeof reconcileSafeModificationsRecord === 'function' &&
+                await reconcileSafeModificationsRecord(data.rejected.cars_modifications_data)) needRefresh = true;
+            if (typeof reconcileSafeRouteRecords === 'function' && await reconcileSafeRouteRecords(data.rejected)) needRefresh = true;
 
             // Only a completed GET advances the pull cursor. POST acknowledgements
             // do not include other devices' changes and must never skip them.
@@ -717,11 +802,13 @@
                 }
                 return data;
             })
-            .then(function (data) {
+            .then(async function (data) {
                 // Сумісність зі старим сервером: він повертає { version, storage },
                 // новий — { revision, keys }.
                 var wasFirstPull = awaitingFirstPull;
                 var incomingKeys = data.keys || data.storage || {};
+                var propertiesReconciled = await reconcileSafeModificationsRecord(incomingKeys.cars_modifications_data);
+                var routesReconciled = await reconcileSafeRouteRecords(incomingKeys);
                 var changed = applyRemoteKeys(incomingKeys, awaitingFirstPull);
                 if (typeof data.revision === 'number') setLastRev(data.revision);
                 else if (typeof data.version === 'number') { /* старий сервер: ревізій немає */ }
@@ -741,7 +828,7 @@
                     });
                 }
 
-                var shouldRefresh = (changed > 0) || isInitial;
+                var shouldRefresh = (changed > 0) || isInitial || propertiesReconciled || routesReconciled;
                 awaitingFirstPull = false;
                 saveMeta();
                 savePending();

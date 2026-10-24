@@ -10,7 +10,7 @@ function extract(file, name) {
     let found;
     function visit(node) {
         if (ts.isFunctionDeclaration(node) && node.name?.text === name) found = node.getText(source);
-        if (ts.isBinaryExpression(node) && node.left.getText(source) === 'window.' + name) found = node.getText(source) + ';';
+        if (ts.isBinaryExpression(node) && node.left.getText(source) === 'window.' + name && !ts.isIdentifier(node.right)) found = node.getText(source) + ';';
         ts.forEachChild(node, visit);
     }
     visit(source); assert.ok(found, name); return found;
@@ -21,6 +21,81 @@ function contextWith(functions, context = {}) {
     return context;
 }
 const mergeContext = () => contextWith([['Shared_sync.js', 'mergeCarValue']]);
+
+test('Route service timestamps do not create conflicts, even without a base snapshot', () => {
+    const c = mergeContext();
+    const remote = {topFields: {fuelStart: '24', odo1: '212971', odo2: '212971', updatedAt: '2026-10-24T17:28:11.390Z'}, rows: [{name: 'Маршрут', inputs: ['А', '8:30', '0']}]};
+    const local = {...remote, topFields: {...remote.topFields, updatedAt: '2026-10-24T17:29:41.076Z'}};
+    const encoded = JSON.stringify(remote);
+    assert.equal(c.mergeCarValue('isolated_car_routes_21.10-31.10_9', JSON.stringify(local), encoded), encoded);
+    assert.equal(c.mergeCarValue('isolated_car_routes_21.10-31.10_9', JSON.stringify(local), encoded, JSON.stringify(local)), encoded);
+    const reordered = {rows: local.rows, topFields: Object.fromEntries(Object.entries(local.topFields).reverse())};
+    assert.equal(c.mergeCarValue('isolated_car_routes_1', JSON.stringify(reordered), encoded), encoded);
+});
+
+test('Ignoring a route timestamp never hides real fuel, odometer or route row collisions', () => {
+    const c = mergeContext(), encode = JSON.stringify;
+    const base = {topFields: {fuelStart: '24', odo1: '100', updatedAt: 'old'}, rows: [{name: 'А', km: '10', updatedAt: 'row-date'}]};
+    for (const field of ['fuelStart', 'odo1']) {
+        const local = {...base, topFields: {...base.topFields, [field]: '30', updatedAt: 'local'}};
+        const remote = {...base, topFields: {...base.topFields, [field]: '40', updatedAt: 'remote'}};
+        assert.equal(c.mergeCarValue('isolated_car_routes_1', encode(local), encode(remote), encode(base)), null);
+        assert.equal(c.mergeCarValue('isolated_car_routes_1', encode(local), encode(remote)), null);
+    }
+    const local = {...base, rows: [{...base.rows[0], updatedAt: 'row-date-local'}]};
+    const remote = {...base, rows: [{...base.rows[0], updatedAt: 'row-date-remote'}]};
+    assert.equal(c.mergeCarValue('isolated_car_routes_1', encode(local), encode(remote), encode(base)), null);
+    assert.equal(c.mergeCarValue('isolated_car_routes_1', encode(base), '{"topFields":{},"rows":{}}'), null);
+});
+
+test('Repeated unchanged route saves preserve the timestamp and never write another local edit', () => {
+    const old = {topFields: {fuelStart: '24', updatedAt: 'old'}, rows: [{km: '10'}]};
+    let raw = JSON.stringify(old), writes = 0;
+    const c = contextWith([['app2.js', 'writeCarRouteSnapshot']], {localStorage: {
+        getItem: () => raw, setItem: (_key, value) => {raw = value; writes++;}
+    }});
+    assert.equal(c.writeCarRouteSnapshot('route', {...old.topFields, updatedAt: 'new'}, old.rows), false);
+    assert.equal(writes, 0); assert.equal(JSON.parse(raw).topFields.updatedAt, 'old');
+    assert.equal(c.writeCarRouteSnapshot('route', {fuelStart: '30', updatedAt: 'real-edit'}, old.rows), true);
+    assert.equal(writes, 1); assert.equal(JSON.parse(raw).topFields.fuelStart, '30');
+    assert.equal(c.writeCarRouteSnapshot('route', {updatedAt: 'later', fuelStart: '30'}, old.rows), false);
+    assert.equal(writes, 1);
+});
+
+function routeRepairContext() {
+    const key = 'isolated_car_routes_21.10-31.10_9';
+    const remote = JSON.stringify({topFields: {fuelStart: '24', updatedAt: 'old'}, rows: [{km: '10'}]});
+    const local = JSON.stringify({topFields: {fuelStart: '24', updatedAt: 'new'}, rows: [{km: '10'}]});
+    const values = {[key]: local}, archives = [];
+    const c = contextWith([['Shared_sync.js', 'mergeCarValue'], ['Shared_sync.js', 'reconcileSafeRouteRecords']], {
+        pending: {[key]: {value: local, blocked: true}}, meta: {carBases: {}}, lastSafetyWarning: 'old warning',
+        localGet: k => values[k], localSet: (k,v) => {values[k] = v;},
+        archiveLocalSiteChange: async (...args) => {archives.push(args);}, setKeyRev() {}, saveMeta() {}, savePending() {}
+    });
+    return {c, key, local, remote, values, archives};
+}
+
+test('An old timestamp-only blocked queue repairs automatically only after both versions are archived', async () => {
+    const {c,key,local,remote,values,archives} = routeRepairContext();
+    assert.equal(await c.reconcileSafeRouteRecords({[key]: {value: remote, rev: 10}}), true);
+    assert.equal(archives.length, 1); assert.equal(archives[0][2], local); assert.equal(archives[0][3], remote);
+    assert.equal(values[key], remote); assert.equal(c.pending[key], undefined); assert.equal(c.lastSafetyWarning, '');
+});
+
+test('Failed route history, concurrent typing and real collisions leave the blocked edit intact', async () => {
+    let f = routeRepairContext();
+    f.c.archiveLocalSiteChange = async () => {throw Error('archive failed');};
+    await assert.rejects(f.c.reconcileSafeRouteRecords({[f.key]: {value: f.remote, rev: 10}}), /archive failed/);
+    assert.equal(f.values[f.key], f.local); assert.equal(f.c.pending[f.key].blocked, true);
+    f = routeRepairContext();
+    f.c.archiveLocalSiteChange = async () => {f.values[f.key] = 'new typing';};
+    assert.equal(await f.c.reconcileSafeRouteRecords({[f.key]: {value: f.remote, rev: 10}}), false);
+    assert.equal(f.values[f.key], 'new typing'); assert.equal(f.c.pending[f.key].blocked, true);
+    f = routeRepairContext();
+    const remote = JSON.parse(f.remote); remote.topFields.fuelStart = '99';
+    assert.equal(await f.c.reconcileSafeRouteRecords({[f.key]: {value: JSON.stringify(remote), rev: 10}}), false);
+    assert.equal(f.archives.length, 0); assert.equal(f.values[f.key], f.local);
+});
 
 function modificationsContext() {
     return contextWith([['Shared_sync.js', 'mergeCarValue'], ['Shared_sync.js', 'mergeCarModifications'], ['Shared_sync.js', 'retainServerModifications']]);
@@ -33,6 +108,33 @@ test('A shorter property overlay retains server vehicles and independently chang
     const remote = {...base, 1: {...base[1], driver: 'B'}, 4: {id: 4}};
     const merged = JSON.parse(c.mergeCarModifications(JSON.stringify(local), JSON.stringify(remote), JSON.stringify(base)));
     assert.deepEqual(merged, {...remote, 1: {id: 1, note: 'new', driver: 'B'}});
+});
+
+test('Saving a partial visible fleet preserves stored properties of other vehicles and unknown fields', () => {
+    let saved, registrySaves = 0;
+    const previous = {1: {id: 1, note: 'before', customField: 'retain'}, 2: {id: 2, note: 'other vehicle'}};
+    const c = contextWith([['app.js', 'saveCarsModificationsToStorage']], {
+        carsData: [{id: 1, model: 'CAR', note: 'after'}],
+        localStorage: {getItem: () => JSON.stringify(previous), setItem: (_key, value) => {saved = JSON.parse(value);}},
+        saveCarsToStorage: () => {registrySaves++;}
+    });
+    c.saveCarsModificationsToStorage();
+    assert.deepEqual(saved[2], previous[2]); assert.equal(saved[1].customField, 'retain');
+    assert.equal(saved[1].note, 'after'); assert.equal(registrySaves, 1);
+});
+
+test('Automatic property reconciliation also archives both versions and retains server-only vehicles', async () => {
+    const key = 'cars_modifications_data', base = '{"1":{"note":"old"}}', local = '{"1":{"note":"new"}}';
+    const remote = '{"1":{"note":"old"},"2":{"id":2}}';
+    let value = local, archived = false;
+    const c = contextWith([['Shared_sync.js', 'mergeCarValue'], ['Shared_sync.js', 'mergeCarModifications'], ['Shared_sync.js', 'reconcileSafeModificationsRecord']], {
+        pending: {[key]: {value: local, baseValue: base, blocked: true}}, meta: {carBases: {}},
+        localGet: () => value, localSet: (_k,v) => {assert.equal(archived, true); value = v;},
+        archiveLocalSiteChange: async () => {archived = true;}, setKeyRev() {}, saveMeta() {}, savePending() {}, lastSafetyWarning: ''
+    });
+    assert.equal(await c.reconcileSafeModificationsRecord({value: remote, rev: 2}), true);
+    assert.deepEqual(JSON.parse(value), {1: {note: 'new'}, 2: {id: 2}});
+    assert.equal(c.pending[key].blocked, false);
 });
 
 test('Property reconciliation refuses same-field collisions, unknown bases and edited remote deletions', () => {

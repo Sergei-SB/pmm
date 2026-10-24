@@ -269,9 +269,20 @@ function loadCarsModifications() {
 
 function saveCarsModificationsToStorage() {
     if (typeof carsData === 'undefined' || !Array.isArray(carsData)) return;
-    let mods = {};
+    // This is an overlay, not the current fleet. Keep properties of vehicles
+    // missing from this browser's registry instead of deleting them on every save.
+    let mods;
+    try {
+        mods = JSON.parse(localStorage.getItem('cars_modifications_data') || '{}');
+        if (!mods || typeof mods !== 'object' || Array.isArray(mods)) throw new Error('Invalid vehicle properties');
+    } catch (error) {
+        console.error('Не збережено характеристики: попередня копія має неправильний формат', error);
+        return;
+    }
     carsData.forEach(car => {
+        const previous = mods[car.id] || {};
         mods[car.id] = {
+            ...previous,
             id: car.id,
             model: car.model,
             plate: car.plate,
@@ -300,6 +311,9 @@ function saveCarsModificationsToStorage() {
             destroyTime: car.destroyTime,
             destroyLocation: car.destroyLocation
         };
+        Object.keys(mods[car.id]).forEach(prop => {
+            if (mods[car.id][prop] === undefined && previous[prop] !== undefined) mods[car.id][prop] = previous[prop];
+        });
     });
     localStorage.setItem('cars_modifications_data', JSON.stringify(mods));
     if (typeof saveCarsToStorage === 'function') {
