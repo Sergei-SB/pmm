@@ -481,7 +481,7 @@
         <section id="equipment-report-view" class="view-section">
             <div class="card-header-panel" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 15px;">
                 <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                    <h2 style="margin: 0; color: #2c3e50;">Десятиденний звіт по обладнанню (Генератори, Webasto, Пушки, Пили)</h2>
+                    <h2 style="margin: 0; color: #2c3e50;">Десятиденний звіт по обладнанню (Генератори, Webasto, Пушки, Пили, Помпи)</h2>
                     <button class="action-btn" onclick="switchView('generators')" style="background-color: #34495e; color: white; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; display: inline-flex; align-items: center; gap: 5px;">← До обліку обладнання</button>
                 </div>
                 <div class="report-controls" style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
@@ -500,6 +500,7 @@
                     </div>
                     <input type="hidden" id="eq-report-custom-period" value="01.10-10.10">
 
+                    <button id="eq-report-add-generator-btn" class="action-btn" onclick="openEquipmentReportGeneratorDialog()" style="background:#27ae60;color:white;border:0;border-radius:4px;padding:6px 14px;font-weight:bold;cursor:pointer">+ Додати генератор</button>
                     <button class="action-btn" onclick="saveEquipmentReportData()" style="background-color: #27ae60; font-weight: bold; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">💾 Зберегти звіт</button>
                     <button class="action-btn print-btn" onclick="printEquipmentReport()" style="background-color: #337ab7; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">
                         <span style="font-size: 14px; vertical-align: middle;">🖨️</span> Друк звіту
@@ -514,6 +515,7 @@
                             <th style="padding: 6px 4px; width: 95px;">Категорія</th>
                             <th style="padding: 6px 4px; width: 100px;">Підрозділ</th>
                             <th style="padding: 6px 4px; min-width: 180px;">Модель обладнання</th>
+                            <th style="padding: 6px 4px; min-width: 140px;">Серійний номер</th>
                             <th style="padding: 6px 4px; width: 75px;">Тип пал.</th>
                             <th style="padding: 6px 4px; width: 85px;">Залишок палива<br>на <span class="eq-rep-start">01.10</span></th>
                             <th style="padding: 6px 4px; width: 85px;">Залишок мастила<br>на <span class="eq-rep-start">01.10</span></th>
@@ -524,6 +526,7 @@
                             <th style="padding: 6px 4px; width: 85px;">Заправка <span class="eq-rep-p3-label">21-31.10</span><br>(паливо)</th>
                             <th style="padding: 6px 4px; width: 85px;">Заправка <span class="eq-rep-p3-label">21-31.10</span><br>(мастило)</th>
                             <th style="padding: 6px 4px; width: 95px;">Залишок палива на початок<br>наст. періоду (<span class="eq-rep-next-start">11.10</span>)</th>
+                            <th class="eq-report-action" style="padding:6px 4px;min-width:110px">Дія</th>
                         </tr>
                     </thead>
                     <tbody id="equipment-report-tbody"></tbody>
@@ -707,7 +710,7 @@
     <script src="developer_panel.js?v=20261024-pumps"></script>
     <script src="permissions_registry.js"></script>
     <script src="broadcast_mail.js"></script>
-    <script src="equipment_report.js?v=20261024-pumps"></script>
+    <script src="equipment_report.js?v=20261025-report-generators"></script>
     <script src="app.js?v=20261024-pumps"></script>
     <script src="app2.js?v=20261024-route-content"></script>
     <script src="aggregates_calc.js?v=20261024-pumps"></script>

@@ -4,6 +4,131 @@
 
 let activeEquipmentReportPeriod = "";
 
+function canEditEquipmentReport() {
+    const role = typeof window.getCurrentAppRole === 'function' ? window.getCurrentAppRole()
+        : (typeof currentRole !== 'undefined' ? currentRole : 'user');
+    return role === 'developer' || role === 'dev' || (typeof window.canRoleEdit === 'function'
+        ? window.canRoleEdit(role, 'equipment_report') && window.canRoleDo(role, 'eq_report_edit') : role === 'admin');
+}
+
+function equipmentReportPeriod() {
+    return document.getElementById('eq-report-custom-period')?.value.trim() || activeEquipmentReportPeriod || '01.10-10.10';
+}
+
+function readEquipmentReportData(period) {
+    const data = JSON.parse(localStorage.getItem('equipment_report_data_' + period) || '{}');
+    if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Неправильний формат збереженого звіту');
+    return data;
+}
+
+function equipmentReportEscape(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function collectEquipmentReportInputs(period) {
+    // Keep rows hidden by subdivision filters or excluded from this period.
+    const data = readEquipmentReportData(period);
+    document.querySelectorAll('#equipment-report-tbody .eq-rep-input').forEach(input => {
+        const id = input.getAttribute('data-id'), field = input.getAttribute('data-field');
+        if (!id || !field) return;
+        if (!Object.prototype.hasOwnProperty.call(data, id)) data[id] = {};
+        data[id][field] = input.value;
+    });
+    return data;
+}
+
+function getEquipmentReportItems(period, includeExcluded = false) {
+    const data = readEquipmentReportData(period);
+    const items = getAllEquipmentItemsUnified().map(item => ({...item,
+        serialNumber: item.serialNumber ?? item.rawItem?.serialNumber ?? ''}));
+    for (const [id, row] of Object.entries(data)) {
+        if (row?._equipment?.category === 'Генератор' && !items.some(item => item.uniqueId === id)) {
+            items.push({...row._equipment, uniqueId: id});
+        }
+    }
+    return includeExcluded ? items : items.filter(item => data[item.uniqueId]?._excluded !== true);
+}
+
+function addEquipmentReportGenerator(details, existingId = '', period = equipmentReportPeriod()) {
+    if (!canEditEquipmentReport()) return false;
+    const data = collectEquipmentReportInputs(period);
+    let id = existingId;
+    if (id) {
+        const item = getEquipmentReportItems(period, true).find(item => item.uniqueId === id && item.category === 'Генератор');
+        if (!item) throw new Error('Генератора немає в обліку або збереженому звіті');
+        data[id] = {...(data[id] || {}), _excluded: false};
+    } else {
+        const model = String(details.model || '').trim();
+        if (!model) throw new Error('Вкажіть модель генератора');
+        id = 'report_gen_' + (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+            ? crypto.randomUUID() : Date.now() + '_' + Math.random().toString(36).slice(2));
+        data[id] = {_excluded: false, serialNumber: String(details.serialNumber || '').trim(),
+            _equipment: {category: 'Генератор', model, serialNumber: String(details.serialNumber || '').trim(),
+                subdivision: String(details.subdivision || '').trim(), fuelType: details.fuelType === 'АБ' ? 'АБ' : 'ДП'}};
+    }
+    localStorage.setItem('equipment_report_data_' + period, JSON.stringify(data));
+    return id;
+}
+
+function setEquipmentReportGeneratorIncluded(id, included, period = equipmentReportPeriod()) {
+    if (!canEditEquipmentReport()) return false;
+    if (!getEquipmentReportItems(period, true).some(item => item.uniqueId === id && item.category === 'Генератор')) return false;
+    const data = collectEquipmentReportInputs(period);
+    data[id] = {...(data[id] || {}), _excluded: !included};
+    // Financial values remain recoverable; the equipment registry is untouched.
+    localStorage.setItem('equipment_report_data_' + period, JSON.stringify(data));
+    return true;
+}
+
+function openEquipmentReportGeneratorDialog() {
+    if (!canEditEquipmentReport()) return;
+    document.getElementById('equipment-report-generator-dialog')?.remove();
+    const period = equipmentReportPeriod(), data = readEquipmentReportData(period);
+    const candidates = getEquipmentReportItems(period, true).filter(item => item.category === 'Генератор' && data[item.uniqueId]?._excluded);
+    const dialog = document.createElement('dialog');
+    dialog.id = 'equipment-report-generator-dialog';
+    dialog.style.cssText = 'width:min(560px,94vw);border:1px solid #94a3b8;border-radius:10px;padding:24px;color:#263747;font:14px Arial,sans-serif;';
+    dialog.innerHTML = `<h2 style="margin-top:0">Додати генератор у звіт</h2><p>Період: ${equipmentReportEscape(period)}. Позиція додається тільки до цього звіту.</p>
+        <form id="equipment-report-generator-form" style="display:grid;gap:12px">
+        <label for="eq-generator-source">Спосіб додавання</label><select name="existingId" id="eq-generator-source" style="width:100%;padding:8px"><option value="">Новий рядок звіту</option>${candidates.map(item => `<option value="${equipmentReportEscape(item.uniqueId)}">Повернути: ${equipmentReportEscape(item.model)} · ${equipmentReportEscape(data[item.uniqueId]?.serialNumber ?? item.serialNumber)}</option>`).join('')}</select>
+        <div id="eq-generator-new-fields" style="display:grid;gap:12px"><label>Модель генератора<input name="model" required style="width:100%;padding:8px;box-sizing:border-box"></label>
+        <label>Серійний номер<input name="serialNumber" style="width:100%;padding:8px;box-sizing:border-box"></label>
+        <label>Підрозділ<input name="subdivision" style="width:100%;padding:8px;box-sizing:border-box"></label>
+        <label>Тип пального<select name="fuelType" style="width:100%;padding:8px"><option>ДП</option><option>АБ</option></select></label></div>
+        <p id="eq-generator-error" role="status" style="color:#b91c1c;margin:0"></p><div style="display:flex;gap:12px;justify-content:flex-end"><button type="button" id="eq-generator-cancel">Скасувати</button><button type="submit" style="background:#27ae60;color:white;border:0;border-radius:5px;padding:10px">Додати у звіт</button></div></form>`;
+    document.body.appendChild(dialog); dialog.showModal();
+    const form = dialog.querySelector('form');
+    dialog.querySelector('#eq-generator-cancel').onclick = () => dialog.remove();
+    dialog.querySelector('#eq-generator-source').onchange = event => {
+        dialog.querySelector('#eq-generator-new-fields').hidden = !!event.target.value;
+        form.elements.model.required = !event.target.value;
+    };
+    form.onsubmit = event => {
+        event.preventDefault();
+        try {
+            const values = Object.fromEntries(new FormData(form));
+            if (!addEquipmentReportGenerator(values, values.existingId, period)) return;
+            dialog.remove();
+            const filter = document.getElementById('equipment-subdivision-filter');
+            if (filter) filter.value = 'all';
+            renderEquipmentReportView();
+        } catch (error) {dialog.querySelector('#eq-generator-error').textContent = error.message;}
+    };
+}
+
+function removeEquipmentReportGenerator(id) {
+    if (!canEditEquipmentReport()) return;
+    const period = equipmentReportPeriod();
+    const item = getEquipmentReportItems(period).find(item => item.uniqueId === id && item.category === 'Генератор');
+    if (!item) return;
+    const dialog = document.createElement('dialog');
+    dialog.style.cssText = 'max-width:520px;border:1px solid #94a3b8;border-radius:10px;padding:24px;font:14px Arial,sans-serif;';
+    dialog.innerHTML = `<h2>Видалити генератор зі звіту?</h2><p>${equipmentReportEscape(item.model)} · ${equipmentReportEscape(period)}</p><p>Рядок буде прибрано лише з цього звіту. Основний облік обладнання не зміниться. Значення рядка збережуться для повернення через «Додати генератор».</p><button id="eq-remove-cancel">Скасувати</button> <button id="eq-remove-confirm">Видалити зі звіту</button>`;
+    document.body.appendChild(dialog); dialog.showModal();
+    dialog.querySelector('#eq-remove-cancel').onclick = () => dialog.remove();
+    dialog.querySelector('#eq-remove-confirm').onclick = () => {setEquipmentReportGeneratorIncluded(id, false, period);dialog.remove();renderEquipmentReportView();};
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     setTimeout(() => {
         initEqReportPeriodDropdown();
@@ -195,6 +320,7 @@ function propagateNextFuelToNextPeriod(periodStr, reportData) {
 
         let changed = false;
         for (let uid in reportData) {
+            if (reportData[uid]?._excluded) continue;
             const nextVal = reportData[uid]?.nextFuel;
             if (nextVal !== undefined && nextVal !== null && String(nextVal).trim() !== '') {
                 if (!nextData[uid]) {
@@ -212,6 +338,7 @@ function propagateNextFuelToNextPeriod(periodStr, reportData) {
 }
 
 function saveCurrentEquipmentReportSilently() {
+    if (!canEditEquipmentReport()) return;
     const periodInput = document.getElementById('eq-report-custom-period');
     const periodStr = periodInput ? periodInput.value.trim() : (activeEquipmentReportPeriod || "01.10-10.10");
     if (!periodStr) return;
@@ -220,24 +347,7 @@ function saveCurrentEquipmentReportSilently() {
     if (rows.length === 0) return;
 
     const storageKey = `equipment_report_data_${periodStr}`;
-    let reportData = {};
-    try {
-        const stored = localStorage.getItem(storageKey);
-        if (stored) reportData = JSON.parse(stored);
-    } catch(e) {}
-
-    const inputs = document.querySelectorAll('.eq-rep-input');
-    inputs.forEach(input => {
-        const id = input.getAttribute('data-id');
-        const field = input.getAttribute('data-field');
-        const val = input.value;
-        if (id && field) {
-            if (!reportData[id]) {
-                reportData[id] = { prevFuel: '', prevOil: '', p1Fuel: '', p1Oil: '', p2Fuel: '', p2Oil: '', p3Fuel: '', p3Oil: '', nextFuel: '' };
-            }
-            reportData[id][field] = val;
-        }
-    });
+    const reportData = collectEquipmentReportInputs(periodStr);
 
     localStorage.setItem(storageKey, JSON.stringify(reportData));
     propagateNextFuelToNextPeriod(periodStr, reportData);
@@ -336,7 +446,7 @@ function getAllEquipmentItemsUnified() {
                     category: src.type,
                     subdivision: actualSub,
                     model: item.model || item.name || `Пристрій #${index + 1}`,
-                    fuelType: item.fuelType || item.fuel || 'Бензин'
+                    fuelType: item.fuelType || item.fuel || 'Бензин', serialNumber: item.serialNumber || ''
                 });
             });
         }
@@ -430,7 +540,7 @@ function renderEquipmentReportView() {
     const periodStr = periodInput ? periodInput.value.trim() : (activeEquipmentReportPeriod || "01.10-10.10");
     updateEquipmentReportHeaders();
 
-    const items = getAllEquipmentItemsUnified();
+    const items = getEquipmentReportItems(periodStr);
 
     const subFilterEl = document.getElementById('equipment-subdivision-filter');
     const currentSubVal = subFilterEl ? subFilterEl.value : 'all';
@@ -440,7 +550,7 @@ function renderEquipmentReportView() {
         items.forEach(i => { if (i.subdivision) subs.add(i.subdivision.trim()); });
         let opts = '<option value="all">Усі</option>';
         subs.forEach(sub => {
-            opts += `<option value="${sub}">${sub}</option>`;
+            opts += `<option value="${equipmentReportEscape(sub)}">${equipmentReportEscape(sub)}</option>`;
         });
         subFilterEl.innerHTML = opts;
         if (subs.has(currentSubVal) || currentSubVal === 'all') {
@@ -485,7 +595,7 @@ function renderEquipmentReportView() {
         };
 
         // Перевіряємо залишок з попереднього періоду (nextFuel попереднього стає prevFuel поточного)
-        if (prevPeriodSavedData && prevPeriodSavedData[item.uniqueId]) {
+        if (prevPeriodSavedData && prevPeriodSavedData[item.uniqueId] && !prevPeriodSavedData[item.uniqueId]._excluded) {
             const carriedFuel = prevPeriodSavedData[item.uniqueId].nextFuel;
             if (carriedFuel !== undefined && carriedFuel !== null && String(carriedFuel).trim() !== '') {
                 if (itemData.prevFuel === '' || itemData.prevFuel === undefined || itemData._autoCarried) {
@@ -505,10 +615,11 @@ function renderEquipmentReportView() {
         tr.setAttribute('data-fuel-type', (item.fuelType || '').toUpperCase());
         tr.innerHTML = `
             <td style="text-align: center;">${idx + 1}</td>
-            <td><span style="background: #e8f8f5; padding: 2px 6px; border-radius: 4px; font-size: 11px; color: #16a085; font-weight: bold;">${item.category}</span></td>
-            <td style="text-align: center;"><strong>${item.subdivision}</strong></td>
-            <td><strong>${item.model}</strong></td>
-            <td style="text-align: center;" class="eq-row-fuel-type">${item.fuelType}</td>
+            <td><span style="background: #e8f8f5; padding: 2px 6px; border-radius: 4px; font-size: 11px; color: #16a085; font-weight: bold;">${equipmentReportEscape(item.category)}</span></td>
+            <td style="text-align: center;"><strong>${equipmentReportEscape(item.subdivision)}</strong></td>
+            <td><strong>${equipmentReportEscape(item.model)}</strong></td>
+            <td><input type="text" class="eq-rep-input" data-id="${equipmentReportEscape(item.uniqueId)}" data-field="serialNumber" aria-label="Серійний номер ${equipmentReportEscape(item.model)}" value="${equipmentReportEscape(itemData.serialNumber ?? item.serialNumber ?? '')}" style="width:100%;box-sizing:border-box;padding:4px;border:1px solid #ccc" ${eqLock}></td>
+            <td style="text-align: center;" class="eq-row-fuel-type">${equipmentReportEscape(item.fuelType)}</td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="prevFuel" value="${itemData.prevFuel || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px; ${itemData._autoCarried ? 'background-color: #f0fdf4;' : ''}" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="prevOil" value="${itemData.prevOil || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p1Fuel" value="${itemData.p1Fuel || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
@@ -518,8 +629,10 @@ function renderEquipmentReportView() {
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p3Fuel" value="${itemData.p3Fuel || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p3Oil" value="${itemData.p3Oil || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="nextFuel" value="${itemData.nextFuel || ''}" style="width: 100%; text-align: center; border: 1px solid #27ae60; background: #f0fdf4; padding: 4px; font-weight: bold; color: #166534;" placeholder="0.0" ${eqLock}></td>
+            <td class="eq-report-action">${item.category === 'Генератор' ? `<button type="button" data-remove-eq-id="${equipmentReportEscape(item.uniqueId)}" ${canEditEq?'':'disabled'} style="background:#c0392b;color:white;border:0;border-radius:4px;padding:6px;cursor:pointer">Видалити зі звіту</button>` : ''}</td>
         `;
         tbody.appendChild(tr);
+        tr.querySelector('[data-remove-eq-id]')?.addEventListener('click', () => removeEquipmentReportGenerator(item.uniqueId));
     });
 
     const curRole2 = (typeof window.getCurrentAppRole === 'function')
@@ -528,6 +641,8 @@ function renderEquipmentReportView() {
     const canEditEq2 = (curRole2 === 'developer') || (typeof window.canRoleEdit === 'function' ? window.canRoleEdit(curRole2, 'equipment_report') : (curRole2 === 'admin'));
     const eqSaveBtn = document.querySelector('button[onclick="saveEquipmentReportData()"]');
     if (eqSaveBtn) eqSaveBtn.style.setProperty('display', canEditEq2 ? 'inline-flex' : 'none', 'important');
+    const addGeneratorBtn = document.getElementById('eq-report-add-generator-btn');
+    if (addGeneratorBtn) addGeneratorBtn.style.display = canEditEquipmentReport() ? 'inline-block' : 'none';
 
     updateEquipmentReportTotals();
 }
@@ -585,7 +700,7 @@ function updateEquipmentReportTotals() {
     const subFilterEl = document.getElementById('equipment-subdivision-filter');
     let footerLabel = 'ВСЬОГО ПО ОБЛАДНАННЮ:';
     if (subFilterEl && subFilterEl.value !== 'all') {
-        footerLabel = `ВСЬОГО ПО ПІДРОЗДІЛУ (${subFilterEl.value}):`;
+        footerLabel = `ВСЬОГО ПО ПІДРОЗДІЛУ (${equipmentReportEscape(subFilterEl.value)}):`;
     }
 
     const totalDpPeriod = dpP1Fuel + dpP2Fuel + dpP3Fuel;
@@ -598,7 +713,7 @@ function updateEquipmentReportTotals() {
 
     tfoot.innerHTML = `
         <tr style="background-color: #eaeaea; font-weight: bold; border-top: 2px solid #bdc3c7;">
-            <td colspan="5" style="text-align: right; padding-right: 10px; border-bottom: 1px solid #dcdcdc;">${footerLabel} (ДП)</td>
+            <td colspan="6" style="text-align: right; padding-right: 10px; border-bottom: 1px solid #dcdcdc;">${footerLabel} (ДП)</td>
             <td style="text-align: center; color: #27ae60; border-bottom: 1px solid #dcdcdc;">${dpPrevFuel !== 0 ? dpPrevFuel.toFixed(1) + ' л' : '0 л'}</td>
             <td rowspan="2" style="text-align: center; vertical-align: middle; border-left: 1px solid #dcdcdc; border-right: 1px solid #dcdcdc; font-size: 11px;">${formatFluidBreakdown(sumPrevOilMap)}</td>
             <td style="text-align: center; color: #27ae60; border-bottom: 1px solid #dcdcdc;">${dpP1Fuel !== 0 ? dpP1Fuel.toFixed(1) + ' л' : '0 л'}</td>
@@ -608,9 +723,10 @@ function updateEquipmentReportTotals() {
             <td style="text-align: center; color: #27ae60; border-bottom: 1px solid #dcdcdc;">${dpP3Fuel !== 0 ? dpP3Fuel.toFixed(1) + ' л' : '0 л'}</td>
             <td rowspan="2" style="text-align: center; vertical-align: middle; border-left: 1px solid #dcdcdc; border-right: 1px solid #dcdcdc; font-size: 11px;">${formatFluidBreakdown(sumP3OilMap)}</td>
             <td style="text-align: center; color: #27ae60; border-bottom: 1px solid #dcdcdc; font-weight: bold;">${dpNextFuel !== 0 ? dpNextFuel.toFixed(1) + ' л' : '0 л'}</td>
+            <td class="eq-report-action" rowspan="2"></td>
         </tr>
         <tr style="background-color: #eaeaea; font-weight: bold; border-bottom: 2px solid #bdc3c7;">
-            <td colspan="5" style="text-align: right; padding-right: 10px; border-bottom: 2px solid #bdc3c7;">${footerLabel} (АБ)</td>
+            <td colspan="6" style="text-align: right; padding-right: 10px; border-bottom: 2px solid #bdc3c7;">${footerLabel} (АБ)</td>
             <td style="text-align: center; color: #2980b9; border-bottom: 2px solid #bdc3c7;">${abPrevFuel !== 0 ? abPrevFuel.toFixed(1) + ' л' : '0 л'}</td>
             <td style="text-align: center; color: #2980b9; border-bottom: 2px solid #bdc3c7;">${abP1Fuel !== 0 ? abP1Fuel.toFixed(1) + ' л' : '0 л'}</td>
             <td style="text-align: center; color: #2980b9; border-bottom: 2px solid #bdc3c7;">${abP2Fuel !== 0 ? abP2Fuel.toFixed(1) + ' л' : '0 л'}</td>
@@ -618,15 +734,17 @@ function updateEquipmentReportTotals() {
             <td style="text-align: center; color: #2980b9; border-bottom: 2px solid #bdc3c7; font-weight: bold;">${abNextFuel !== 0 ? abNextFuel.toFixed(1) + ' л' : '0 л'}</td>
         </tr>
         <tr style="background-color: #d5f5e3; font-weight: bold; border-top: 2px solid #27ae60; border-bottom: 2px solid #27ae60;">
-            <td colspan="5" style="text-align: right; padding-right: 10px; color: #145a32;">ВСЬОГО ЗА ПЕРІУД:</td>
+            <td colspan="6" style="text-align: right; padding-right: 10px; color: #145a32;">ВСЬОГО ЗА ПЕРІУД:</td>
             <td colspan="2" style="text-align: center; color: #27ae60;">Початковий: ДП ${dpPrevFuel.toFixed(1)} л | АБ ${abPrevFuel.toFixed(1)} л</td>
             <td colspan="6" style="text-align: left; padding-left: 15px; color: #2c3e50;">Заправка: ДП <strong style="color: #27ae60;">${totalDpPeriod.toFixed(1)} л</strong> | АБ <strong style="color: #2980b9;">${totalAbPeriod.toFixed(1)} л</strong> | Мастило <strong style="color: #8e44ad;">${formatFluidBreakdown(totalOilPeriodMap)}</strong></td>
             <td style="text-align: center; color: #145a32; font-weight: bold;">${(dpNextFuel + abNextFuel) > 0 ? (dpNextFuel + abNextFuel).toFixed(1) + ' л' : '0 л'}</td>
+            <td class="eq-report-action"></td>
         </tr>
     `;
 }
 
 function saveEquipmentReportData() {
+    if (!canEditEquipmentReport()) return;
     const periodInput = document.getElementById('eq-report-custom-period');
     const periodStr = periodInput ? periodInput.value.trim() : "01.10-10.10";
 
@@ -638,19 +756,7 @@ function saveEquipmentReportData() {
     initEqReportPeriodDropdown();
 
     const storageKey = `equipment_report_data_${periodStr}`;
-    const inputs = document.querySelectorAll('.eq-rep-input');
-    let reportData = {};
-
-    inputs.forEach(input => {
-        const id = input.getAttribute('data-id');
-        const field = input.getAttribute('data-field');
-        const val = input.value;
-
-        if (!reportData[id]) {
-            reportData[id] = { prevFuel: '', prevOil: '', p1Fuel: '', p1Oil: '', p2Fuel: '', p2Oil: '', p3Fuel: '', p3Oil: '', nextFuel: '' };
-        }
-        reportData[id][field] = val;
-    });
+    const reportData = collectEquipmentReportInputs(periodStr);
 
     localStorage.setItem(storageKey, JSON.stringify(reportData));
     propagateNextFuelToNextPeriod(periodStr, reportData);
@@ -670,7 +776,7 @@ function printEquipmentReport() {
     const periodStr = periodInput ? periodInput.value.trim() : "01.10-10.10";
     const subFilterEl = document.getElementById('equipment-subdivision-filter');
     const subVal = subFilterEl ? subFilterEl.value : 'all';
-    const subLabel = subVal !== 'all' ? ` (Підрозділ: ${subVal})` : '';
+    const subLabel = subVal !== 'all' ? ` (Підрозділ: ${equipmentReportEscape(subVal)})` : '';
 
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -690,6 +796,7 @@ function printEquipmentReport() {
                 th, td { border: 1px solid #333; padding: 4px 5px; text-align: center; }
                 th { background-color: #2e7d32 !important; color: white !important; font-size: 10px; }
                 td:nth-child(4) { text-align: left; }
+                .eq-report-action { display:none !important; }
                 input { border: none; text-align: center; width: 100%; font-size: 10px; background: transparent; }
                 tfoot tr { font-weight: bold; background: #eee; }
                 @media print {
@@ -715,22 +822,12 @@ function printEquipmentReport() {
 
 document.addEventListener('input', function(e) {
     if (e.target.classList.contains('eq-rep-input')) {
+        if (!canEditEquipmentReport()) return;
         const periodInput = document.getElementById('eq-report-custom-period');
         const periodStr = periodInput ? periodInput.value.trim() : "01.10-10.10";
         const storageKey = `equipment_report_data_${periodStr}`;
         
-        let reportData = {};
-        const inputs = document.querySelectorAll('.eq-rep-input');
-        inputs.forEach(input => {
-            const id = input.getAttribute('data-id');
-            const field = input.getAttribute('data-field');
-            const val = input.value;
-
-            if (!reportData[id]) {
-                reportData[id] = { prevFuel: '', prevOil: '', p1Fuel: '', p1Oil: '', p2Fuel: '', p2Oil: '', p3Fuel: '', p3Oil: '', nextFuel: '' };
-            }
-            reportData[id][field] = val;
-        });
+        const reportData = collectEquipmentReportInputs(periodStr);
 
         localStorage.setItem(storageKey, JSON.stringify(reportData));
         propagateNextFuelToNextPeriod(periodStr, reportData);
