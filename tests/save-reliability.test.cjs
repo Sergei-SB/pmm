@@ -22,6 +22,41 @@ function contextWith(functions, context = {}) {
 }
 const mergeContext = () => contextWith([['Shared_sync.js', 'mergeCarValue']]);
 
+test('Registry safety rejection preserves typed notes and blocks retries until resolved', async () => {
+    for (const key of ['user_cars_database_v2', 'cars_modifications_data']) {
+        const typed = JSON.stringify([{ id: 1, note: 'Нова примітка' }]);
+        const older = JSON.stringify([{ id: 1, note: '' }, { id: 2 }, { id: 3 }]);
+        const values = { [key]: typed }, revisions = {}, statuses = [];
+        let refreshes = 0;
+        const c = contextWith([['Shared_sync.js', 'buildPayload'], ['Shared_sync.js', 'flushPending']], {
+            pending: { [key]: { value: typed, deleted: false } },
+            meta: { carBases: { [key]: older } }, manualBackupInProgress: false,
+            pushInFlight: false, pullInFlight: false, awaitingFirstPull: false,
+            localSet: (name, value) => { values[name] = value; },
+            getKeyRev: name => revisions[name] || 5,
+            setKeyRev: (name, value) => { revisions[name] = value; },
+            isCarKey: () => true, getRole: () => 'developer', deviceId: 'test',
+            SERVER_URL: 'https://test.invalid', PUSH_TIMEOUT_MS: 1000,
+            RETRY_MIN_MS: 1000, RETRY_MAX_MS: 15000, retryDelay: 1000,
+            setStatus: status => statuses.push(status), saveMeta() {}, savePending() {},
+            schedulePush() {}, pullSharedEvent() {},
+            refreshAllViewsSafely: () => { refreshes++; },
+            fetchWithTimeout: async () => ({ ok: true, json: async () => ({
+                applied: {}, rejected: { [key]: { value: older, rev: 10, safetyBlocked: true } }
+            }) })
+        });
+        await c.flushPending();
+        assert.equal(values[key], typed, 'visible/local note must not revert');
+        assert.equal(values['__sync_car_conflict_' + key], typed);
+        assert.equal(c.pending[key].value, typed);
+        assert.equal(c.pending[key].blocked, true);
+        assert.equal(revisions[key], undefined, 'unresolved edit must retain its base revision');
+        assert.equal(Object.keys(c.buildPayload().changes).length, 0);
+        assert.equal(refreshes, 0);
+        assert.ok(statuses.includes('conflict'));
+    }
+});
+
 test('An identical blocked key is acknowledged without overwriting either version', () => {
     const values = { setting: 'same' };
     let revision;

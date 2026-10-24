@@ -499,14 +499,10 @@
                     if (rec.safetyBlocked) {
                         var candidate = pending[key];
                         if (candidate && candidate.value) localSet('__sync_car_conflict_' + key, candidate.value);
-                        delete pending[key];
-                        if (typeof rec.value === 'string') {
-                            localSet(key, rec.value);
-                            if (isCarKey(key)) meta.carBases[key] = rec.value;
-                        }
-                        setKeyRev(key, rec.rev);
-                        lastSafetyWarning = 'Сервер заблокував зменшення реєстру. Попередній список авто збережено; оновіть сторінку для перевірки.';
-                        needRefresh = true;
+                        // Keep the user's text and pending edit until the conflict is resolved.
+                        // A safety rejection must never restore stale values over local edits.
+                        if (candidate) candidate.blocked = true;
+                        lastSafetyWarning = 'Сервер заблокував зміну через розбіжність списків авто. Ваші примітки збережено локально; відкрийте конфлікти синхронізації для перевірки.';
                         setStatus('conflict');
                         return;
                     }
