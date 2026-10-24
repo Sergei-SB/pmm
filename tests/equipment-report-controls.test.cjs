@@ -53,3 +53,43 @@ test('Read-only roles cannot add or exclude report rows, and malformed reports a
     const f=fixture('user');assert.equal(f.c.addEquipmentReportGenerator({model:'NO'},'',f.period),false);assert.equal(f.c.setEquipmentReportGeneratorIncluded('gen_1',false,f.period),false);f.c.saveEquipmentReportData();assert.equal(f.values.size,0);
     const other=fixture();other.values.set(other.storageKey,'[]');assert.throws(()=>other.c.addEquipmentReportGenerator({model:'NEW'},'',other.period));assert.equal(other.values.get(other.storageKey),'[]');
 });
+
+test('Generator suggestions search inventory names, serials and units without mixing other categories',()=>{
+    const {c,inventory,period}=fixture();
+    inventory[0].model='Hyundai HHY 10050SI';
+    inventory.push({uniqueId:'gen_2',category:'Генератор',model:'Hyundai HHY 10050SI',subdivision:'ВТО',fuelType:'АБ',serialNumber:'SECOND-02'});
+    inventory.push({uniqueId:'gen_3',category:'Генератор',model:'Hyundai DESTROYED',note:'Знищено'});
+    assert.equal(c.searchEquipmentReportGenerators(period,'  HYUNDAI  ').length,2);
+    assert.equal(c.searchEquipmentReportGenerators(period,'second-02')[0].uniqueId,'gen_2');
+    assert.equal(c.searchEquipmentReportGenerators(period,'ВТО')[0].uniqueId,'gen_2');
+    assert.equal(c.searchEquipmentReportGenerators(period,'PUMP').length,0);
+});
+
+test('Selecting an inventory generator edits the existing report row and keeps financial data and inventory intact',()=>{
+    const {c,inventory,period,values,storageKey}=fixture();
+    values.set(storageKey,JSON.stringify({gen_1:{p1Fuel:'25',nextFuel:'10'}}));
+    const id=c.addEquipmentReportGenerator({serialNumber:'REPORT-001',model:'GEN updated',subdivision:'ВТО'},'gen_1',period);
+    assert.equal(id,'gen_1');assert.equal(c.getEquipmentReportItems(period).length,2);
+    const stored=JSON.parse(values.get(storageKey));assert.equal(stored.gen_1.p1Fuel,'25');assert.equal(stored.gen_1.nextFuel,'10');
+    assert.equal(c.getEquipmentReportItems(period)[0].model,'GEN updated');
+    assert.equal(c.getEquipmentReportItems(period)[0].serialNumber,'REPORT-001');assert.equal(c.getEquipmentReportItems(period)[0].subdivision,'ВТО');
+    assert.equal(inventory[0].model,'GEN');assert.equal(inventory[0].rawItem.serialNumber,'GEN-001');
+    assert.equal(c.getEquipmentReportItems('01.11-10.11')[0].serialNumber,'GEN-001');
+    assert.equal(c.searchEquipmentReportGenerators(period,'GEN')[0].sourceModel,'GEN');
+});
+
+test('Matching a model requires an explicit selection or a different serial instead of making duplicates',()=>{
+    const {c,period}=fixture();
+    assert.throws(()=>c.addEquipmentReportGenerator({model:' gen ',serialNumber:'gen-001'},'',period),/вже є/);
+    assert.throws(()=>c.addEquipmentReportGenerator({model:'GEN'},'',period),/вже є/);
+    const id=c.addEquipmentReportGenerator({model:'GEN',serialNumber:'ANOTHER-001'},'',period);
+    assert.ok(id.startsWith('report_gen_'));assert.equal(c.getEquipmentReportItems(period).length,3);
+});
+
+test('Suggestions identify excluded rows and restore their original financial values',()=>{
+    const {c,period,values,storageKey}=fixture();
+    values.set(storageKey,JSON.stringify({gen_1:{_excluded:true,p1Fuel:'42',serialNumber:'SN42'}}));
+    const option=c.searchEquipmentReportGenerators(period,'SN42')[0];assert.equal(option.status,'restore');assert.equal(option.fromInventory,true);
+    c.addEquipmentReportGenerator({},option.uniqueId,period);
+    assert.equal(c.searchEquipmentReportGenerators(period,'SN42')[0].status,'edit');assert.equal(JSON.parse(values.get(storageKey)).gen_1.p1Fuel,'42');
+});
