@@ -119,3 +119,32 @@ test('Suggestions identify excluded rows and restore their original financial va
     c.addEquipmentReportGenerator({},option.uniqueId,period);
     assert.equal(c.searchEquipmentReportGenerators(period,'SN42')[0].status,'edit');assert.equal(JSON.parse(values.get(storageKey)).gen_1.p1Fuel,'42');
 });
+
+test('Report searches combine subdivision, partial model and partial serial, ignoring case and excluding removed rows',()=>{
+    const {c,inventory,period,values,storageKey}=fixture();
+    inventory.push({uniqueId:'web_1',category:'Webasto',model:'Webasto Air TOP',subdivision:'ВТО',serialNumber:'WF-8002-A'});
+    inventory.push({uniqueId:'saw_1',category:'Бензопила',model:'STIHL MS 180',subdivision:'',serialNumber:'ABC-123'});
+    values.set(storageKey,JSON.stringify({pump_1:{serialNumber:'REPORT-99'},gen_1:{_excluded:true}}));
+    const items=c.getEquipmentReportItems(period);
+    assert.equal(c.filterEquipmentReportItems(items,'ВТО',' air ','wf-8')[0].uniqueId,'web_1');
+    assert.equal(c.filterEquipmentReportItems(items,'ВТО','air','9').length,0);
+    assert.equal(c.filterEquipmentReportItems(items,'all','','report-')[0].uniqueId,'pump_1');
+    assert.equal(c.filterEquipmentReportItems(items,'__unassigned__','stihl','abc')[0].uniqueId,'saw_1');
+    assert.equal(c.filterEquipmentReportItems(items,'all','GEN').length,0);
+    assert.equal(c.filterEquipmentReportItems(items).length,3);
+});
+
+test('Changing search filters saves pending edits and preserves rows hidden by previous searches',()=>{
+    const {c,values,storageKey,setInputs}=fixture();
+    values.set(storageKey,JSON.stringify({gen_1:{p1Fuel:'10'},pump_1:{p1Fuel:'99',serialNumber:'KEEP'}}));
+    let renders=0;c.renderEquipmentReportView=()=>{renders++;};
+    setInputs([['gen_1','p1Fuel','35'],['gen_1','serialNumber','UPDATED']]);
+    c.changeEquipmentReportFilter('model','PUMP');
+    setInputs([['pump_1','p1Fuel','101']]);
+    c.changeEquipmentReportFilter('serial','KEEP');
+    const saved=JSON.parse(values.get(storageKey));
+    assert.equal(saved.gen_1.p1Fuel,'35');assert.equal(saved.gen_1.serialNumber,'UPDATED');
+    assert.equal(saved.pump_1.p1Fuel,'101');assert.equal(saved.pump_1.serialNumber,'KEEP');assert.equal(renders,2);
+    const readOnly=fixture('user');readOnly.c.renderEquipmentReportView=()=>{};
+    readOnly.c.changeEquipmentReportFilter('model','PUMP');assert.equal(readOnly.values.size,0);
+});

@@ -670,6 +670,25 @@ function mergeFluidMaps(targetMap, sourceMap) {
     return targetMap;
 }
 
+function filterEquipmentReportItems(items, subdivision = 'all', model = '', serial = '') {
+    const normalize = normalizeEquipmentGeneratorSearch;
+    return items.filter(item => {
+        const unit = String(item.subdivision || '').trim();
+        return (subdivision === 'all' || (subdivision === '__unassigned__' ? !unit : unit === subdivision)) &&
+            normalize(item.model).includes(normalize(model)) && normalize(item.serialNumber).includes(normalize(serial));
+    });
+}
+
+function changeEquipmentReportFilter(kind, value) {
+    // Persist editable cells before replacing the visible rows. Hidden rows remain in storage.
+    saveCurrentEquipmentReportSilently();
+    if (kind === 'subdivision') {
+        const toolbar = document.getElementById('equipment-subdivision-filter');
+        if (toolbar) toolbar.value = value;
+    }
+    renderEquipmentReportView();
+}
+
 function renderEquipmentReportView() {
     const tbody = document.getElementById('equipment-report-tbody');
     if (!tbody) return;
@@ -687,22 +706,29 @@ function renderEquipmentReportView() {
         const subs = new Set();
         items.forEach(i => { if (i.subdivision) subs.add(i.subdivision.trim()); });
         let opts = '<option value="all">Усі</option>';
+        if (items.some(item => !String(item.subdivision || '').trim())) opts += '<option value="__unassigned__">Без підрозділу</option>';
         subs.forEach(sub => {
             opts += `<option value="${equipmentReportEscape(sub)}">${equipmentReportEscape(sub)}</option>`;
         });
         subFilterEl.innerHTML = opts;
-        if (subs.has(currentSubVal) || currentSubVal === 'all') {
+        if (subs.has(currentSubVal) || currentSubVal === 'all' || (currentSubVal === '__unassigned__' && items.some(item => !String(item.subdivision || '').trim()))) {
             subFilterEl.value = currentSubVal;
         }
     }
     const selectedSub = subFilterEl ? subFilterEl.value : 'all';
 
-    const filteredItems = items.filter(item => {
-        if (selectedSub !== 'all' && item.subdivision.trim() !== selectedSub) {
-            return false;
-        }
-        return true;
-    });
+    const headerSub = document.getElementById('eq-report-subdivision-search');
+    if (headerSub && subFilterEl) {headerSub.innerHTML = subFilterEl.innerHTML; headerSub.value = selectedSub;}
+    const models = document.getElementById('eq-report-model-options');
+    const modelOptions = [...new Set(filterEquipmentReportItems(items, selectedSub).map(item => item.model).filter(Boolean))]
+        .sort((a,b) => String(a).localeCompare(String(b),'uk',{numeric:true}))
+        .map(model => `<option value="${equipmentReportEscape(model)}"></option>`).join('');
+    if (models && models.innerHTML !== modelOptions) models.innerHTML = modelOptions;
+    const modelQuery = document.getElementById('eq-report-model-search')?.value || '';
+    const serialQuery = document.getElementById('eq-report-serial-search')?.value || '';
+    const filteredItems = filterEquipmentReportItems(items, selectedSub, modelQuery, serialQuery);
+    const resultStatus = document.getElementById('eq-report-search-status');
+    if (resultStatus) resultStatus.textContent = `Знайдено: ${filteredItems.length} із ${items.length}` + (filteredItems.length ? '' : '. Змініть або очистьте фільтри.');
 
     const storageKey = `equipment_report_data_${periodStr}`;
     let savedData = {};
@@ -840,7 +866,10 @@ function updateEquipmentReportTotals() {
     const subFilterEl = document.getElementById('equipment-subdivision-filter');
     let footerLabel = 'ВСЬОГО ПО ОБЛАДНАННЮ:';
     if (subFilterEl && subFilterEl.value !== 'all') {
-        footerLabel = `ВСЬОГО ПО ПІДРОЗДІЛУ (${equipmentReportEscape(subFilterEl.value)}):`;
+        footerLabel = `ВСЬОГО ПО ПІДРОЗДІЛУ (${subFilterEl.value === '__unassigned__' ? 'Без підрозділу' : equipmentReportEscape(subFilterEl.value)}):`;
+    }
+    if (document.getElementById('eq-report-model-search')?.value || document.getElementById('eq-report-serial-search')?.value) {
+        footerLabel = 'ВСЬОГО ЗА ФІЛЬТРОМ:';
     }
 
     const totalDpPeriod = dpP1Fuel + dpP2Fuel + dpP3Fuel;
@@ -936,7 +965,7 @@ function printEquipmentReport() {
                 th, td { border: 1px solid #333; padding: 4px 5px; text-align: center; }
                 th { background-color: #2e7d32 !important; color: white !important; font-size: 10px; }
                 td:nth-child(4) { text-align: left; }
-                .eq-report-action { display:none !important; }
+                .eq-report-action, .eq-report-search { display:none !important; }
                 input { border: none; text-align: center; width: 100%; font-size: 10px; background: transparent; }
                 tfoot tr { font-weight: bold; background: #eee; }
                 @media print {
