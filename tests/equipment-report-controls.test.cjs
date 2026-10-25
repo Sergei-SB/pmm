@@ -38,7 +38,33 @@ test('Removing/restoring a report generator retains its financial values and the
     setInputs([]);c.addEquipmentReportGenerator({},'gen_1',period);
     assert.ok(c.getEquipmentReportItems(period).some(item=>item.uniqueId==='gen_1'));
     assert.equal(JSON.parse(values.get(storageKey)).gen_1.nextFuel,'10');assert.equal(JSON.parse(values.get(storageKey)).gen_1.serialNumber,'HISTORIC');
-    assert.equal(c.setEquipmentReportGeneratorIncluded('pump_1',false,period),false);
+    assert.equal(c.setEquipmentReportItemIncluded('pump_1',false,period),true);
+});
+
+test('All equipment categories can be removed and restored only in the selected report, retaining every value',()=>{
+    const {c,values,inventory,period,storageKey,setInputs}=fixture();
+    for (const [id,category] of [['web_1','Webasto'],['heat_1','Теплова пушка'],['saw_1','Бензопила']]) {
+        inventory.push({uniqueId:id,category,model:category,subdivision:'ВТО',fuelType:'ДП'});
+    }
+    const registry=JSON.stringify(inventory);
+    for (const item of inventory) {
+        const original={serialNumber:'SN-'+item.uniqueId,p1Fuel:'25',p2Oil:'3',nextFuel:'10'};
+        const data=JSON.parse(values.get(storageKey)||'{}');data[item.uniqueId]=original;
+        values.set(storageKey,JSON.stringify(data));
+        setInputs([[item.uniqueId,'p1Fuel','30']]);
+        assert.equal(c.setEquipmentReportItemIncluded(item.uniqueId,false,period),true);
+        assert.ok(!c.getEquipmentReportItems(period).some(row=>row.uniqueId===item.uniqueId));
+        assert.ok(c.getEquipmentReportItems('01.11-10.11').some(row=>row.uniqueId===item.uniqueId));
+        setInputs([]);
+        assert.equal(c.setEquipmentReportItemIncluded(item.uniqueId,true,period),true);
+        assert.ok(c.getEquipmentReportItems(period).some(row=>row.uniqueId===item.uniqueId));
+        assert.deepEqual(JSON.parse(values.get(storageKey))[item.uniqueId],{...original,p1Fuel:'30',_excluded:false});
+    }
+    assert.equal(JSON.stringify(inventory),registry);
+    assert.equal(c.setEquipmentReportItemIncluded('unknown',false,period),false);
+    const readOnly=fixture('user');
+    assert.equal(readOnly.c.setEquipmentReportItemIncluded('pump_1',false,readOnly.period),false);
+    assert.equal(readOnly.values.size,0);
 });
 test('All save paths preserve filtered/excluded rows, custom metadata and serial edits',()=>{
     for(const method of ['saveCurrentEquipmentReportSilently','saveEquipmentReportData','input']){

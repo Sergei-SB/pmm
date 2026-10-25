@@ -107,8 +107,12 @@ function addEquipmentReportGenerator(details, existingId = '', period = equipmen
 }
 
 function setEquipmentReportGeneratorIncluded(id, included, period = equipmentReportPeriod()) {
+    return setEquipmentReportItemIncluded(id, included, period);
+}
+
+function setEquipmentReportItemIncluded(id, included, period = equipmentReportPeriod()) {
     if (!canEditEquipmentReport()) return false;
-    if (!getEquipmentReportItems(period, true).some(item => item.uniqueId === id && item.category === 'Генератор')) return false;
+    if (!getEquipmentReportItems(period, true).some(item => item.uniqueId === id)) return false;
     const data = collectEquipmentReportInputs(period);
     data[id] = {...(data[id] || {}), _excluded: !included};
     // Financial values remain recoverable; the equipment registry is untouched.
@@ -232,17 +236,35 @@ function openEquipmentReportGeneratorDialog() {
     };
 }
 
-function removeEquipmentReportGenerator(id) {
+function removeEquipmentReportItem(id) {
     if (!canEditEquipmentReport()) return;
     const period = equipmentReportPeriod();
-    const item = getEquipmentReportItems(period).find(item => item.uniqueId === id && item.category === 'Генератор');
+    const item = getEquipmentReportItems(period).find(item => item.uniqueId === id);
     if (!item) return;
     const dialog = document.createElement('dialog');
     dialog.style.cssText = 'max-width:520px;border:1px solid #94a3b8;border-radius:10px;padding:24px;font:14px Arial,sans-serif;';
-    dialog.innerHTML = `<h2>Видалити генератор зі звіту?</h2><p>${equipmentReportEscape(item.model)} · ${equipmentReportEscape(period)}</p><p>Рядок буде прибрано лише з цього звіту. Основний облік обладнання не зміниться. Значення рядка збережуться для повернення через «Додати генератор».</p><button id="eq-remove-cancel">Скасувати</button> <button id="eq-remove-confirm">Видалити зі звіту</button>`;
+    dialog.innerHTML = `<h2>Видалити обладнання зі звіту?</h2><p>${equipmentReportEscape(item.category)} · ${equipmentReportEscape(item.model)} · ${equipmentReportEscape(period)}</p><p>Рядок буде прибрано лише з цього звіту. Основний облік обладнання не зміниться. Значення рядка збережуться для повернення через «Повернути видалене».</p><button id="eq-remove-cancel">Скасувати</button> <button id="eq-remove-confirm">Видалити зі звіту</button>`;
     document.body.appendChild(dialog); dialog.showModal();
     dialog.querySelector('#eq-remove-cancel').onclick = () => dialog.remove();
-    dialog.querySelector('#eq-remove-confirm').onclick = () => {setEquipmentReportGeneratorIncluded(id, false, period);dialog.remove();renderEquipmentReportView();};
+    dialog.querySelector('#eq-remove-confirm').onclick = () => {setEquipmentReportItemIncluded(id, false, period);dialog.remove();renderEquipmentReportView();};
+}
+
+function openEquipmentReportRestoreDialog() {
+    if (!canEditEquipmentReport()) return;
+    const period = equipmentReportPeriod(), data = readEquipmentReportData(period);
+    const excluded = getEquipmentReportItems(period, true).filter(item => data[item.uniqueId]?._excluded === true);
+    const dialog = document.createElement('dialog');
+    dialog.style.cssText = 'max-width:620px;max-height:80vh;overflow:auto;border:1px solid #94a3b8;border-radius:10px;padding:24px;font:14px Arial,sans-serif;';
+    dialog.innerHTML = `<h2>Повернути обладнання у звіт</h2><p>Період: ${equipmentReportEscape(period)}. Попередні значення рядків будуть збережені.</p><div>${excluded.map(item => `<p>${equipmentReportEscape(item.category)} · ${equipmentReportEscape(item.model)} · ${equipmentReportEscape(item.serialNumber)} <button type="button" data-restore-eq-id="${equipmentReportEscape(item.uniqueId)}">Повернути у звіт</button></p>`).join('') || '<p>У цьому звіті немає видалених позицій.</p>'}</div><button type="button" id="eq-restore-close">Закрити</button>`;
+    document.body.appendChild(dialog); dialog.showModal();
+    dialog.querySelector('#eq-restore-close').onclick = () => dialog.remove();
+    dialog.querySelectorAll('[data-restore-eq-id]').forEach(button => {
+        button.onclick = () => {
+            if (setEquipmentReportItemIncluded(button.getAttribute('data-restore-eq-id'), true, period)) {
+                dialog.remove(); renderEquipmentReportView();
+            }
+        };
+    });
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -745,10 +767,10 @@ function renderEquipmentReportView() {
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p3Fuel" value="${itemData.p3Fuel || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p3Oil" value="${itemData.p3Oil || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="nextFuel" value="${itemData.nextFuel || ''}" style="width: 100%; text-align: center; border: 1px solid #27ae60; background: #f0fdf4; padding: 4px; font-weight: bold; color: #166534;" placeholder="0.0" ${eqLock}></td>
-            <td class="eq-report-action">${item.category === 'Генератор' ? `<button type="button" data-remove-eq-id="${equipmentReportEscape(item.uniqueId)}" ${canEditEq?'':'disabled'} style="background:#c0392b;color:white;border:0;border-radius:4px;padding:6px;cursor:pointer">Видалити зі звіту</button>` : ''}</td>
+            <td class="eq-report-action"><button type="button" data-remove-eq-id="${equipmentReportEscape(item.uniqueId)}" ${canEditEq?'':'disabled'} style="background:#c0392b;color:white;border:0;border-radius:4px;padding:6px;cursor:pointer">Видалити зі звіту</button></td>
         `;
         tbody.appendChild(tr);
-        tr.querySelector('[data-remove-eq-id]')?.addEventListener('click', () => removeEquipmentReportGenerator(item.uniqueId));
+        tr.querySelector('[data-remove-eq-id]')?.addEventListener('click', () => removeEquipmentReportItem(item.uniqueId));
     });
 
     const curRole2 = (typeof window.getCurrentAppRole === 'function')
@@ -759,6 +781,8 @@ function renderEquipmentReportView() {
     if (eqSaveBtn) eqSaveBtn.style.setProperty('display', canEditEq2 ? 'inline-flex' : 'none', 'important');
     const addGeneratorBtn = document.getElementById('eq-report-add-generator-btn');
     if (addGeneratorBtn) addGeneratorBtn.style.display = canEditEquipmentReport() ? 'inline-block' : 'none';
+    const restoreBtn = document.getElementById('eq-report-restore-btn');
+    if (restoreBtn) restoreBtn.style.display = canEditEquipmentReport() ? 'inline-block' : 'none';
 
     updateEquipmentReportTotals();
 }
