@@ -13,7 +13,7 @@ function getPumpsList() {
     if (stored === null) return [];
     const parsed = JSON.parse(stored);
     if (!Array.isArray(parsed)) throw new Error('Неправильний формат збережених помп');
-    return parsed;
+    return parsed.map(item => typeof applyEquipmentFuelLimits === 'function' ? applyEquipmentFuelLimits(item) : item);
 }
 
 function canManagePumps(feature = 'eq_edit_hours') {
@@ -313,6 +313,10 @@ function updatePumpsProp(id, prop, val, rerender = true) {
                 item.motoHoursDay = foundRef.motoHoursDay;
                 item.oilNorm10Days = foundRef.oilNorm10Days;
             }
+        }
+        if (['consumption','motoHoursDay'].includes(prop) && typeof applyEquipmentFuelLimits === 'function') {
+            applyEquipmentFuelLimits(item, 12, true);
+            updateEquipmentFuelLimitCells(item, 'updatePumpsProp');
         }
         savePumpsList(list);
         if (prop === 'model' && rerender) renderPumpsView();

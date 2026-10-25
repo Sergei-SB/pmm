@@ -15,7 +15,7 @@ function getChainsawsList() {
         const stored = localStorage.getItem('chainsaws_custom_data');
         if (stored) {
             const parsed = JSON.parse(stored);
-            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed.map(item => typeof applyEquipmentFuelLimits === 'function' ? applyEquipmentFuelLimits(item, 4) : item);
         }
     } catch(e) {}
     localStorage.setItem('chainsaws_custom_data', JSON.stringify(defaultChainsawsData));
@@ -305,6 +305,10 @@ function updateChainsawsProp(id, prop, val) {
                 item.motoHoursDay = foundRef.motoHoursDay;
                 item.oilNorm10Days = foundRef.oilNorm10Days;
             }
+        }
+        if (['consumption','motoHoursDay'].includes(prop) && typeof applyEquipmentFuelLimits === 'function') {
+            applyEquipmentFuelLimits(item, 4, true);
+            updateEquipmentFuelLimitCells(item, 'updateChainsawsProp');
         }
         saveChainsawsList(list);
         if (prop === 'model') renderChainsawsView();
