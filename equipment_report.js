@@ -41,10 +41,11 @@ function getEquipmentReportItems(period, includeExcluded = false) {
     const data = readEquipmentReportData(period);
     const items = getAllEquipmentItemsUnified().map(item => ({...item, ...data[item.uniqueId]?._equipment,
         uniqueId: item.uniqueId,
+        subdivision: data[item.uniqueId]?.subdivision ?? data[item.uniqueId]?._equipment?.subdivision ?? item.subdivision ?? '',
         serialNumber: data[item.uniqueId]?.serialNumber ?? item.serialNumber ?? item.rawItem?.serialNumber ?? ''}));
     for (const [id, row] of Object.entries(data)) {
         if (row?._equipment?.category === 'Генератор' && !items.some(item => item.uniqueId === id)) {
-            items.push({...row._equipment, uniqueId: id});
+            items.push({...row._equipment, uniqueId: id, subdivision: row.subdivision ?? row._equipment.subdivision ?? ''});
         }
     }
     return includeExcluded ? items : items.filter(item => data[item.uniqueId]?._excluded !== true);
@@ -87,6 +88,7 @@ function addEquipmentReportGenerator(details, existingId = '', period = equipmen
             data[id]._equipment = {category:'Генератор',model:item.model,serialNumber:item.serialNumber,
                 subdivision:item.subdivision,fuelType:item.fuelType,...(data[id]._equipment || {}),...changes};
             if (changes.serialNumber !== undefined) data[id].serialNumber = changes.serialNumber;
+            if (changes.subdivision !== undefined) data[id].subdivision = changes.subdivision;
         }
     } else {
         const model = String(details.model || '').trim();
@@ -719,6 +721,10 @@ function renderEquipmentReportView() {
 
     const headerSub = document.getElementById('eq-report-subdivision-search');
     if (headerSub && subFilterEl) {headerSub.innerHTML = subFilterEl.innerHTML; headerSub.value = selectedSub;}
+    const unitOptions = document.getElementById('eq-report-subdivision-options');
+    if (unitOptions) unitOptions.innerHTML = [...new Set([...getAllEquipmentItemsUnified(), ...items]
+        .map(item => String(item.subdivision || '').trim()).filter(Boolean))]
+        .sort((a,b) => a.localeCompare(b,'uk')).map(unit => `<option value="${equipmentReportEscape(unit)}"></option>`).join('');
     const models = document.getElementById('eq-report-model-options');
     const modelOptions = [...new Set(filterEquipmentReportItems(items, selectedSub).map(item => item.model).filter(Boolean))]
         .sort((a,b) => String(a).localeCompare(String(b),'uk',{numeric:true}))
@@ -780,7 +786,7 @@ function renderEquipmentReportView() {
         tr.innerHTML = `
             <td style="text-align: center;">${idx + 1}</td>
             <td><span style="background: #e8f8f5; padding: 2px 6px; border-radius: 4px; font-size: 11px; color: #16a085; font-weight: bold;">${equipmentReportEscape(item.category)}</span></td>
-            <td style="text-align: center;"><strong>${equipmentReportEscape(item.subdivision)}</strong></td>
+            <td style="text-align: center;"><input type="text" class="eq-rep-input" data-id="${equipmentReportEscape(item.uniqueId)}" data-field="subdivision" list="eq-report-subdivision-options" aria-label="Підрозділ ${equipmentReportEscape(item.model)}" value="${equipmentReportEscape(item.subdivision)}" onchange="changeEquipmentReportFilter('row-subdivision',this.value)" style="width:100%;box-sizing:border-box;padding:4px;border:1px solid #ccc;text-align:center" ${eqLock}></td>
             <td><strong>${equipmentReportEscape(item.model)}</strong></td>
             <td><input type="text" class="eq-rep-input" data-id="${equipmentReportEscape(item.uniqueId)}" data-field="serialNumber" aria-label="Серійний номер ${equipmentReportEscape(item.model)}" value="${equipmentReportEscape(itemData.serialNumber ?? item.serialNumber ?? '')}" style="width:100%;box-sizing:border-box;padding:4px;border:1px solid #ccc" ${eqLock}></td>
             <td style="text-align: center;" class="eq-row-fuel-type">${equipmentReportEscape(item.fuelType)}</td>

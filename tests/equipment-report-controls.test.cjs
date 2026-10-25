@@ -148,3 +148,23 @@ test('Changing search filters saves pending edits and preserves rows hidden by p
     const readOnly=fixture('user');readOnly.c.renderEquipmentReportView=()=>{};
     readOnly.c.changeEquipmentReportFilter('model','PUMP');assert.equal(readOnly.values.size,0);
 });
+
+test('Inline subdivision edits persist per period for inventory and report-only rows and are used by search and generator dialog',()=>{
+    const {c,inventory,period,values,storageKey,setInputs,listeners}=fixture();
+    const id=c.addEquipmentReportGenerator({model:'CUSTOM',subdivision:'РМТЗ'},'',period);
+    const before=JSON.stringify(inventory);
+    setInputs([['gen_1','subdivision','НОВИЙ'],['gen_1','p1Fuel','25'],[id,'subdivision','ВТО']]);
+    listeners.input({target:{classList:{contains:()=>true}}});
+    assert.equal(c.getEquipmentReportItems(period).find(item=>item.uniqueId==='gen_1').subdivision,'НОВИЙ');
+    assert.equal(c.getEquipmentReportItems(period).find(item=>item.uniqueId===id).subdivision,'ВТО');
+    assert.equal(c.searchEquipmentReportGenerators(period,'НОВИЙ')[0].uniqueId,'gen_1');
+    assert.equal(c.filterEquipmentReportItems(c.getEquipmentReportItems(period),'НОВИЙ').length,1);
+    assert.equal(JSON.parse(values.get(storageKey)).gen_1.p1Fuel,'25');
+    assert.equal(c.getEquipmentReportItems('01.11-10.11')[0].subdivision,'РМТЗ');
+    assert.equal(JSON.stringify(inventory),before);
+    setInputs([]);c.addEquipmentReportGenerator({subdivision:'ШТАБ'},'gen_1',period);
+    assert.equal(c.getEquipmentReportItems(period)[0].subdivision,'ШТАБ');
+    setInputs([['gen_1','subdivision','']]);c.saveCurrentEquipmentReportSilently();
+    assert.equal(c.getEquipmentReportItems(period)[0].subdivision,'');
+    assert.equal(c.filterEquipmentReportItems(c.getEquipmentReportItems(period),'__unassigned__')[0].uniqueId,'gen_1');
+});
