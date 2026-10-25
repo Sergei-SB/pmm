@@ -178,3 +178,22 @@ test('Inline subdivision edits persist per period for inventory and report-only 
     assert.equal(c.getEquipmentReportItems(period)[0].subdivision,'');
     assert.equal(c.filterEquipmentReportItems(c.getEquipmentReportItems(period),'__unassigned__')[0].uniqueId,'gen_1');
 });
+
+test('Equipment report always groups new and restored rows by category without changing data or order within groups',()=>{
+    const {c,inventory,period,values,storageKey}=fixture();
+    inventory.unshift({uniqueId:'web_1',category:'Webasto',model:'WEB'});
+    inventory.push({uniqueId:'heat_1',category:'Теплова пушка',model:'HEAT'},{uniqueId:'saw_1',category:'Бензопила',model:'SAW'});
+    const registry=JSON.stringify(inventory);
+    const extraPump=c.addEquipmentReportGenerator({category:'Помпа',model:'PUMP'},'',period);
+    const extraGen=c.addEquipmentReportGenerator({model:'GEN'},'',period);
+    const extraWeb=c.addEquipmentReportGenerator({category:'Webasto',model:'WEB'},'',period);
+    const expected=['gen_1',extraGen,'web_1',extraWeb,'heat_1','saw_1','pump_1',extraPump];
+    const before=values.get(storageKey);
+    assert.deepEqual(Array.from(c.getEquipmentReportItems(period),item=>item.uniqueId),expected);
+    assert.equal(values.get(storageKey),before);assert.equal(JSON.stringify(inventory),registry);
+    c.setEquipmentReportItemIncluded(extraGen,false,period);
+    assert.deepEqual(Array.from(c.getEquipmentReportItems(period),item=>item.uniqueId),expected.filter(id=>id!==extraGen));
+    c.setEquipmentReportItemIncluded(extraGen,true,period);
+    assert.deepEqual(Array.from(c.getEquipmentReportItems(period),item=>item.uniqueId),expected);
+    assert.deepEqual(Array.from(c.getEquipmentReportItems(period,true),item=>item.uniqueId),expected);
+});

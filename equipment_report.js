@@ -49,6 +49,13 @@ function getEquipmentReportItems(period, includeExcluded = false) {
                 serialNumber: row.serialNumber ?? row._equipment.serialNumber ?? ''});
         }
     }
+    const categoryOrder = ['Генератор','Webasto','Теплова пушка','Бензопила','Помпа'];
+    const rank = item => {
+        const index = categoryOrder.indexOf(item.category);
+        return index < 0 ? categoryOrder.length : index;
+    };
+    // Stable grouping keeps the existing order and distinct IDs within each category.
+    items.sort((a,b) => rank(a) - rank(b));
     return includeExcluded ? items : items.filter(item => data[item.uniqueId]?._excluded !== true);
 }
 
