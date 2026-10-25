@@ -121,9 +121,15 @@ function getAllEquipmentList() {
 window.refreshAggregatesEquipmentList = function() {
     const listContainer = document.getElementById('agg-items-list');
     if (!listContainer) return;
+    const selected = window._allCalculatedEquipment?.[window._selectedAggIndex];
     const all = getAllEquipmentList();
+    if (selected) {
+        const index = all.findIndex(item => item.category === selected.category && String(item.id) === String(selected.id));
+        if (index >= 0) window._selectedAggIndex = index;
+    }
     window._allCalculatedEquipment = all;
     renderAggDropdownItems(all);
+    onSelectedEquipmentChange();
 };
 
 // ГОЛОВНЕ ВІДОБРАЖЕННЯ КАЛЬКУЛЯТОРА
@@ -617,6 +623,13 @@ function selectAggItem(index, titleText) {
     saveAggCalcState();
 }
 
+function aggregateInventoryNumber(value) {
+    const text = String(value ?? '').trim().replace(',', '.');
+    if (!/^\d+(?:\.\d*)?$/.test(text)) return 0;
+    const number = Number(text);
+    return Number.isFinite(number) ? number : 0;
+}
+
 function selectCustomAggText(customText) {
     window._selectedAggIndex = -1;
     window._customAggText = customText;
@@ -648,7 +661,13 @@ function getSelectedEquipment() {
         };
     }
     if (window._selectedAggIndex !== null && window._selectedAggIndex >= 0 && window._allCalculatedEquipment) {
-        return window._allCalculatedEquipment[window._selectedAggIndex];
+        const selected = window._allCalculatedEquipment[window._selectedAggIndex];
+        if (!selected) return null;
+        // The cached dropdown identifies the unit; current registry values supply its norms.
+        const current = getAllEquipmentList().find(item => item.category === selected.category && String(item.id) === String(selected.id));
+        if (!current) return null;
+        return {...current, consumption: aggregateInventoryNumber(current.consumption),
+            oilNorm10Days: aggregateInventoryNumber(current.oilNorm10Days)};
     }
     if (window._customAggText) {
         const cons = parseFloat(document.getElementById('custom-cons-input')?.value) || 3.33;
@@ -709,13 +728,13 @@ function onSelectedEquipmentChange() {
     const eq = getSelectedEquipment();
     if (!eq) return;
 
-    const hourlyConsumption = parseFloat(eq.consumption) || 0;
-    const oilNorm = parseFloat(eq.oilNorm10Days) || 0;
+    const hourlyConsumption = aggregateInventoryNumber(eq.consumption);
+    const oilNorm = aggregateInventoryNumber(eq.oilNorm10Days);
 
     infoBox.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
             <div style="display: flex; gap: 12px; align-items: center;">
-                <span><strong>Розхід:</strong> <span style="color: #c0392b;">${hourlyConsumption} л/год</span></span>
+                <span><strong>Розхід:</strong> <span style="color: #c0392b;">${hourlyConsumption > 0 ? hourlyConsumption + ' л/год' : 'Вкажіть норму в «Облік обладнання»'}</span></span>
                 <span><strong>Мастило (10 дн):</strong> <span style="color: #2980b9;">${oilNorm > 0 ? oilNorm + ' л' : '—'}</span></span>
             </div>
             ${hoursBlockHtml}
@@ -773,7 +792,12 @@ function triggerRecalc() {
     if (!eq) return;
 
     let maxDailyHours = parseFloat(document.getElementById('calc-max-daily-hours')?.value) || 24;
-    const hourlyRate = parseFloat(eq.consumption) || 1;
+    const hourlyRate = aggregateInventoryNumber(eq.consumption);
+    if (hourlyRate <= 0) {
+        const results = document.getElementById('calc-details-box');
+        if (results) results.textContent = 'Для розрахунку вкажіть розхід палива в «Облік обладнання» для вибраного агрегату.';
+        return;
+    }
     let baseOilNorm10Days = parseFloat(eq.oilNorm10Days) || 0;
     let isIntegerHours = !!window._isIntegerHours;
     let isVerification = !!window._isVerificationMode;
@@ -916,7 +940,8 @@ function onManualMotoHourChange(periodIdx, dayIdx, val) {
     const eq = getSelectedEquipment();
     if (!eq) return;
 
-    let hourlyRate = parseFloat(eq.consumption) || 1;
+    let hourlyRate = aggregateInventoryNumber(eq.consumption);
+    if (hourlyRate <= 0) return;
     let baseOilNorm10Days = parseFloat(eq.oilNorm10Days) || 0;
 
     let totalMotoHoursAll = 0;
@@ -990,7 +1015,8 @@ function displayCalcResults(eq, totalMotoHours, daysCount, totalFuel, totalOil, 
 
     let isIntegerHours = !!window._isIntegerHours;
     let isVerification = !!window._isVerificationMode;
-    let hourlyRate = parseFloat(eq.consumption) || 1;
+    let hourlyRate = aggregateInventoryNumber(eq.consumption);
+    if (hourlyRate <= 0) return;
 
     const verifContainer = document.getElementById('verification-summary-container');
     if (verifContainer) {
