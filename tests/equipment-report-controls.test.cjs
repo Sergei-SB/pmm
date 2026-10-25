@@ -104,12 +104,22 @@ test('Selecting an inventory generator edits the existing report row and keeps f
     assert.equal(c.searchEquipmentReportGenerators(period,'GEN')[0].sourceModel,'GEN');
 });
 
-test('Matching a model requires an explicit selection or a different serial instead of making duplicates',()=>{
-    const {c,period}=fixture();
-    assert.throws(()=>c.addEquipmentReportGenerator({model:' gen ',serialNumber:'gen-001'},'',period),/вже є/);
-    assert.throws(()=>c.addEquipmentReportGenerator({model:'GEN'},'',period),/вже є/);
-    const id=c.addEquipmentReportGenerator({model:'GEN',serialNumber:'ANOTHER-001'},'',period);
-    assert.ok(id.startsWith('report_gen_'));assert.equal(c.getEquipmentReportItems(period).length,3);
+test('Identical models and serials create independent report rows in every equipment category',()=>{
+    const {c,period,inventory,values,storageKey}=fixture();
+    const original=JSON.stringify(inventory), ids=[];
+    for (const category of ['Генератор','Webasto','Теплова пушка','Бензопила','Помпа']) {
+        for (let i=0;i<3;i++) ids.push(c.addEquipmentReportGenerator({category,model:'GEN',serialNumber:'GEN-001'},'',period));
+        assert.equal(c.searchEquipmentReportGenerators(period,'GEN-001',category).length,category==='Генератор'?4:3);
+    }
+    assert.equal(new Set(ids).size,15);assert.equal(c.getEquipmentReportItems(period).length,17);
+    assert.equal(c.getEquipmentReportItems('01.11-10.11').length,2);assert.equal(JSON.stringify(inventory),original);
+    const first=ids[0],second=ids[1],data=JSON.parse(values.get(storageKey));data[first].p1Fuel='25';data[second].p1Fuel='10';values.set(storageKey,JSON.stringify(data));
+    c.addEquipmentReportGenerator({subdivision:'ВТО'},first,period);
+    c.setEquipmentReportItemIncluded(first,false,period);
+    assert.ok(c.getEquipmentReportItems(period).some(item=>item.uniqueId===second));
+    c.setEquipmentReportItemIncluded(first,true,period);
+    const saved=JSON.parse(values.get(storageKey));assert.equal(saved[first].p1Fuel,'25');assert.equal(saved[second].p1Fuel,'10');
+    assert.equal(c.getEquipmentReportItems(period).find(item=>item.uniqueId===second).subdivision,'');
 });
 
 test('Suggestions identify excluded rows and restore their original financial values',()=>{

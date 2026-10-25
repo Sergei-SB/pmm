@@ -44,8 +44,9 @@ function getEquipmentReportItems(period, includeExcluded = false) {
         subdivision: data[item.uniqueId]?.subdivision ?? data[item.uniqueId]?._equipment?.subdivision ?? item.subdivision ?? '',
         serialNumber: data[item.uniqueId]?.serialNumber ?? item.serialNumber ?? item.rawItem?.serialNumber ?? ''}));
     for (const [id, row] of Object.entries(data)) {
-        if (row?._equipment?.category === 'Генератор' && !items.some(item => item.uniqueId === id)) {
-            items.push({...row._equipment, uniqueId: id, subdivision: row.subdivision ?? row._equipment.subdivision ?? ''});
+        if (['Генератор','Webasto','Теплова пушка','Бензопила','Помпа'].includes(row?._equipment?.category) && !items.some(item => item.uniqueId === id)) {
+            items.push({...row._equipment, uniqueId: id, subdivision: row.subdivision ?? row._equipment.subdivision ?? '',
+                serialNumber: row.serialNumber ?? row._equipment.serialNumber ?? ''});
         }
     }
     return includeExcluded ? items : items.filter(item => data[item.uniqueId]?._excluded !== true);
@@ -55,10 +56,10 @@ function normalizeEquipmentGeneratorSearch(value) {
     return String(value ?? '').normalize('NFKC').toLocaleLowerCase('uk-UA').replace(/\s+/g, ' ').trim();
 }
 
-function searchEquipmentReportGenerators(period, query = '') {
+function searchEquipmentReportGenerators(period, query = '', category = 'Генератор') {
     const data = readEquipmentReportData(period), needle = normalizeEquipmentGeneratorSearch(query);
     const inventory = getAllEquipmentItemsUnified();
-    return getEquipmentReportItems(period, true).filter(item => item.category === 'Генератор' &&
+    return getEquipmentReportItems(period, true).filter(item => item.category === category &&
         !/знищ/ui.test(String(item.note || item.rawItem?.note || ''))).map(item => {
         const source = inventory.find(row => row.uniqueId === item.uniqueId);
         return {...item, fromInventory: !!source, sourceModel: source?.model || '',
@@ -75,34 +76,31 @@ function addEquipmentReportGenerator(details, existingId = '', period = equipmen
     const data = collectEquipmentReportInputs(period);
     let id = existingId;
     if (id) {
-        const item = getEquipmentReportItems(period, true).find(item => item.uniqueId === id && item.category === 'Генератор');
-        if (!item) throw new Error('Генератора немає в обліку або збереженому звіті');
+        const item = getEquipmentReportItems(period, true).find(item => item.uniqueId === id);
+        if (!item) throw new Error('Обладнання немає в обліку або збереженому звіті');
         const changes = {};
         for (const field of ['model','serialNumber','subdivision','fuelType']) {
             if (details[field] !== undefined) changes[field] = String(details[field]).trim();
         }
-        if (changes.model !== undefined && !changes.model) throw new Error('Вкажіть модель генератора');
+        if (changes.model !== undefined && !changes.model) throw new Error('Вкажіть модель обладнання');
         if (changes.fuelType !== undefined && !['ДП','АБ'].includes(changes.fuelType)) throw new Error('Виберіть тип пального');
         data[id] = {...(data[id] || {}), _excluded: false};
         if (Object.keys(changes).length) {
-            data[id]._equipment = {category:'Генератор',model:item.model,serialNumber:item.serialNumber,
+            data[id]._equipment = {category:item.category,model:item.model,serialNumber:item.serialNumber,
                 subdivision:item.subdivision,fuelType:item.fuelType,...(data[id]._equipment || {}),...changes};
             if (changes.serialNumber !== undefined) data[id].serialNumber = changes.serialNumber;
             if (changes.subdivision !== undefined) data[id].subdivision = changes.subdivision;
         }
     } else {
         const model = String(details.model || '').trim();
-        if (!model) throw new Error('Вкажіть модель генератора');
-        const serial = normalizeEquipmentGeneratorSearch(details.serialNumber);
-        const duplicates = searchEquipmentReportGenerators(period).filter(item =>
-            [item.model,item.sourceModel].some(value => normalizeEquipmentGeneratorSearch(value) === normalizeEquipmentGeneratorSearch(model)) &&
-            (!serial || normalizeEquipmentGeneratorSearch(item.serialNumber) === serial));
-        if (duplicates.length) throw new Error('Генератор з цією назвою вже є у списку. Виберіть його з підказки для додавання або редагування. Для іншого генератора цієї моделі вкажіть окремий серійний номер.');
+        if (!model) throw new Error('Вкажіть модель обладнання');
+        const category = details.category || 'Генератор';
+        if (!['Генератор','Webasto','Теплова пушка','Бензопила','Помпа'].includes(category)) throw new Error('Виберіть категорію обладнання');
         id = 'report_gen_' + (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
             ? crypto.randomUUID() : Date.now() + '_' + Math.random().toString(36).slice(2));
         data[id] = {_excluded: false, serialNumber: String(details.serialNumber || '').trim(),
-            _equipment: {category: 'Генератор', model, serialNumber: String(details.serialNumber || '').trim(),
-                subdivision: String(details.subdivision || '').trim(), fuelType: details.fuelType === 'АБ' ? 'АБ' : 'ДП'}};
+            _equipment: {category, model, serialNumber: String(details.serialNumber || '').trim(),
+                subdivision: String(details.subdivision || '').trim(), fuelType: String(details.fuelType || 'ДП').trim()}};
     }
     localStorage.setItem('equipment_report_data_' + period, JSON.stringify(data));
     return id;
@@ -126,18 +124,28 @@ function openEquipmentReportGeneratorDialog() {
     if (!canEditEquipmentReport()) return;
     document.getElementById('equipment-report-generator-dialog')?.remove();
     const period = equipmentReportPeriod(), data = readEquipmentReportData(period);
-    const candidates = searchEquipmentReportGenerators(period);
+    let category = 'Генератор';
+    const candidates = searchEquipmentReportGenerators(period, '', category);
     const dialog = document.createElement('dialog');
     dialog.id = 'equipment-report-generator-dialog';
     dialog.style.cssText = 'width:min(620px,94vw);max-height:90vh;overflow:auto;border:1px solid #94a3b8;border-radius:10px;padding:24px;color:#263747;font:14px Arial,sans-serif;';
-    dialog.innerHTML = `<h2 style="margin-top:0">Додати генератор у звіт</h2><p>Період: ${equipmentReportEscape(period)}. Позиція додається тільки до цього звіту.</p>
+    dialog.innerHTML = `<h2 style="margin-top:0">Додати обладнання у звіт</h2><p>Період: ${equipmentReportEscape(period)}. Кожна нова одиниця додається окремим рядком, навіть з однаковою назвою та серійним номером.</p>
         <form id="equipment-report-generator-form" style="display:grid;gap:12px">
+        <label for="eq-generator-category">Категорія</label><select name="category" id="eq-generator-category" style="width:100%;padding:8px"><option>Генератор</option><option>Webasto</option><option>Теплова пушка</option><option>Бензопила</option><option>Помпа</option></select>
         <label for="eq-generator-source">Спосіб додавання</label><select name="existingId" id="eq-generator-source" style="width:100%;padding:8px"><option value="">Новий рядок звіту</option>${candidates.map(item => `<option value="${equipmentReportEscape(item.uniqueId)}">${item.status==='restore'?'Повернути':'Редагувати'}: ${equipmentReportEscape(item.model)} · ${equipmentReportEscape(item.serialNumber || 'без серійного номера')} · ${equipmentReportEscape(item.subdivision || 'без підрозділу')}</option>`).join('')}</select>
         <div id="eq-generator-new-fields" style="display:grid;gap:12px"><div id="eq-generator-model-box" style="position:relative"><label for="eq-generator-model">Модель генератора</label><div style="display:flex;gap:6px"><input id="eq-generator-model" name="model" role="combobox" aria-autocomplete="list" aria-controls="eq-generator-suggestions" aria-expanded="false" autocomplete="off" placeholder="Почніть вводити модель або виберіть зі списку…" required style="width:100%;padding:8px;box-sizing:border-box"><button type="button" id="eq-generator-list-btn" aria-label="Показати список генераторів" title="Вибрати генератор з обліку обладнання" style="padding:5px 12px;cursor:pointer">▼</button></div><div id="eq-generator-suggestions" role="listbox" aria-label="Підказки генераторів" hidden style="position:absolute;left:0;right:0;z-index:20;max-height:210px;overflow:auto;background:#fff;border:1px solid #94a3b8;border-radius:5px;box-shadow:0 5px 18px #0002"></div></div>
         <label>Серійний номер<input name="serialNumber" style="width:100%;padding:8px;box-sizing:border-box"></label>
         <label>Підрозділ<input name="subdivision" style="width:100%;padding:8px;box-sizing:border-box"></label>
         <label>Тип пального<select name="fuelType" style="width:100%;padding:8px"><option>ДП</option><option>АБ</option></select></label></div>
         <p id="eq-generator-selection-status" aria-live="polite" style="color:#166534;margin:0;font-size:12px"></p><p id="eq-generator-error" role="status" style="color:#b91c1c;margin:0"></p><div style="display:flex;gap:12px;justify-content:flex-end"><button type="button" id="eq-generator-cancel">Скасувати</button><button type="submit" id="eq-generator-submit" style="background:#27ae60;color:white;border:0;border-radius:5px;padding:10px">Додати у звіт</button></div></form>`;
+    dialog.querySelector('label[for="eq-generator-model"]').textContent = 'Модель обладнання';
+    dialog.querySelector('#eq-generator-list-btn').setAttribute('aria-label','Показати список обладнання');
+    dialog.querySelector('#eq-generator-list-btn').title = 'Вибрати обладнання з обліку';
+    dialog.querySelector('#eq-generator-suggestions').setAttribute('aria-label','Підказки обладнання');
+    const copyButton = document.createElement('button');
+    copyButton.type = 'button'; copyButton.id = 'eq-generator-copy'; copyButton.hidden = true;
+    copyButton.textContent = 'Додати ще одну таку одиницю';
+    dialog.querySelector('#eq-generator-selection-status').after(copyButton);
     document.body.appendChild(dialog); dialog.showModal();
     const form = dialog.querySelector('form');
     const modelInput = form.elements.model, sourceSelect = form.elements.existingId;
@@ -149,7 +157,7 @@ function openEquipmentReportGeneratorDialog() {
         modelInput.removeAttribute('aria-activedescendant'); activeIndex = -1;
     }
     function selectGenerator(id) {
-        const item = searchEquipmentReportGenerators(period).find(row => row.uniqueId === id);
+        const item = searchEquipmentReportGenerators(period, '', category).find(row => row.uniqueId === id);
         if (!item) return;
         sourceSelect.value = id;
         selectedSnapshot = {};
@@ -162,14 +170,15 @@ function openEquipmentReportGeneratorDialog() {
             form.elements[field].value = value; selectedSnapshot[field] = value;
         }
         status.textContent = item.status==='restore'
-            ? 'Генератор буде повернуто до цього звіту зі збереженими цифрами. Дані нижче можна відредагувати.'
-            : 'Цей генератор уже є у звіті. Можна відредагувати його дані без дублювання рядка. Облік обладнання не зміниться.';
+            ? 'Обладнання буде повернуто до цього звіту зі збереженими цифрами. Або натисніть «Додати ще одну таку одиницю» для нового рядка.'
+            : 'Вибрано існуючий рядок для редагування. Для окремої одиниці натисніть «Додати ще одну таку одиницю».';
+        copyButton.hidden = false;
         dialog.querySelector('#eq-generator-submit').textContent = item.status==='restore'?'Повернути у звіт':'Зберегти зміни у звіті';
         dialog.querySelector('#eq-generator-error').textContent = '';
         hideSuggestions();
     }
     function showSuggestions(query) {
-        const all = searchEquipmentReportGenerators(period,query);
+        const all = searchEquipmentReportGenerators(period,query,category);
         matches = all.slice(0,30); activeIndex = -1; suggestions.replaceChildren();
         for (const [index,item] of matches.entries()) {
             const option = document.createElement('button');
@@ -184,17 +193,30 @@ function openEquipmentReportGeneratorDialog() {
         if (!matches.length || all.length > matches.length) {
             const note = document.createElement('div'); note.style.cssText = 'padding:10px;font-size:12px;color:#64748b';
             note.textContent = !matches.length
-                ? 'Збігів немає. Можна додати новий рядок або змінити назву вибраного генератора.'
+                ? 'Збігів немає. Можна додати новий рядок або змінити назву вибраного обладнання.'
                 : 'Показано перші 30 збігів із '+all.length+'. Уточніть модель, серійний номер або підрозділ.';
             suggestions.appendChild(note);
         }
         suggestions.hidden = false; modelInput.setAttribute('aria-expanded','true');
     }
     dialog.querySelector('#eq-generator-cancel').onclick = () => dialog.remove();
+    copyButton.onclick = () => {
+        sourceSelect.value = ''; selectedSnapshot = null; copyButton.hidden = true;
+        status.textContent = 'Буде додано окрему одиницю обладнання. Існуючий рядок та його цифри залишаться без змін.';
+        dialog.querySelector('#eq-generator-submit').textContent = 'Додати у звіт';
+        hideSuggestions();
+    };
+    dialog.querySelector('#eq-generator-category').onchange = event => {
+        category = event.target.value;
+        sourceSelect.innerHTML = '<option value="">Новий рядок звіту</option>' + searchEquipmentReportGenerators(period, '', category)
+            .map(item => `<option value="${equipmentReportEscape(item.uniqueId)}">${item.status==='restore'?'Повернути':'Редагувати'}: ${equipmentReportEscape(item.model)} · ${equipmentReportEscape(item.serialNumber || 'без серійного номера')} · ${equipmentReportEscape(item.subdivision || 'без підрозділу')}</option>`).join('');
+        sourceSelect.onchange({target:sourceSelect});
+    };
     dialog.querySelector('#eq-generator-source').onchange = event => {
         if (event.target.value) selectGenerator(event.target.value);
         else {
             selectedSnapshot = null;
+            copyButton.hidden = true;
             for (const field of ['model','serialNumber','subdivision']) form.elements[field].value = '';
             form.elements.fuelType.value = 'ДП'; status.textContent = '';
             dialog.querySelector('#eq-generator-submit').textContent = 'Додати у звіт';
@@ -231,6 +253,9 @@ function openEquipmentReportGeneratorDialog() {
             dialog.remove();
             const filter = document.getElementById('equipment-subdivision-filter');
             if (filter) filter.value = 'all';
+            for (const fieldId of ['eq-report-model-search','eq-report-serial-search']) {
+                const input = document.getElementById(fieldId); if (input) input.value = '';
+            }
             renderEquipmentReportView();
             const row = Array.from(document.querySelectorAll('#equipment-report-tbody tr')).find(row=>row.querySelector('.eq-rep-input')?.dataset.id===id);
             if(row){row.scrollIntoView({block:'center',behavior:'smooth'});row.querySelector('.eq-rep-input')?.focus({preventScroll:true});}
