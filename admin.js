@@ -219,6 +219,7 @@ function logoutDeveloperSession() {
 }
 
 function updateRoleUI() {
+    if (typeof syncRegistryDeveloperVisibility === 'function') syncRegistryDeveloperVisibility();
     if (typeof window.developerPanelUpdateRoleUI === 'function') {
         window.developerPanelUpdateRoleUI();
         return;

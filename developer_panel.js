@@ -515,6 +515,7 @@ window.applyCarsReportColumnRoleStyle = function(canShowReportCol) {
 };
 
 window.updateRoleUI = function() {
+    if (typeof syncRegistryDeveloperVisibility === 'function') syncRegistryDeveloperVisibility();
     const role = (typeof window.getCurrentAppRole === 'function')
         ? window.getCurrentAppRole()
         : ((typeof currentRole !== 'undefined') ? currentRole : 'user');

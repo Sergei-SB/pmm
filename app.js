@@ -604,7 +604,21 @@ function getCarGroup(car) {
 }
 
 // Фільтрація кнопками: Усі / Легкові / Вантажні / Мотоцикли / Квадроцикли
+function isRegistryDeveloper() {
+    const role = typeof window.getCurrentAppRole === 'function' ? window.getCurrentAppRole()
+        : (typeof currentRole !== 'undefined' ? currentRole : (window.currentRole || 'user'));
+    return role === 'developer';
+}
+
+function syncRegistryDeveloperVisibility() {
+    const isDev = isRegistryDeveloper();
+    document.documentElement.classList.toggle('registry-developer', isDev);
+    // A hidden category filter must never leave other roles with an incomplete fleet.
+    if (!isDev && currentCategoryFilter !== 'all') filterCarsByCategory('all');
+}
+
 function filterCarsByCategory(category) {
+    if (!isRegistryDeveloper()) category = 'all';
     currentCategoryFilter = category;
     
     const btnMap = {
@@ -637,6 +651,7 @@ function filterCarsByCategory(category) {
 }
 
 function updateCarVehicleType(carId, newType) {
+    if (!isRegistryDeveloper()) return;
     const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
     const car = safeCars.find(c => Number(c.id) === Number(carId));
     if (car) {
@@ -652,6 +667,7 @@ function updateCarVehicleType(carId, newType) {
 }
 
 function renderCarsTable(filterQuery = '') {
+    syncRegistryDeveloperVisibility();
     const tbody = document.getElementById('cars-tbody');
     if (!tbody) return;
     tbody.innerHTML = '';
@@ -751,7 +767,7 @@ function renderCarsTable(filterQuery = '') {
         
         tr.innerHTML = `
             <td>${index + 1}</td>
-            <td>
+            <td class="registry-developer-only">
                 <select class="table-cell-input" onchange="updateCarVehicleType(${car.id}, this.value)" style="font-size: 11px; padding: 2px; cursor: pointer;">
                     <option value="легковий" ${group === 'легковий' ? 'selected' : ''}>Легковий</option>
                     <option value="вантажний" ${group === 'вантажний' ? 'selected' : ''}>Вантажний</option>

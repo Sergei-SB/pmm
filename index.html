@@ -88,6 +88,7 @@
     </script>
     <link rel="stylesheet" href="style.css">
     <style>
+        html:not(.registry-developer) #base-view .registry-developer-only { display: none !important; }
         table thead tr, 
         .compact-base-table thead tr, 
         .data-table thead tr {
@@ -218,7 +219,7 @@
         <section id="base-view" class="view-section active">
             <h2>Реєстр транспортних засобів</h2>
             <div class="category-filters" style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                <div class="registry-developer-only" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
                     <button id="btn-cat-all" class="action-btn active" onclick="filterCarsByCategory('all')">Усі</button>
                     <button id="btn-cat-car" class="action-btn" onclick="filterCarsByCategory('легковий')">Легкові</button>
                     <button id="btn-cat-truck" class="action-btn" onclick="filterCarsByCategory('вантажний')">Вантажні</button>
@@ -248,7 +249,7 @@
                     <thead>
                         <tr>
                             <th>№ з/п</th>
-                            <th>Тип авто</th>
+                            <th class="registry-developer-only">Тип авто</th>
                             <th>Номер<br>
                                 <select id="base-plate-filter" onchange="renderCarsTable()" style="font-size: 10px; padding: 1px; width: 100%; border-radius: 2px; border: 1px solid #1b5e20; background: white; color: #333; cursor: pointer;">
                                     <option value="all">Усі</option>
@@ -707,15 +708,15 @@
     <script src="pumps.js?v=20261025-auto-limits"></script>
     <script src="utils.js"></script>
     <script src="car_details_view.js"></script>
-    <script src="admin.js"></script>
+    <script src="admin.js?v=20261026-registry-dev"></script>
     <script src="developer.js"></script>
     <script src="moderator.js"></script>
     <script src="developer_mail.js"></script>
-    <script src="developer_panel.js?v=20261024-pumps"></script>
+    <script src="developer_panel.js?v=20261026-registry-dev"></script>
     <script src="permissions_registry.js"></script>
     <script src="broadcast_mail.js"></script>
     <script src="equipment_report.js?v=20261025-category-order"></script>
-    <script src="app.js?v=20261024-pumps"></script>
+    <script src="app.js?v=20261026-registry-dev"></script>
     <script src="app2.js?v=20261024-route-content"></script>
     <script src="aggregates_calc.js?v=20261025-inventory-rates"></script>
     <script src="destroyed_equipment.js?v=20261024-pumps"></script>
