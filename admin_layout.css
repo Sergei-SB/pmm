@@ -1,0 +1,33 @@
+/* The classic layout is unchanged. Every modern selector stays inside the developer panel. */
+#dev-panel-view .dev-admin-layout-switch{display:flex;align-items:center;gap:3px;padding:4px;background:#fff;border:1px solid #cbd5e1;border-radius:9px;flex-shrink:0}
+#dev-panel-view .dev-admin-layout-switch[hidden]{display:none!important}
+#dev-panel-view .dev-admin-layout-switch>span{font-size:11px;color:#64748b;margin:0 7px}
+#dev-panel-view .dev-admin-layout-switch button{background:transparent;color:#475569;border:0;border-radius:6px;padding:8px 12px;cursor:pointer;font:600 12px Arial,sans-serif}
+#dev-panel-view .dev-admin-layout-switch button[aria-pressed=true]{background:#1f5144;color:#fff;box-shadow:0 2px 4px #153e3020}
+#dev-panel-view .dev-admin-layout-switch button:focus-visible{outline:2px solid #16a085;outline-offset:2px}
+#dev-panel-view .dev-admin-brand{display:none}
+#dev-panel-view .dev-admin-content{min-width:0}
+#dev-panel-view.dev-admin-modern{background:#f3f6f4;color:#203a32;border-radius:18px;padding:24px;box-sizing:border-box}
+#dev-panel-view.dev-admin-modern>.card-header-panel{background:#fff;border:1px solid #dce5df;border-radius:14px;padding:22px;box-shadow:0 4px 16px #173e2e05}
+#dev-panel-view.dev-admin-modern>.card-header-panel h2{font:700 22px/1.4 Arial,sans-serif;letter-spacing:-.5px;color:#203a32;margin:0;flex:1;min-width:260px}
+#dev-panel-view.dev-admin-modern #dev-panel-header-actions{width:100%;border-top:1px solid #e7eee9;padding-top:16px;margin-top:8px}
+#dev-panel-view.dev-admin-modern .dev-admin-workspace{display:grid;grid-template-columns:240px minmax(0,1fr);gap:24px;align-items:start}
+#dev-panel-view.dev-admin-modern .dev-admin-navigation{display:flex!important;flex-direction:column;gap:8px!important;padding:22px 16px;background:#183d32;border-radius:14px;position:sticky;top:18px;margin-bottom:0!important;box-sizing:border-box}
+#dev-panel-view.dev-admin-modern .dev-admin-brand{display:block;padding:4px 12px 24px;color:#fff;font-size:20px;font-weight:700;letter-spacing:1px}
+#dev-panel-view.dev-admin-modern .dev-admin-brand small{display:block;color:#bbd2c4;font-size:11px;letter-spacing:0;font-weight:400;margin-top:9px;line-height:1.7}
+#dev-panel-view.dev-admin-modern .dev-admin-navigation>button{display:block!important;width:100%;text-align:left;white-space:normal;background:transparent!important;color:#d0dfd5!important;border:1px solid transparent!important;border-radius:9px!important;padding:14px 12px!important;font:600 12px/1.6 Arial,sans-serif!important;box-shadow:none!important}
+#dev-panel-view.dev-admin-modern .dev-admin-navigation>button:hover{background:#ffffff12!important;color:#fff!important}
+#dev-panel-view.dev-admin-modern .dev-admin-navigation>button[data-active=true]{background:#dcead9!important;color:#193b30!important;border-color:#dcead9!important}
+#dev-panel-view.dev-admin-modern .dev-admin-content>div{border-color:#dce5df!important;border-radius:13px!important;box-shadow:0 3px 12px #173e2e04!important}
+#dev-panel-view.dev-admin-modern .dev-admin-stats{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+@media(min-width:1450px){#dev-panel-view.dev-admin-modern .dev-admin-stats{grid-template-columns:repeat(4,minmax(0,1fr))!important}}
+@media(max-width:500px){#dev-panel-view.dev-admin-modern .dev-admin-stats{grid-template-columns:minmax(0,1fr)!important}}
+#dev-panel-view.dev-admin-modern .dev-admin-content table{background:#fff;border-collapse:separate!important;border-spacing:0;font-size:12px}
+#dev-panel-view.dev-admin-modern .dev-admin-content th{background:#edf4ef!important;color:#244b3c!important;border-color:#dce5df!important;padding:13px 11px!important}
+#dev-panel-view.dev-admin-modern .dev-admin-content td{border-color:#e5ece7!important;padding:11px!important}
+#dev-panel-view.dev-admin-modern .dev-admin-content tr:hover>td{background:#f6faf7}
+#dev-panel-view.dev-admin-modern .dev-admin-content input[type=checkbox]{accent-color:#246449;cursor:pointer}
+#dev-panel-view.dev-admin-modern .dev-admin-content input:not([type=checkbox]):not([type=file]),#dev-panel-view.dev-admin-modern .dev-admin-content select{border-color:#cddbd2!important;border-radius:6px!important}
+@media(max-width:1100px){#dev-panel-view.dev-admin-modern .dev-admin-workspace{grid-template-columns:190px minmax(0,1fr);gap:16px}#dev-panel-view.dev-admin-modern{padding:16px}}
+@media(max-width:800px){#dev-panel-view.dev-admin-modern .dev-admin-workspace{grid-template-columns:minmax(0,1fr)}#dev-panel-view.dev-admin-modern .dev-admin-navigation{position:static;flex-direction:row;flex-wrap:wrap;padding:12px}#dev-panel-view.dev-admin-modern .dev-admin-navigation>button{width:auto;flex:1 1 180px;padding:10px!important}#dev-panel-view.dev-admin-modern .dev-admin-brand{width:100%;padding:5px 8px 12px}#dev-panel-view.dev-admin-modern .dev-admin-brand small{display:none}#dev-panel-view.dev-admin-modern>.card-header-panel{padding:16px}#dev-panel-view.dev-admin-modern>.card-header-panel h2{font-size:19px}}
+@media print{#dev-panel-view .dev-admin-layout-switch{display:none!important}}

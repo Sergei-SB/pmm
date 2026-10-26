@@ -908,6 +908,7 @@ function ensureDevPanelHeaderButtons() {
         </button>
         <input type="file" id="dev-backup-import-input" accept=".json,application/json" multiple style="display: none;" onchange="handleImportBackupFiles(event)">
     `;
+    if (typeof window.syncDeveloperPanelLayout === 'function') window.syncDeveloperPanelLayout();
 }
 
 function flushAllActiveSiteChangesToStorage() {
@@ -2122,7 +2123,7 @@ window.renderDeveloperPanel = function() {
 
     if (currentDevSubTab === 'dashboard') {
         subTabContentHtml = `
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px;">
+            <div class="dev-admin-stats" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px;">
                 <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
                     <div style="font-size: 13px; color: #64748b; font-weight: bold; margin-bottom: 8px;">Активні сесії / Профілі</div>
                     <div style="font-size: 28px; font-weight: 800; color: #27ae60;">${users.length}</div>
@@ -2612,27 +2613,28 @@ window.renderDeveloperPanel = function() {
     }
 
     container.innerHTML = `
-        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px;">
-            <button type="button" onclick="switchDevSubTab('dashboard')" style="${subTabBtnStyle('dashboard')}">
+        <div class="dev-admin-workspace"><nav class="dev-admin-navigation" aria-label="Розділи панелі керування" style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px;">
+            <div class="dev-admin-brand">ПММ<small>Панель керування<br>Єдині дані в обох виглядах</small></div>
+            <button type="button" data-active="${currentDevSubTab==='dashboard'}" onclick="switchDevSubTab('dashboard')" style="${subTabBtnStyle('dashboard')}">
                 📊 Статистика та графіки
             </button>
-            <button type="button" onclick="switchDevSubTab('permissions')" style="${subTabBtnStyle('permissions')}">
+            <button type="button" data-active="${currentDevSubTab==='permissions'}" onclick="switchDevSubTab('permissions')" style="${subTabBtnStyle('permissions')}">
                 🛡️ Матриця прав та Доступ (Адмін / Модер / Юзер)
             </button>
-            <button type="button" onclick="switchDevSubTab('passwords')" style="${subTabBtnStyle('passwords')}">
+            <button type="button" data-active="${currentDevSubTab==='passwords'}" onclick="switchDevSubTab('passwords')" style="${subTabBtnStyle('passwords')}">
                 🔑 Паролі кабінетів
             </button>
-            <button type="button" onclick="switchDevSubTab('users')" style="${subTabBtnStyle('users')}">
+            <button type="button" data-active="${currentDevSubTab==='users'}" onclick="switchDevSubTab('users')" style="${subTabBtnStyle('users')}">
                 👥 Користувачі та Бани (${users.length} / 🚫 ${bannedCount})
             </button>
-            <button type="button" onclick="switchDevSubTab('logs')" style="${subTabBtnStyle('logs')}">
+            <button type="button" data-active="${currentDevSubTab==='logs'}" onclick="switchDevSubTab('logs')" style="${subTabBtnStyle('logs')}">
                 ⚠️ Попередження і Логи (${logs.length})
             </button>
-            <button type="button" onclick="switchDevSubTab('database')" style="${subTabBtnStyle('database')}">
+            <button type="button" data-active="${currentDevSubTab==='database'}" onclick="switchDevSubTab('database')" style="${subTabBtnStyle('database')}">
                 💾 База даних та Бекап
             </button>
-        </div>
-        ${subTabContentHtml}
+        </nav><div class="dev-admin-content">
+        ${subTabContentHtml}</div></div>
     `;
     } catch (err) {
         console.error('Помилка відмальовки панелі розробника:', err);
