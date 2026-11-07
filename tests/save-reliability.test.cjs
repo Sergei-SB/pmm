@@ -62,6 +62,23 @@ test('Repeated unchanged route saves preserve the timestamp and never write anot
     assert.equal(writes, 1);
 });
 
+test('Driver odometer supplies the shared route total and preserves the original manual entry', () => {
+    const c = contextWith([['driver_routes.js', 'parseDriverOdometer'], ['driver_routes.js', 'applyDriverOdometer']]);
+    const row = {dataset: {driverOdometer: '213021'}};
+    const total = {value: '18'};
+    assert.equal(c.applyDriverOdometer(row, total, 212971), 213021);
+    assert.equal(total.value, '50');
+    assert.equal(row.dataset.driverManualTotal, '18');
+    row.dataset.driverOdometer = '213000';
+    assert.equal(c.applyDriverOdometer(row, total, 213021), null);
+    assert.ok(row.driverReadingError);
+    assert.equal(total.value, '18');
+    row.dataset.driverOdometer = '';
+    assert.equal(c.applyDriverOdometer(row, total, 213021), null);
+    assert.equal(total.value, '18');
+    assert.equal(row.dataset.driverManualTotal, undefined);
+});
+
 function routeRepairContext() {
     const key = 'isolated_car_routes_21.10-31.10_9';
     const remote = JSON.stringify({topFields: {fuelStart: '24', updatedAt: 'old'}, rows: [{km: '10'}]});

@@ -1054,8 +1054,8 @@ function addRouteRow(routeName = 'Виконання БЗ Харків', dateVal
             <td><input type="text" value="${dateVal}" style="width: 45px; text-align: center;"></td>
             <td><input type="text" class="row-cargo" value="" style="width: 38px;" oninput="updateRouteTotals()"></td>
             <td><input type="text" value="" style="width: 38px;" oninput="updateRouteTotals()"></td>
-            <td><input type="text" value="" style="width: 38px;" oninput="updateRouteTotals()"></td>
-            <td><input type="text" class="total-col" value="${totalVal}" style="width: 45px;" oninput="updateRouteTotals()"></td>
+            <td><input type="text" class="row-trailer" value="" style="width: 38px;" oninput="updateRouteTotals()"></td>
+            <td><input type="text" class="total-col" value="${totalVal}" style="width: 45px;" oninput="updateManualRouteTotal(this)"></td>
             <td><button class="delete-row-btn" onclick="this.closest('tr').remove(); updateRouteTotals();">X</button></td>
             <td><input type="text" value="о/с" style="width: 38px; text-align: center;"></td>
             <td><input type="text" class="row-tons" value="" style="width: 55px;" oninput="updateRouteTotals()"></td>
@@ -1066,10 +1066,10 @@ function addRouteRow(routeName = 'Виконання БЗ Харків', dateVal
         tr.innerHTML = `
             <td><input type="text" value="${routeName}" style="width: 340px; text-align: left; padding-left: 5px;" oninput="updateRouteTotals()"></td>
             <td><input type="text" value="${dateVal}" style="width: 50px;"></td>
+            <td><input type="text" class="row-cargo" value="" style="width: 40px;"></td>
             <td><input type="text" value="" style="width: 40px;"></td>
-            <td><input type="text" value="" style="width: 40px;"></td>
-            <td><input type="text" value="" style="width: 40px;"></td>
-            <td><input type="text" class="total-col" value="${totalVal}" style="width: 50px;" oninput="updateRouteTotals()"></td>
+            <td><input type="text" class="row-trailer" value="" style="width: 40px;"></td>
+            <td><input type="text" class="total-col" value="${totalVal}" style="width: 50px;" oninput="updateManualRouteTotal(this)"></td>
             <td><button class="delete-row-btn" onclick="this.closest('tr').remove(); updateRouteTotals();">X</button></td>
             <td><input type="text" value="о/с" style="width: 40px;"></td>
             <td><input type="text" class="row-odo" style="width: 90px;" readonly></td>
@@ -1108,11 +1108,19 @@ function applyPresetToActiveRow(text) {
     }
 }
 
+function updateManualRouteTotal(input) {
+    const row = input.closest('tr');
+    delete row.dataset.driverOdometer;
+    delete row.dataset.driverManualTotal;
+    updateRouteTotals();
+}
+
 function updateRouteTotals() {
     let totalKm = 0;
-    let startOdoInput = document.getElementById('odo-1')?.value || '0';
+    let startOdoInput = document.getElementById('odo-1')?.value || '';
     let startOdo = evaluateExpression(startOdoInput);
     let currentOdo = startOdo;
+    let hasOdometer = Boolean(startOdoInput.trim()) && (startOdo > 0 || /^0+(?:[.,]0+)?$/.test(startOdoInput.trim()));
 
     const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
     const car = safeCars.find(c => Number(c.id) === Number(currentCarId));
@@ -1123,10 +1131,17 @@ function updateRouteTotals() {
     rows.forEach(row => {
         const kmInput = row.querySelector('.total-col');
         const odoInput = row.querySelector('.row-odo');
+        const driverReading = typeof applyDriverOdometer === 'function'
+            ? applyDriverOdometer(row, kmInput, hasOdometer ? currentOdo : null) : null;
         const tripVal = evaluateExpression(kmInput?.value);
         
         totalKm += tripVal;
-        currentOdo += tripVal;
+        if (driverReading !== null) {
+            currentOdo = driverReading;
+            hasOdometer = true;
+        } else {
+            currentOdo += tripVal;
+        }
         if (odoInput) odoInput.value = currentOdo;
 
         const cargoInput = row.querySelector('.row-cargo');
@@ -1146,7 +1161,7 @@ function updateRouteTotals() {
 
     const odo2 = document.getElementById('odo-2');
     if (odo2) {
-        odo2.value = currentOdo > 0 ? currentOdo : "";
+        odo2.value = hasOdometer || currentOdo > 0 ? currentOdo : "";
     }
 
     document.querySelectorAll('#sum-km').forEach(el => {
@@ -1336,6 +1351,7 @@ function updateRouteTotals() {
         const adblueLeftEl = document.getElementById('adblue-left');
         if (adblueLeftEl) adblueLeftEl.textContent = fmt(adblueLeft, 2);
     }
+    if (typeof refreshDriverRouteView === 'function') refreshDriverRouteView(car);
 }
 
 document.addEventListener('click', function(e) {

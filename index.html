@@ -87,7 +87,7 @@
             reader.readAsDataURL(file);
         }
     </script>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=20261107-driver-odometer">
     <style>
         html:not(.registry-developer) #base-view .registry-developer-only { display: none !important; }
         table thead tr, 
@@ -348,6 +348,10 @@
                                 <tr><td>Початковий одометр</td><td><input type="text" id="odo-1" value=""></td></tr>
                                 <tr><td>Кінцевий одометр</td><td><input type="text" id="odo-2" value=""></td></tr>
                             </table>
+                            <div id="route-mode-switch" role="group" aria-label="Режим таблиці маршрутів">
+                                <button type="button" data-route-mode="technical" aria-pressed="true">Для зампотехів</button>
+                                <button type="button" data-route-mode="driver" aria-pressed="false">Для водіїв</button>
+                            </div>
                         </div>
                     </div>
 
@@ -358,6 +362,13 @@
                             </thead>
                             <tbody id="routes-tbody"></tbody>
                         </table>
+                        <div id="driver-route-panel" hidden>
+                            <p class="driver-route-hint">Введіть одометр після поїздки. Пробіг, кінцевий одометр і витрата оновляться в обох режимах.</p>
+                            <table aria-label="Одометри для водіїв">
+                                <thead><tr><th>№</th><th>Маршрут</th><th id="driver-odometer-heading">Одометр</th><th>Пройдено, км</th><th id="driver-cargo-heading">Вантаж, км</th><th id="driver-trailer-heading">Причіп, км</th><th id="driver-tons-heading">Кількість, т</th><th id="driver-tkm-heading">Т-км</th></tr></thead>
+                                <tbody id="driver-routes-tbody"></tbody>
+                            </table>
+                        </div>
                         
                         <button class="action-btn" onclick="addRouteRow()">+ Додати рядок маршруту</button>
 
@@ -718,8 +729,9 @@
     <script src="permissions_registry.js"></script>
     <script src="broadcast_mail.js"></script>
     <script src="equipment_report.js?v=20261025-category-order"></script>
-    <script src="app.js?v=20261026-registry-dev"></script>
-    <script src="app2.js?v=20261024-route-content"></script>
+    <script src="driver_routes.js?v=20261107-driver-odometer"></script>
+    <script src="app.js?v=20261107-driver-odometer"></script>
+    <script src="app2.js?v=20261107-driver-odometer"></script>
     <script src="aggregates_calc.js?v=20261025-inventory-rates"></script>
     <script src="destroyed_equipment.js?v=20261024-pumps"></script>
     <script src="documents.js"></script>

@@ -306,6 +306,12 @@ function loadCarDataForActivePeriod() {
                 if (typeof addRouteRow === 'function') {
                     addRouteRow(rData.name || 'Виконання БЗ Харків', rData.time || '8:30', '', truckActive);
                     const lastRow = tbody.lastElementChild;
+                    if (lastRow && (typeof rData.driverOdometer === 'string' || typeof rData.driverOdometer === 'number')) {
+                        lastRow.dataset.driverOdometer = String(rData.driverOdometer);
+                    }
+                    if (lastRow && typeof rData.driverManualTotal === 'string') {
+                        lastRow.dataset.driverManualTotal = rData.driverManualTotal;
+                    }
                     if (lastRow && Array.isArray(rData.inputs)) {
                         const inputs = lastRow.querySelectorAll('input');
                         rData.inputs.forEach((val, idx) => {
@@ -474,11 +480,14 @@ function saveCarRoutesForPeriod(periodToSave, carIdToSave, isManualSave = false)
     rows.forEach(row => {
         const inputs = row.querySelectorAll('input');
         const inputValues = Array.from(inputs).map(inp => inp.value);
-        rowsData.push({
+        const savedRow = {
             name: inputs[0] ? inputs[0].value : '',
             time: inputs[1] ? inputs[1].value : '8:30',
             inputs: inputValues
-        });
+        };
+        if (row.dataset?.driverOdometer) savedRow.driverOdometer = row.dataset.driverOdometer;
+        if (row.dataset?.driverManualTotal !== undefined) savedRow.driverManualTotal = row.dataset.driverManualTotal;
+        rowsData.push(savedRow);
     });
 
     const odo1Val = document.getElementById('odo-1')?.value || '';
