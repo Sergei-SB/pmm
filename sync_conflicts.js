@@ -34,6 +34,21 @@
         try {
             var local = JSON.parse(item.local.value), remote = JSON.parse(item.remote.value);
             if (!local || !remote || typeof local !== 'object' || typeof remote !== 'object') return;
+            var registry = item.id === 'user_cars_database_v2' && Array.isArray(local) && Array.isArray(remote) && window.pmmRegistryVehicleMatch;
+            if (registry) {
+                var localRows = {}, remoteRows = {}, matched = new Set();
+                local.forEach(function (car, index) {
+                    var matches = remote.filter(function (saved) {return window.pmmRegistryVehicleMatch(car, saved);});
+                    localRows[index] = car;
+                    if (matches.length === 1 && !matched.has(matches[0])) {
+                        remoteRows[index] = matches[0];
+                        matched.add(matches[0]);
+                    }
+                });
+                remote.forEach(function (car, index) {if (!matched.has(car)) remoteRows['server-' + index] = car;});
+                local = localRows; remote = remoteRows;
+                node('p', 'Авто порівнюються за VIN або номером. При збереженні вашої версії записи, які є тільки на сайті, залишаться в реєстрі.', section);
+            }
             var left = Object.keys(local), right = Object.keys(remote);
             var remoteOnly = right.filter(function (id) {return !Object.prototype.hasOwnProperty.call(local, id);});
             var localOnly = left.filter(function (id) {return !Object.prototype.hasOwnProperty.call(remote, id);});
@@ -49,6 +64,7 @@
                 var l = local[id], r = remote[id];
                 if (!l || !r || typeof l !== 'object' || typeof r !== 'object') return;
                 Object.keys(Object.assign({}, l, r)).forEach(function (field) {
+                    if (registry && field === 'id') return;
                     if (JSON.stringify(l[field]) === JSON.stringify(r[field])) return;
                     function text(value) {
                         var str = value === undefined ? '(відсутнє)' : typeof value === 'string' ? value : JSON.stringify(value);

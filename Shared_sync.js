@@ -123,7 +123,7 @@
 
     // Three-way merge: retain offline additions and independent field edits;
     // never restore a vehicle deleted remotely from an unchanged local snapshot.
-    function mergeCarValue(key, localValue, remoteValue, baseValue) {
+    function mergeCarValue(key, localValue, remoteValue, baseValue, preferLocal) {
         try {
             var local = JSON.parse(localValue);
             var remote = JSON.parse(remoteValue);
@@ -189,7 +189,24 @@
                 }
                 if (Array.isArray(l[id]) || Array.isArray(r[id])) {
                     if (JSON.stringify(l[id]) === JSON.stringify(b[id])) return;
-                    if (JSON.stringify(r[id]) !== JSON.stringify(b[id]) && JSON.stringify(l[id]) !== JSON.stringify(r[id])) throw new Error('Conflicting row changes');
+                    if (JSON.stringify(r[id]) !== JSON.stringify(b[id]) && JSON.stringify(l[id]) !== JSON.stringify(r[id])) {
+                        if (!route || id !== 'rows' || l[id].length !== r[id].length || l[id].length !== b[id].length) {
+                            throw new Error('Conflicting row changes');
+                        }
+                        result[id] = l[id].map(function (row, index) {
+                            var oldRow = b[id][index], serverRow = r[id][index];
+                            var lockId = oldRow.routeLock && oldRow.routeLock.id;
+                            if (lockId && (row.routeLock?.id !== lockId || serverRow.routeLock?.id !== lockId)) throw new Error('Route order changed');
+                            if (JSON.stringify(row) === JSON.stringify(oldRow)) return serverRow;
+                            if (JSON.stringify(serverRow) === JSON.stringify(oldRow)) return row;
+                            var localFields = Object.assign({}, row), serverFields = Object.assign({}, serverRow);
+                            delete localFields.routeLock;
+                            delete serverFields.routeLock;
+                            if (JSON.stringify(localFields) === JSON.stringify(serverFields)) return serverRow;
+                            throw new Error('Conflicting edits in the same route row');
+                        });
+                        return;
+                    }
                     result[id] = l[id];
                     return;
                 }
@@ -197,8 +214,8 @@
                 Object.keys(l[id]).forEach(function (field) {
                     var changed = JSON.stringify(l[id][field]) !== JSON.stringify(b[id][field]);
                     var remoteUnchanged = JSON.stringify(r[id][field]) === JSON.stringify(b[id][field]);
-                    if (changed && !remoteUnchanged && JSON.stringify(l[id][field]) !== JSON.stringify(r[id][field])) throw new Error('Conflicting edits');
-                    if (changed && (remoteUnchanged || JSON.stringify(l[id][field]) === JSON.stringify(r[id][field]))) row[field] = l[id][field];
+                    if (changed && !remoteUnchanged && !preferLocal && JSON.stringify(l[id][field]) !== JSON.stringify(r[id][field])) throw new Error('Conflicting edits');
+                    if (changed) row[field] = l[id][field];
                 });
                 result[id] = row;
             });
@@ -217,7 +234,7 @@
     // This map is an overlay of vehicle properties, not the fleet itself.
     // Missing entries in an older browser must not delete properties retained
     // on the server. Still refuse different edits of the same field.
-    function mergeCarModifications(localValue, remoteValue, baseValue) {
+    function mergeCarModifications(localValue, remoteValue, baseValue, preferLocal) {
         try {
             var local = JSON.parse(localValue), remote = JSON.parse(remoteValue);
             var base = baseValue ? JSON.parse(baseValue) : {};
@@ -228,7 +245,7 @@
             Object.keys(base).forEach(function (id) {
                 if (!Object.prototype.hasOwnProperty.call(complete, id)) complete[id] = base[id];
             });
-            var result = mergeCarValue('cars_modifications_data', JSON.stringify(complete), remoteValue, JSON.stringify(base));
+            var result = mergeCarValue('cars_modifications_data', JSON.stringify(complete), remoteValue, JSON.stringify(base), preferLocal && !!baseValue);
             if (result === null) return null;
             var merged = JSON.parse(result);
             // Retain every server entry; omission from an overlay is not an
@@ -243,6 +260,53 @@
     function conflictMergeValue(item, candidate) {
         if (item.kind !== 'key' || item.id !== 'cars_modifications_data' || item.local.deleted || item.remote.deleted) return null;
         return mergeCarModifications(item.local.value, item.remote.value, candidate.baseValue);
+    }
+
+    function registryVehicleMatch(car, candidate) {
+        var vin = String(car.vin || '').trim().toUpperCase();
+        var otherVin = String(candidate.vin || '').trim().toUpperCase();
+        if (vin.length === 17 && otherVin.length === 17) return vin === otherVin;
+        var plate = String(car.plate || '').replace(/[\s-]/g, '').toUpperCase();
+        return !!plate && plate === String(candidate.plate || '').replace(/[\s-]/g, '').toUpperCase();
+    }
+    window.pmmRegistryVehicleMatch = registryVehicleMatch;
+
+    function retainServerRegistry(localValue, remoteValue, baseValue, explicit) {
+        try {
+            var local = JSON.parse(localValue), remote = JSON.parse(remoteValue);
+            var base = baseValue ? JSON.parse(baseValue) : [];
+            if (![local, remote, base].every(function (cars) {
+                return Array.isArray(cars) && cars.every(function (car) {return car && car.id != null;}) &&
+                    new Set(cars.map(function (car) {return String(car.id);})).size === cars.length;
+            }) || (!explicit && !base.length)) return null;
+            var result = remote.slice();
+            var updated = new Set();
+            for (var car of local) {
+                var originals = base.filter(function (old) {return registryVehicleMatch(car, old);});
+                if (originals.length > 1) return null;
+                var original = originals[0];
+                var matches = remote.filter(function (saved) {
+                    return registryVehicleMatch(car, saved) || (original && registryVehicleMatch(original, saved));
+                });
+                if (matches.length > 1) return null;
+                var saved = matches[0];
+                if (!saved) {
+                    if (original && JSON.stringify(car) === JSON.stringify(original)) continue;
+                    // IDs are foreign keys for routes, reports and documents.
+                    if (result.some(function (item) {return String(item.id) === String(car.id);})) return null;
+                    result.push(car);
+                    continue;
+                }
+                if (updated.has(saved.id) || (!original && !explicit && String(car.id) !== String(saved.id))) return null;
+                updated.add(saved.id);
+                var next = Object.assign({}, saved);
+                Object.keys(car).forEach(function (field) {
+                    if (field !== 'id' && (original ? JSON.stringify(car[field]) !== JSON.stringify(original[field]) : explicit)) next[field] = car[field];
+                });
+                result[remote.indexOf(saved)] = next;
+            }
+            return JSON.stringify(result);
+        } catch (_) { return null; }
     }
 
     function retainServerModifications(localValue, remoteValue) {
@@ -261,12 +325,14 @@
     // Reconcile only provably independent changes, including old blocked queues.
     // No version is chosen for differing edits of the same field. This also runs
     // on normal polling, so a harmless overlay mismatch needs no repeated clicks.
-    async function reconcileSafeModificationsRecord(remote) {
-        var key = 'cars_modifications_data', p = pending[key];
+    async function reconcileSafeModificationsRecord(remote, key = 'cars_modifications_data') {
+        var p = pending[key];
         if (!p || !p.blocked || p.deleted || !remote || remote.deleted || typeof remote.value !== 'string') return false;
         var original = p.value, base = p.baseValue;
         if (localGet(key) !== original) return false;
-        var merged = mergeCarModifications(original, remote.value, base);
+        var merged = key === 'user_cars_database_v2'
+            ? (p.role === 'developer' ? retainServerRegistry(original, remote.value, base, false) : null)
+            : mergeCarModifications(original, remote.value, base, p.role === 'developer');
         if (merged === null) return false;
         if (typeof window.archiveLocalSiteChange !== 'function') return false;
         await window.archiveLocalSiteChange('safe-properties-reconciliation', key, original, remote.value);
@@ -287,7 +353,7 @@
         for (var key of Object.keys(records || {})) {
             if (!/^isolated_car_routes_/.test(key)) continue;
             var p = pending[key], remote = records[key];
-            if (!p || !p.blocked || p.deleted || !remote || remote.deleted || typeof remote.value !== 'string') continue;
+            if (!p || !p.blocked || p.routeLocked || p.deleted || !remote || remote.deleted || typeof remote.value !== 'string') continue;
             var original = p.value, base = p.baseValue;
             if (localGet(key) !== original) continue;
             var merged = mergeCarValue(key, original, remote.value, base);
@@ -339,6 +405,7 @@
     }
 
     function getRole() {
+        if (typeof window.getCurrentAppRole === 'function') return window.getCurrentAppRole();
         try {
             if (typeof window.currentRole !== 'undefined' && window.currentRole) {
                 return String(window.currentRole).toLowerCase().trim();
@@ -361,6 +428,18 @@
         var r = getRole();
         return r === 'admin' || r === 'developer' || r === 'dev';
     }
+
+    // Keep the author of an unconfirmed route snapshot when the same browser
+    // switches to a lower role. The server must assign row locks first.
+    window.hasPendingPrivilegedRouteSave = function (key) {
+        var edit = pending[key];
+        if (!edit || edit.deleted || !['developer', 'dev', 'admin'].includes(edit.role)) return false;
+        try {
+            return JSON.stringify(JSON.parse(edit.value).rows) !== JSON.stringify(JSON.parse(edit.baseValue || 'null')?.rows);
+        } catch (error) {
+            return true;
+        }
+    };
 
     function readActiveReportPeriod() {
         try {
@@ -455,13 +534,17 @@
             }
             pending[key] = { value: str, deleted: false, preBoot: awaitingFirstPull };
         }
+        pending[key].role = getRole();
         if (isCarKey(key) && !deleted) {
             pending[key].baseValue = prior && prior.baseValue !== undefined ? prior.baseValue
                 : (meta.carBases[key] !== undefined ? meta.carBases[key] : previousValue);
         }
         // Module save hooks may rewrite a blocked key during a cloud save.
         // Keep it blocked until an archived reconciliation or explicit choice.
-        if (prior && prior.blocked) pending[key].blocked = true;
+        if (prior && prior.blocked) {
+            pending[key].blocked = true;
+            pending[key].routeLocked = prior.routeLocked;
+        }
         savePending();
         schedulePush(PUSH_DEBOUNCE_MS);
     }
@@ -534,13 +617,16 @@
     function buildPayload() {
         var changes = {};
         var deletedKeys = [];
+        var deletionRoles = {};
         Object.keys(pending).forEach(function (key) {
             var p = pending[key];
             if (!p || p.blocked) return;
-            if (p.deleted) deletedKeys.push(key);
-            else changes[key] = { value: p.value, baseRev: getKeyRev(key) };
+            if (p.deleted) {
+                deletedKeys.push(key);
+                if (p.role) deletionRoles[key] = p.role;
+            } else changes[key] = { value: p.value, baseRev: getKeyRev(key), role: p.role };
         });
-        return { changes: changes, deletedKeys: deletedKeys };
+        return { changes: changes, deletedKeys: deletedKeys, deletionRoles: deletionRoles };
     }
 
     function schedulePush(delay) {
@@ -588,16 +674,25 @@
                 deviceId: deviceId,
                 role: getRole(),
                 changes: payload.changes,
-                deletedKeys: payload.deletedKeys
+                deletedKeys: payload.deletedKeys,
+                deletionRoles: payload.deletionRoles
             })
         }, PUSH_TIMEOUT_MS).then(function (res) {
             if (!res.ok) throw new Error('HTTP ' + res.status);
             return res.json();
         }).then(async function (data) {
+            if (!data || !data.ok || !data.applied) throw new Error('Сервер не підтвердив запис');
+            var needRefresh = false;
             // прибираємо з черги лише те, що не змінилося під час запиту
             changeKeys.forEach(function (key) {
                 var p = pending[key];
                 if (data.applied && Object.prototype.hasOwnProperty.call(data.applied, key) && p && !p.deleted && payload.changes[key] && p.value === payload.changes[key].value) {
+                    if (key.startsWith('isolated_car_routes_') && window.hasPendingPrivilegedRouteSave(key)) needRefresh = true;
+                    var canonical = data.canonical && data.canonical[key];
+                    if (typeof canonical === 'string' && localGet(key) === p.value) {
+                        localSet(key, canonical);
+                        needRefresh = true;
+                    }
                     delete pending[key];
                 }
             });
@@ -606,14 +701,13 @@
                 if (data.applied && Object.prototype.hasOwnProperty.call(data.applied, key) && p && p.deleted) delete pending[key];
             });
 
-            var needRefresh = false;
-
             if (data && data.applied) {
                 Object.keys(data.applied).forEach(function (key) {
                     setKeyRev(key, data.applied[key]);
                     if (isCarKey(key) && payload.changes[key]) {
-                        meta.carBases[key] = payload.changes[key].value;
-                        if (pending[key] && !pending[key].deleted) pending[key].baseValue = payload.changes[key].value;
+                        var confirmed = (data.canonical && data.canonical[key]) ?? payload.changes[key].value;
+                        meta.carBases[key] = confirmed;
+                        if (pending[key] && !pending[key].deleted) pending[key].baseValue = confirmed;
                     }
                 });
             }
@@ -623,13 +717,18 @@
                     var rec = data.rejected[key];
                     if (!rec) return;
 
-                    if (rec.safetyBlocked) {
+                    if (rec.safetyBlocked || rec.routeLocked) {
                         var candidate = pending[key];
                         if (candidate && candidate.value) localSet('__sync_car_conflict_' + key, candidate.value);
                         // Keep the user's text and pending edit until the conflict is resolved.
                         // A safety rejection must never restore stale values over local edits.
-                        if (candidate) candidate.blocked = true;
-                        lastSafetyWarning = 'Сервер заблокував зміну через розбіжність списків авто. Ваші примітки збережено локально; відкрийте конфлікти синхронізації для перевірки.';
+                        if (candidate) {
+                            candidate.blocked = true;
+                            candidate.routeLocked = !!rec.routeLocked;
+                        }
+                        lastSafetyWarning = rec.routeLocked
+                            ? 'Цей рядок маршруту захищено розробником або адміністратором. Ваш варіант збережено у браузері.'
+                            : 'Сервер заблокував зміну через розбіжність списків авто. Ваші примітки збережено локально; відкрийте конфлікти синхронізації для перевірки.';
                         setStatus('conflict');
                         return;
                     }
@@ -662,6 +761,9 @@
             if (data.rejected && data.rejected.cars_modifications_data &&
                 typeof reconcileSafeModificationsRecord === 'function' &&
                 await reconcileSafeModificationsRecord(data.rejected.cars_modifications_data)) needRefresh = true;
+            if (data.rejected && data.rejected.user_cars_database_v2 &&
+                typeof reconcileSafeModificationsRecord === 'function' &&
+                await reconcileSafeModificationsRecord(data.rejected.user_cars_database_v2, 'user_cars_database_v2')) needRefresh = true;
             if (typeof reconcileSafeRouteRecords === 'function' && await reconcileSafeRouteRecords(data.rejected)) needRefresh = true;
 
             // Only a completed GET advances the pull cursor. POST acknowledgements
@@ -705,7 +807,8 @@
                     } else setStatus('conflict');
                     return;
                 }
-                if (pending[key] && !pending[key].deleted && !isCarKey(key) && incoming > getKeyRev(key) && pending[key].value !== rec.value) {
+                if (pending[key] && incoming <= getKeyRev(key)) return;
+                if (pending[key] && !isCarKey(key) && (pending[key].deleted !== !!rec.deleted || (!rec.deleted && pending[key].value !== rec.value))) {
                     localSet('__sync_value_conflict_' + key, pending[key].value);
                     pending[key].blocked = true;
                     setStatus('conflict');
@@ -715,12 +818,14 @@
                 // A smaller server snapshot must not silently erase a previously
                 // saved local fleet on startup. Keep server edits and add the
                 // missing local vehicles, preserving their original IDs.
-                if (key === 'user_cars_database_v2' && !rec.deleted && window.__pmmHadSavedCars) {
+                if (key === 'user_cars_database_v2' && !pending[key] && !rec.deleted && window.__pmmHadSavedCars) {
                     try {
                         var localCars = JSON.parse(localGet(key) || '[]');
                         var remoteCars = JSON.parse(rec.value);
                         var remoteIds = new Set(remoteCars.map(function (car) { return String(car.id); }));
-                        var missingCars = localCars.filter(function (car) { return !remoteIds.has(String(car.id)); });
+                        var missingCars = localCars.filter(function (car) {
+                            return !remoteIds.has(String(car.id)) && !remoteCars.some(function (saved) {return registryVehicleMatch(car, saved);});
+                        });
                         if (localCars.length > remoteCars.length && missingCars.length > 1) {
                             var kept = JSON.stringify(remoteCars.concat(missingCars));
                             localSet(key, kept);
@@ -735,9 +840,12 @@
 
                 if (pending[key] && !pending[key].deleted && isCarKey(key) && !rec.deleted && typeof rec.value === 'string') {
                     var p = pending[key];
-                    var merged = key === 'cars_modifications_data'
-                        ? mergeCarModifications(p.value, rec.value, p.baseValue)
-                        : mergeCarValue(key, p.value, rec.value, p.baseValue);
+                    var developerEdit = p.role === 'developer' && !!p.baseValue;
+                    var merged = key === 'user_cars_database_v2' && p.role === 'developer'
+                        ? retainServerRegistry(p.value, rec.value, p.baseValue, false)
+                        : key === 'cars_modifications_data'
+                        ? mergeCarModifications(p.value, rec.value, p.baseValue, developerEdit)
+                        : mergeCarValue(key, p.value, rec.value, p.baseValue, developerEdit && /^(report_data_|equipment_report_data_)/.test(key));
                     if (merged === null) {
                         localSet('__sync_car_conflict_' + key, p.value);
                         p.blocked = true;
@@ -748,14 +856,18 @@
                     meta.carBases[key] = rec.value;
                     setKeyRev(key, incoming);
                     if (merged === rec.value) delete pending[key];
-                    else pending[key] = {value: merged, deleted: false, preBoot: false, baseValue: rec.value};
+                    else pending[key] = {value: merged, deleted: false, preBoot: false, baseValue: rec.value, role: p.role};
                     return;
                 }
 
-                if (isFirstPull && pending[key]) {
-                    // Перший pull: якщо сервер знає цей ключ — перемагає сервер,
-                    // якщо не знає — локальне значення залишається в черзі й піде на сервер.
-                    delete pending[key];
+                if (pending[key]) {
+                    var edit = pending[key];
+                    if (edit.deleted === !!rec.deleted && (edit.deleted || edit.value === rec.value)) delete pending[key];
+                    else {
+                        edit.blocked = true;
+                        setStatus('conflict');
+                        return;
+                    }
                 } else if (!isFirstPull && incoming <= getKeyRev(key)) {
                     return;
                 }
@@ -808,8 +920,13 @@
                 var wasFirstPull = awaitingFirstPull;
                 var incomingKeys = data.keys || data.storage || {};
                 var propertiesReconciled = await reconcileSafeModificationsRecord(incomingKeys.cars_modifications_data);
+                var registryReconciled = await reconcileSafeModificationsRecord(incomingKeys.user_cars_database_v2, 'user_cars_database_v2');
                 var routesReconciled = await reconcileSafeRouteRecords(incomingKeys);
                 var changed = applyRemoteKeys(incomingKeys, awaitingFirstPull);
+                if (Array.isArray(data.activity)) {
+                    window.pmmSharedActivity = data.activity;
+                    callIfExists('renderPmmSharedActivity');
+                }
                 if (typeof data.revision === 'number') setLastRev(data.revision);
                 else if (typeof data.version === 'number') { /* старий сервер: ревізій немає */ }
 
@@ -822,19 +939,20 @@
                         if (!incomingKeys[k] && !pending[k]) {
                             var val = localGet(k);
                             if (val !== null && val !== undefined) {
-                                pending[k] = { value: String(val), deleted: false, preBoot: false };
+                                // Older local-only records have no attributable author.
+                                pending[k] = { value: String(val), deleted: false, preBoot: false, role: 'user' };
                             }
                         }
                     });
                 }
 
-                var shouldRefresh = (changed > 0) || isInitial || propertiesReconciled || routesReconciled;
+                var shouldRefresh = (changed > 0) || isInitial || propertiesReconciled || registryReconciled || routesReconciled;
                 awaitingFirstPull = false;
                 saveMeta();
                 savePending();
 
                 if (shouldRefresh) refreshAllViewsSafely();
-                setStatus(Object.keys(pending).length > 0 ? 'saving' : 'ok');
+                setStatus(Object.keys(pending).some(function (key) { return pending[key].blocked; }) ? 'conflict' : 'ok');
                 if (Object.keys(pending).length > 0) schedulePush(200);
                 if (typeof data.filesVersion === 'number') return pullDocsIfNewer(data.filesVersion, wasFirstPull);
             })
@@ -1075,9 +1193,10 @@
         try {
             if (typeof window.getStrictActivePeriod === 'function') period = window.getStrictActivePeriod();
         } catch (e) {}
-        callIfExists('saveCarRoutesForPeriod', period ? [period] : []);
-        callIfExists('saveCarsModificationsToStorage');
-        callIfExists('saveCarsToStorage');
+        var card = document.getElementById('card-view');
+        if (card && (card.classList.contains('active') || card.style.display === 'block')) {
+            callIfExists('saveCarRoutesForPeriod', period ? [period] : []);
+        }
         callIfExists('saveDocumentEditorDraft');
 
         [['report-view', 'saveCurrentReportSilently'], ['equipment-report-view', 'saveCurrentEquipmentReportSilently'],
@@ -1086,22 +1205,16 @@
             if (section && (section.classList.contains('active') || section.style.display === 'block')) callIfExists(entry[1]);
         });
 
-        localKeys().forEach(function (key) {
-            if (!isSyncedKey(key)) return;
-            var value = localGet(key);
-            if (value === null) return;
-            var previous = pending[key];
-            if (previous && previous.blocked) return;
-            pending[key] = { value: value, deleted: false, preBoot: false };
-            if (isCarKey(key)) pending[key].baseValue = previous && previous.baseValue !== undefined ? previous.baseValue : meta.carBases[key];
-        });
-        savePending();
-
         // Saving to the shared site does not download files onto the computer.
         // Local history remains a recovery aid; GitHub is server-side persistence.
         var serverBackup = false;
-        manualSavePromise = Promise.resolve().then(function () {
+        manualSavePromise = Promise.resolve().then(async function () {
             manualBackupInProgress = false;
+            var deadline = Date.now() + 25000;
+            while (pushInFlight || pullInFlight || filesInFlight || awaitingFirstPull) {
+                if (Date.now() >= deadline) throw new Error('Сервер ще не відповів');
+                await new Promise(function (resolve) { setTimeout(resolve, 100); });
+            }
             // Only independent property edits can be reconciled here. Genuine
             // field collisions, registry deletions and file conflicts stay blocked.
             return typeof window.reconcilePmmModificationsConflict === 'function'
@@ -1122,12 +1235,16 @@
             .then(function () {
                 var left = Object.keys(pending).length + Object.keys(documentPending).length;
                 var hasConflicts = Object.keys(pending).some(function (key) { return pending[key].blocked; }) || Object.keys(documentPending).some(function (id) { return documentPending[id].blocked; });
-                setStatus(lastSafetyWarning || hasConflicts ? 'conflict' : (left > 0 ? 'saving' : 'ok'));
+                var hasStorageErrors = Object.keys(storageErrors).length > 0;
+                setStatus(lastSafetyWarning || hasConflicts ? 'conflict' : (left > 0 ? 'saving' : (serverBackup ? 'ok' : 'offline')));
                 if (!showNotification) return;
 
-                var msg = lastSafetyWarning || (hasConflicts ? 'Є конфлікт. Ваш варіант збережено локально; серверний варіант не перезаписано.' : left > 0 ? 'Частина змін ще у черзі — збереження на сайт не завершено.' : 'Дані збережено на сайті та доступні всім користувачам.');
+                var msg = lastSafetyWarning || (hasConflicts ? 'Є конфлікт. Ваш варіант збережено локально; серверний варіант не перезаписано.'
+                    : hasStorageErrors ? 'Браузер не зміг зберегти частину змін.'
+                    : left > 0 ? 'Частина змін ще у черзі — збереження на сайт не завершено.'
+                    : serverBackup ? 'Дані збережено на сайті та доступні всім користувачам.' : 'Збереження на сайті не підтверджено.');
                 msg += serverBackup ? ' Серверна резервна копія створена.' : ' Серверну резервну копію не підтверджено.';
-                var color = left > 0 || lastSafetyWarning || !serverBackup ? '#d97706' : '#27ae60';
+                var color = left > 0 || lastSafetyWarning || hasStorageErrors || !serverBackup ? '#d97706' : '#27ae60';
                 if (!callIfExists('showDevNotification', [msg, color])) alert(msg);
             }).catch(function (error) {
                 setStatus('offline');
@@ -1228,6 +1345,10 @@
         if (choice === 'local' && item.kind === 'key' && item.id === 'cars_modifications_data' && !item.local.deleted && !item.remote.deleted) {
             mergedValue = retainServerModifications(item.local.value, item.remote.value);
         }
+        if (choice === 'local' && item.kind === 'key' && item.id === 'user_cars_database_v2' && !item.local.deleted && !item.remote.deleted) {
+            mergedValue = retainServerRegistry(item.local.value, item.remote.value, current.baseValue, true);
+            if (mergedValue === null) throw new Error('Не вдалося однозначно зіставити авто за VIN або номером. Реєстр збережено в обох версіях.');
+        }
         if (typeof window.archiveLocalSiteChange !== 'function') throw new Error('Модуль історії змін недоступний');
         await window.archiveLocalSiteChange('conflict-review', item.id, JSON.stringify(item.local), JSON.stringify(item.remote));
         var p = checkCurrent();
@@ -1246,6 +1367,8 @@
                     p.value = mergedValue;
                 }
                 p.blocked = false;
+                p.role = getRole();
+                delete p.routeLocked;
                 if (isCarKey(item.id)) p.baseValue = item.remote.deleted ? null : item.remote.value;
             }
             if (isCarKey(item.id)) meta.carBases[item.id] = item.remote.deleted ? null : item.remote.value;
@@ -1278,7 +1401,8 @@
         saveMeta();
         refreshAllViewsSafely();
         setStatus('ok');
-        pullServer(false);
+        if (choice !== 'server' && item.kind === 'key') await flushPending();
+        else pullServer(false);
         schedulePush(0); scheduleDocPush(0);
     };
 
@@ -1344,7 +1468,8 @@
                 deviceId: deviceId,
                 role: getRole(),
                 changes: payload.changes,
-                deletedKeys: payload.deletedKeys
+                deletedKeys: payload.deletedKeys,
+                deletionRoles: payload.deletionRoles
             });
             if (navigator.sendBeacon) {
                 navigator.sendBeacon(SERVER_URL + '/api/shared-state', new Blob([body], { type: 'application/json' }));

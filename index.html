@@ -362,6 +362,7 @@
                             </thead>
                             <tbody id="routes-tbody"></tbody>
                         </table>
+                        <p id="route-protection-pending" role="status" hidden>Очікуємо підтвердження змін Розробника або Адміна. Після підтвердження можна редагувати відкриті рядки.</p>
                         <div id="driver-route-panel" hidden>
                             <p class="driver-route-hint">Введіть одометр після поїздки. Пробіг, кінцевий одометр і витрата оновляться в обох режимах.</p>
                             <table aria-label="Одометри для водіїв">
@@ -370,7 +371,7 @@
                             </table>
                         </div>
                         
-                        <button class="action-btn" onclick="addRouteRow()">+ Додати рядок маршруту</button>
+                        <button id="add-card-route-row" class="action-btn" onclick="addEditableRouteRow()">+ Додати рядок маршруту</button>
 
                         <div class="fuel-summary-footer">
                             <div class="footer-layout-flex">
@@ -724,14 +725,14 @@
     <script src="developer.js"></script>
     <script src="moderator.js"></script>
     <script src="developer_mail.js"></script>
-    <script src="developer_panel.js?v=20261026-dual-admin"></script>
+    <script src="developer_panel.js?v=20261107-route-protection"></script>
     <script src="admin_layout.js?v=20261026-dual-admin"></script>
     <script src="permissions_registry.js"></script>
     <script src="broadcast_mail.js"></script>
     <script src="equipment_report.js?v=20261025-category-order"></script>
-    <script src="driver_routes.js?v=20261107-driver-odometer"></script>
-    <script src="app.js?v=20261107-driver-odometer"></script>
-    <script src="app2.js?v=20261107-driver-odometer"></script>
+    <script src="driver_routes.js?v=20261107-route-protection"></script>
+    <script src="app.js?v=20261107-route-protection"></script>
+    <script src="app2.js?v=20261107-route-protection"></script>
     <script src="aggregates_calc.js?v=20261025-inventory-rates"></script>
     <script src="destroyed_equipment.js?v=20261024-pumps"></script>
     <script src="documents.js"></script>
@@ -739,7 +740,7 @@
     <script src="presence.js"></script>
     <script src="automatic_backup.js"></script>
     <script src="document_sync.js"></script>
-    <script src="sync_conflicts.js?v=20261024-modifications-merge"></script>
-    <script src="Shared_sync.js?v=20261024-pumps"></script>
+    <script src="sync_conflicts.js?v=20261107-registry-identity"></script>
+    <script src="Shared_sync.js?v=20261107-developer-save"></script>
 </body>
 </html>

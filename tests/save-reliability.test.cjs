@@ -63,7 +63,7 @@ test('Repeated unchanged route saves preserve the timestamp and never write anot
 });
 
 test('Driver odometer supplies the shared route total and preserves the original manual entry', () => {
-    const c = contextWith([['driver_routes.js', 'parseDriverOdometer'], ['driver_routes.js', 'applyDriverOdometer']]);
+    const c = contextWith([['driver_routes.js', 'parseDriverOdometer'], ['driver_routes.js', 'isProtectedRouteRow'], ['driver_routes.js', 'applyDriverOdometer']]);
     const row = {dataset: {driverOdometer: '213021'}};
     const total = {value: '18'};
     assert.equal(c.applyDriverOdometer(row, total, 212971), 213021);
@@ -169,12 +169,42 @@ test('Module save hooks retain blocked overlay status and its original merge bas
         pending: {cars_modifications_data: {value: 'old local', baseValue: 'original server', blocked: true}},
         isCarKey: () => true, meta: {carBases: {cars_modifications_data: 'new server'}},
         awaitingFirstPull: false, MAX_VALUE_BYTES: 10000, PUSH_DEBOUNCE_MS: 400,
+        getRole: () => 'admin',
         savePending() {}, schedulePush() {}
     });
     c.queueLocalChange('cars_modifications_data', 'edited local', false, 'old local');
     assert.equal(c.pending.cars_modifications_data.blocked, true);
     assert.equal(c.pending.cars_modifications_data.baseValue, 'original server');
     assert.equal(c.pending.cars_modifications_data.value, 'edited local');
+});
+
+test('A lower role cannot rewrite a route while a developer save is awaiting confirmation', () => {
+    const key = 'isolated_car_routes_01.11-10.11_9';
+    let role = 'developer';
+    const c = contextWith([
+        ['Shared_sync.js', 'hasPendingPrivilegedRouteSave'],
+        ['driver_routes.js', 'routeEditorRole'],
+        ['driver_routes.js', 'isProtectedRouteRow'],
+        ['driver_routes.js', 'isAwaitingRouteProtection'],
+        ['driver_routes.js', 'isRouteRowReadOnly'],
+        ['app2.js', 'saveCarRoutesForPeriod']
+    ], {
+        getCurrentAppRole: () => role,
+        currentCarId: 9, getStrictActivePeriod: () => '01.11-10.11', getRoutesKey: () => key,
+        pending: {[key]: {role: 'developer', value: '{"rows":[{"inputs":["100"]}]}', baseValue: '{"rows":[{"inputs":["20"]}]}'}},
+        isRestoringState: false, updateRouteTotals: () => assert.fail('A lower role must not rewrite the pending snapshot')
+    });
+    const open = {dataset: {}};
+    const locked = {dataset: {routeLockId: 'server-confirmed'}};
+    assert.equal(c.isRouteRowReadOnly(open), false);
+    for (role of ['moderator', 'user']) {
+        assert.equal(c.isRouteRowReadOnly(open), true);
+        c.saveCarRoutesForPeriod();
+        assert.equal(c.pending[key].role, 'developer');
+    }
+    delete c.pending[key];
+    assert.equal(c.isRouteRowReadOnly(locked), true);
+    assert.equal(c.isRouteRowReadOnly(open), false);
 });
 
 test('An explicitly chosen local property version retains other server records and fields', async () => {
@@ -205,7 +235,7 @@ test('Registry safety rejection preserves typed notes and blocks retries until r
             schedulePush() {}, pullSharedEvent() {},
             refreshAllViewsSafely: () => { refreshes++; },
             fetchWithTimeout: async () => ({ ok: true, json: async () => ({
-                applied: {}, rejected: { [key]: { value: older, rev: 10, safetyBlocked: true } }
+                ok: true, applied: {}, rejected: { [key]: { value: older, rev: 10, safetyBlocked: true } }
             }) })
         });
         await c.flushPending();
@@ -243,7 +273,8 @@ function conflictContext() {
         localRemove: key => {delete values[key];}, setKeyRev: (key, rev) => {revisions[key] = rev;},
         isCarKey: () => true, meta: {lastRev: 99, carBases: {}},
         archiveLocalSiteChange: async (...args) => {backups.push(args);},
-        saveMeta() {}, savePending() {}, refreshAllViewsSafely() {}, setStatus() {}, pullServer() {}, schedulePush() {}, scheduleDocPush() {}
+        saveMeta() {}, savePending() {}, refreshAllViewsSafely() {}, setStatus() {}, pullServer() {}, flushPending() {}, schedulePush() {}, scheduleDocPush() {},
+        getRole: () => 'developer'
     });
     const item = {kind: 'key', id: 'report_data_test', local: {value: 'local', deleted: false}, remote: {value: 'server', rev: 42, deleted: false}};
     return {c, values, revisions, backups, item};
@@ -345,6 +376,7 @@ test('Cloud save sends reports and documents to the shared server without downlo
     let downloads = 0, sent = 0, files = 0, archives = 0;
     const c = contextWith([['Shared_sync.js', 'forcePushAllDataToServer']], {
         manualSavePromise: null, manualBackupInProgress: false, lastSafetyWarning: '',
+        pushInFlight: false, pullInFlight: false, filesInFlight: false, awaitingFirstPull: false, storageErrors: {},
         setStatus() {}, callIfExists() {}, document: { getElementById: () => null },
         localKeys: () => ['report_data_blocked'], isSyncedKey: () => true, localGet: () => 'local conflict',
         pending: {report_data_blocked: {value: 'local conflict', blocked: true}}, documentPending: {}, savePending() {},
@@ -386,7 +418,7 @@ test('Opening site with a smaller server registry preserves missing real local c
     const local = Array.from({ length: 108 }, (_, i) => ({ id: i + 1, model: 'car' }));
     const remote = local.slice(0, 68); remote[0] = { id: 1, model: 'newer server model' };
     const values = { user_cars_database_v2: JSON.stringify(local) };
-    const c = contextWith([['Shared_sync.js', 'isCarKey'], ['Shared_sync.js', 'mergeCarValue'], ['Shared_sync.js', 'applyRemoteKeys']], {
+    const c = contextWith([['Shared_sync.js', 'isCarKey'], ['Shared_sync.js', 'registryVehicleMatch'], ['Shared_sync.js', 'mergeCarValue'], ['Shared_sync.js', 'applyRemoteKeys']], {
         __pmmHadSavedCars: true, pending: {}, meta: { carBases: {} }, applyingRemote: false,
         isSyncedKey: () => true, localGet: key => values[key] ?? null, localSet: (key, value) => { values[key] = value; },
         localRemove: key => { delete values[key]; }, setKeyRev() {}, getKeyRev: () => 0, setStatus() {}
@@ -395,6 +427,26 @@ test('Opening site with a smaller server registry preserves missing real local c
     const kept = JSON.parse(values.user_cars_database_v2);
     assert.equal(kept.length, 108); assert.equal(kept[0].model, 'newer server model');
     assert.equal(JSON.parse(c.pending.user_cars_database_v2.value).length, 108);
+});
+
+test('Developer registry save matches the same vehicle across reordered IDs and keeps server-only records', async () => {
+    const {c, values, item, backups} = conflictContext();
+    for (const name of ['registryVehicleMatch', 'retainServerRegistry']) vm.runInContext(extract('Shared_sync.js', name), c);
+    const encode = JSON.stringify;
+    const original = {id: 23, plate: 'TI 763 G', note: 'old', driver: 'A'};
+    const local = [{...original, note: 'developer'}];
+    const remote = [{id: 23, plate: 'KI 574 G', note: 'another car'}, {...original, id: 51, note: 'other edit', driver: 'B'}];
+    const expected = [remote[0], {...remote[1], note: 'developer'}];
+    const key = 'user_cars_database_v2';
+    values[key] = encode(local);
+    c.pending[key] = {value: encode(local), blocked: true, baseValue: encode([original])};
+    Object.assign(item, {id: key, local: {value: encode(local), deleted: false}, remote: {value: encode(remote), rev: 42, deleted: false}});
+    await c.resolvePmmSyncConflict(item, 'local');
+    assert.deepEqual(JSON.parse(values[key]), expected);
+    assert.equal(c.pending[key].role, 'developer');
+    assert.equal(backups.length, 1);
+    assert.equal(c.retainServerRegistry(encode([{id: 23, plate: 'XX 000 X'}]), encode(remote), null, true), null);
+    assert.deepEqual(JSON.parse(c.retainServerRegistry(encode(local), encode(remote), encode([original]), false)), expected);
 });
 test('Fresh demo data is not added to an existing real server registry', () => {
     const values = { user_cars_database_v2: '[{"id":1},{"id":2},{"id":3}]' };

@@ -743,7 +743,7 @@ window.updateRoleUI = function() {
     const clearRoutesBtns = document.querySelectorAll('#card-view .routes-panel .btn-red, #card-view button[onclick*="clearActiveCarCardRoutes"]');
     clearRoutesBtns.forEach(b => b.style.setProperty("display", canClearRoutes ? "inline-block" : "none", "important"));
 
-    const addRouteBtn = document.querySelector('#card-view button[onclick="addRouteRow()"]');
+    const addRouteBtn = document.getElementById('add-card-route-row');
     if (addRouteBtn) {
         addRouteBtn.style.setProperty("display", canEditRoutes ? "inline-block" : "none", "important");
     }
@@ -761,6 +761,7 @@ window.updateRoleUI = function() {
         input.style.backgroundColor = canEditRoutes ? '' : '#f5f5f5';
         input.style.cursor = canEditRoutes ? '' : 'not-allowed';
     });
+    if (typeof applyRouteRowLocks === 'function') applyRouteRowLocks(canEditRoutes);
 
     // [ДЕТАЛЬНА КАРТКА АВТО (ТТХ ТА ДОКУМЕНТИ)]
     const canEditDetails = isDev || window.canRoleEdit(role, 'car_details');
@@ -2572,6 +2573,10 @@ window.renderDeveloperPanel = function() {
         `;
     } else if (currentDevSubTab === 'logs') {
         subTabContentHtml = `
+            <section style="background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px; margin-bottom: 16px;">
+                <h3 style="margin-top: 0;">Збережені зміни на сайті</h3>
+                <div id="dev-shared-activity" style="max-height: 320px; overflow-y: auto;"></div>
+            </section>
             <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
                     <h3 style="margin: 0; color: #2c3e50; font-size: 16px;">⚠️ Журнал подій безпеки та імпорту/експорту (${logs.length})</h3>
@@ -2636,6 +2641,7 @@ window.renderDeveloperPanel = function() {
         </nav><div class="dev-admin-content">
         ${subTabContentHtml}</div></div>
     `;
+    if (currentDevSubTab === 'logs') window.renderPmmSharedActivity();
     } catch (err) {
         console.error('Помилка відмальовки панелі розробника:', err);
         const container = getDevPanelContainer();
@@ -2649,6 +2655,37 @@ window.renderDeveloperPanel = function() {
             `;
         }
     }
+};
+
+window.renderPmmSharedActivity = function () {
+    const container = document.getElementById('dev-shared-activity');
+    if (!container) return;
+    const events = window.pmmSharedActivity || [];
+    const lastRevision = String(events.at(-1)?.rev || 0);
+    if (container.dataset.revision === lastRevision) return;
+    container.dataset.revision = lastRevision;
+    container.replaceChildren();
+    if (!events.length) {
+        container.textContent = 'Підтверджених змін у журналі поки немає.';
+        return;
+    }
+    const roles = {developer: 'Розробник', admin: 'Адмін', moderator: 'Модератор', user: 'Юзер'};
+    const list = document.createElement('ul');
+    for (const event of events.slice().reverse()) {
+        const item = document.createElement('li');
+        const route = /^isolated_car_routes_(.+)_(\d+)$/.exec(event.key);
+        let section = event.key;
+        if (route) {
+            const car = typeof carsData !== 'undefined' && carsData.find(car => String(car.id) === route[2]);
+            section = `Картка авто та Маршрути · ${car?.plate || 'авто № ' + route[2]} · ${route[1]}`;
+        } else if (event.key.startsWith('file:')) {
+            section = 'Файл документа · ' + event.key.slice(5);
+        }
+        const operation = event.operation === 'delete' ? 'видалення' : 'збереження';
+        item.textContent = `${new Date(event.at).toLocaleString('uk-UA')} · ${roles[event.role] || 'Юзер'} · ${operation} · ${section}`;
+        list.appendChild(item);
+    }
+    container.appendChild(list);
 };
 
 window.renderDevPanelView = window.renderDeveloperPanel;

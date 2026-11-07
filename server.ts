@@ -24,6 +24,7 @@ import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { archiveSnapshot, writeSnapshotWithBackup, registryChangeBlocked } from './storage_backups.ts';
 import { configuredGitHubStorage } from './github_storage.ts';
+import { protectRouteRows } from './route_locks.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -62,6 +63,15 @@ interface Store {
   filesVersion: number;
   filesChangedAt: string;
   bans: BanRecord[];
+  activity: SharedActivity[];
+}
+
+interface SharedActivity {
+  rev: number;
+  at: number;
+  key: string;
+  role: string;
+  operation: 'save' | 'delete';
 }
 
 interface OnlineSession {
@@ -140,6 +150,7 @@ function isTargetBanned(ip: string, deviceId: string, userName: string): { banne
 interface NormalizedChange {
   value: string;
   baseRev: number;
+  role?: string;
 }
 
 interface RejectedRecord {
@@ -147,12 +158,14 @@ interface RejectedRecord {
   rev: number;
   deleted: boolean;
   safetyBlocked?: boolean;
+  routeLocked?: boolean;
 }
 
 interface ApplyResult {
   applied: Record<string, number>;
   rejected: Record<string, RejectedRecord>;
   changedCount: number;
+  canonical: Record<string, string>;
 }
 
 type JsonObject = Record<string, unknown>;
@@ -218,6 +231,7 @@ function emptyStore(): Store {
     filesVersion: 0,
     filesChangedAt: new Date().toISOString(),
     bans: activeBans.map(ban => ({ ...ban })),
+    activity: [],
   };
 }
 
@@ -235,6 +249,11 @@ function normalizeStore(parsed: JsonObject): Store {
   store.changedAt = asString(parsed.changedAt, store.changedAt);
   store.filesVersion = asNumber(parsed.filesVersion);
   store.filesChangedAt = asString(parsed.filesChangedAt, store.filesChangedAt);
+  if (Array.isArray(parsed.activity)) store.activity = parsed.activity.filter((event): event is SharedActivity => {
+    const entry = asObject(event);
+    return typeof entry.key === 'string' && typeof entry.role === 'string' && typeof entry.at === 'number' && typeof entry.rev === 'number'
+      && (entry.operation === 'save' || entry.operation === 'delete');
+  }).slice(-500);
   if (Array.isArray(parsed.bans)) store.bans = parsed.bans.filter((ban): ban is BanRecord => {
     const record = asObject(ban);
     return typeof record.id === 'string' && typeof record.targetValue === 'string'
@@ -397,27 +416,41 @@ function normalizeChange(entry: unknown): NormalizedChange | null {
     return {
       value: typeof rawValue === 'string' ? rawValue : String(rawValue),
       baseRev: asNumber(obj.baseRev),
+      role: typeof obj.role === 'string' ? obj.role : undefined,
     };
   }
   return null;
 }
 
+function activityRole(value: unknown): string {
+  const role = asString(value, 'user').toLowerCase().trim();
+  return role === 'dev' ? 'developer' : (['developer', 'admin', 'moderator'].includes(role) ? role : 'user');
+}
+
+function recordSharedActivity(rev: number, key: string, role: string, operation: SharedActivity['operation']): void {
+  store.activity.push({rev, at: Date.now(), key: key.slice(0, 240), role, operation});
+  if (store.activity.length > 500) store.activity.splice(0, store.activity.length - 500);
+}
+
 function applyChanges(body: unknown, options: { seedAllowed: boolean }): ApplyResult {
   const payload = asObject(body);
   const deviceId = asString(payload.deviceId, 'unknown');
-  const role = asString(payload.role, 'user');
+  const role = activityRole(payload.role);
   const changes = asObject(payload.changes);
   const deletedKeys = Array.isArray(payload.deletedKeys) ? payload.deletedKeys : [];
+  const deletionRoles = asObject(payload.deletionRoles);
   const seedAllowed = options.seedAllowed;
 
   const applied: Record<string, number> = {};
   const rejected: Record<string, RejectedRecord> = {};
+  const canonical: Record<string, string> = {};
   let changedCount = 0;
 
   for (const key of Object.keys(changes)) {
     if (!isSyncableKey(key)) continue;
     const entry = normalizeChange(changes[key]);
     if (!entry) continue;
+    const authorRole = entry.role === undefined ? role : activityRole(entry.role);
 
     const existing = store.keys[key];
     if (registryChangeBlocked(key, existing && !existing.deleted ? existing.value : undefined, entry.value)) {
@@ -426,6 +459,10 @@ function applyChanges(body: unknown, options: { seedAllowed: boolean }): ApplyRe
       continue;
     }
     if (existing && !seedAllowed) {
+      if (!existing.deleted && existing.value === entry.value) {
+        applied[key] = existing.rev;
+        continue;
+      }
       // Приймаємо зміну лише коли вона зроблена на основі актуальної ревізії.
       if (entry.baseRev < existing.rev) {
         rejected[key] = {
@@ -435,30 +472,41 @@ function applyChanges(body: unknown, options: { seedAllowed: boolean }): ApplyRe
         };
         continue;
       }
-      if (!existing.deleted && existing.value === entry.value) {
-        applied[key] = existing.rev;
-        continue;
-      }
     }
 
+    const protectedRoute = key.startsWith('isolated_car_routes_') && !seedAllowed
+      ? protectRouteRows(existing && !existing.deleted ? existing.value : undefined, entry.value, authorRole) : null;
+    if (protectedRoute?.blocked) {
+      rejected[key] = {value: existing && !existing.deleted ? existing.value : undefined,
+        rev: existing?.rev || 0, deleted: !existing || existing.deleted, routeLocked: true};
+      continue;
+    }
+    const value = protectedRoute?.value ?? entry.value;
+    if (value !== entry.value) canonical[key] = value;
+    if (existing && !existing.deleted && existing.value === value && !seedAllowed) {
+      applied[key] = existing.rev;
+      continue;
+    }
     const rev = nextRev();
     store.keys[key] = {
-      value: entry.value,
+      value,
       rev,
       updatedAt: Date.now(),
-      updatedByRole: role,
+      updatedByRole: authorRole,
       deviceId,
       deleted: false,
     };
     applied[key] = rev;
+    if (!seedAllowed) recordSharedActivity(rev, key, authorRole, 'save');
     changedCount += 1;
   }
 
   for (const rawKey of deletedKeys) {
     const key = String(rawKey);
     if (!isSyncableKey(key)) continue;
+    const authorRole = deletionRoles[key] === undefined ? role : activityRole(deletionRoles[key]);
     const existing = store.keys[key];
-    if (!existing) continue;
+    if (!existing) { applied[key] = 0; continue; }
     if (registryChangeBlocked(key, existing.value, undefined)) {
       rejected[key] = { value: existing.value, rev: existing.rev, deleted: existing.deleted, safetyBlocked: true };
       continue;
@@ -467,16 +515,21 @@ function applyChanges(body: unknown, options: { seedAllowed: boolean }): ApplyRe
       applied[key] = existing.rev;
       continue;
     }
+    if (key.startsWith('isolated_car_routes_') && protectRouteRows(existing.value, undefined, authorRole).blocked) {
+      rejected[key] = { value: existing.value, rev: existing.rev, deleted: false, routeLocked: true };
+      continue;
+    }
     const rev = nextRev();
     store.keys[key] = {
       value: existing.value,
       rev,
       updatedAt: Date.now(),
-      updatedByRole: role,
+      updatedByRole: authorRole,
       deviceId,
       deleted: true,
     };
     applied[key] = rev;
+    if (!seedAllowed) recordSharedActivity(rev, key, authorRole, 'delete');
     changedCount += 1;
   }
 
@@ -485,7 +538,7 @@ function applyChanges(body: unknown, options: { seedAllowed: boolean }): ApplyRe
     store.changedAt = new Date().toISOString();
   }
 
-  return { applied, rejected, changedCount };
+  return { applied, rejected, changedCount, canonical };
 }
 
 // --- Сервер ---------------------------------------------------------------
@@ -569,6 +622,7 @@ async function startServer(): Promise<void> {
       revision: store.revision,
       changedAt: store.changedAt,
       filesVersion: store.filesVersion,
+      activity: store.activity.slice(-100),
       keys,
     });
   });
@@ -584,6 +638,7 @@ async function startServer(): Promise<void> {
       res.json({
         ok: true,
         applied: result.applied,
+        canonical: result.canonical,
         rejected: result.rejected,
         changedCount: result.changedCount,
         revision: store.revision,
@@ -687,6 +742,7 @@ async function startServer(): Promise<void> {
           if (prev && asNumber(f.baseRev) < prev.rev) { rejected[id] = { rev: prev.rev, deleted: prev.deleted }; continue; }
           const rev = nextRev();
           store.files[id] = { id, fileDataUrl, fileName, updatedAt: Date.now(), rev, deleted: false };
+          if (payload.isInitialSeed !== true) recordSharedActivity(rev, 'file:' + id, activityRole(role), 'save');
           applied[id] = rev;
           modifiedCount += 1;
         }
@@ -699,6 +755,7 @@ async function startServer(): Promise<void> {
           if (asNumber(deletion.baseRev) < prev.rev) { rejected[id] = { rev: prev.rev, deleted: false }; continue; }
           const rev = nextRev();
           store.files[id] = { ...prev, rev, updatedAt: Date.now(), deleted: true };
+          recordSharedActivity(rev, 'file:' + id, activityRole(role), 'delete');
           applied[id] = rev;
           modifiedCount += 1;
         }

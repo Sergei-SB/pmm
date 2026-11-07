@@ -12,6 +12,10 @@ function applyDriverOdometer(row, totalInput, previous) {
     row.driverReadingIsBaseline = false;
     if (!totalInput) return null;
     const odometer = parseDriverOdometer(reading);
+    if (isProtectedRouteRow(row)) {
+        const distance = evaluateExpression(totalInput.value);
+        return odometer !== null && (previous === null || previous + distance === odometer) ? odometer : null;
+    }
     if (reading && odometer === null) row.driverReadingError = 'Введіть коректний показник';
     else if (odometer !== null && previous !== null && odometer < previous) {
         row.driverReadingError = 'Менше попереднього показника';
@@ -29,9 +33,45 @@ function applyDriverOdometer(row, totalInput, previous) {
     return odometer;
 }
 
-function canEditDriverRoutes() {
-    const role = typeof window.getCurrentAppRole === 'function' ? window.getCurrentAppRole()
+function routeEditorRole() {
+    return typeof window.getCurrentAppRole === 'function' ? window.getCurrentAppRole()
         : (typeof currentRole !== 'undefined' ? currentRole : window.currentRole);
+}
+
+function isProtectedRouteRow(row) {
+    return Boolean(row?.dataset.routeLockId) && !['developer', 'dev', 'admin'].includes(routeEditorRole());
+}
+
+function isAwaitingRouteProtection() {
+    if (['developer', 'dev', 'admin'].includes(routeEditorRole()) ||
+        typeof window.hasPendingPrivilegedRouteSave !== 'function' ||
+        typeof currentCarId === 'undefined' || !currentCarId) return false;
+    const period = getStrictActivePeriod();
+    return Boolean(period && window.hasPendingPrivilegedRouteSave(getRoutesKey(currentCarId, period)));
+}
+
+function isRouteRowReadOnly(row) {
+    return isProtectedRouteRow(row) || isAwaitingRouteProtection();
+}
+
+function applyRouteRowLocks(canEdit = canEditDriverRoutes()) {
+    const awaitingProtection = isAwaitingRouteProtection();
+    const notice = document.getElementById('route-protection-pending');
+    if (notice) notice.hidden = !awaitingProtection;
+    const addButton = document.getElementById('add-card-route-row');
+    if (addButton) addButton.disabled = awaitingProtection || !canEdit;
+    document.querySelectorAll('#routes-tbody tr').forEach(row => {
+        const locked = isProtectedRouteRow(row);
+        row.title = locked ? 'Рядок захищено розробником або адміністратором' : '';
+        row.querySelectorAll('input, .delete-row-btn').forEach(control => {
+            control.disabled = locked || awaitingProtection || !canEdit;
+        });
+    });
+    refreshDriverRouteView();
+}
+
+function canEditDriverRoutes() {
+    const role = routeEditorRole();
     return role === 'developer' || Boolean(window.canRoleEdit?.(role, 'card') && window.canRoleDo?.(role, 'card_routes_edit'));
 }
 
@@ -77,7 +117,7 @@ function refreshDriverRouteView(car) {
                 field.setAttribute('aria-label', `${label}, рядок ${index + 1}`);
                 cell.appendChild(field);
                 field.addEventListener('input', () => {
-                    if (panel.hidden || !canEditDriverRoutes()) { field.value = sourceInput.value; return; }
+                    if (panel.hidden || !canEditDriverRoutes() || isRouteRowReadOnly(sourceRoute)) { field.value = sourceInput.value; return; }
                     sourceInput.value = field.value;
                     saveCarRoutesForPeriod();
                 });
@@ -85,7 +125,7 @@ function refreshDriverRouteView(car) {
             row.insertCell().hidden = !truck;
             row.addEventListener('click', () => { lastActiveRow = sourceRoute; });
             input.addEventListener('input', () => {
-                if (panel.hidden || !canEditDriverRoutes()) {
+                if (panel.hidden || !canEditDriverRoutes() || isRouteRowReadOnly(sourceRoute)) {
                     input.value = sourceRoute.dataset.driverOdometer || '';
                     return;
                 }
@@ -98,11 +138,13 @@ function refreshDriverRouteView(car) {
 
     Array.from(tbody.rows).forEach((row, index) => {
         const sourceRoute = sourceRows[index];
+        const rowCanEdit = canEdit && !isRouteRowReadOnly(sourceRoute);
+        row.title = sourceRoute.title;
         const input = row.cells[2].firstElementChild;
         row.cells[1].textContent = sourceRoute.cells[0]?.querySelector('input')?.value || '—';
         if (document.activeElement !== input) input.value = sourceRoute.dataset.driverOdometer || '';
-        input.disabled = !canEdit;
-        input.readOnly = !canEdit;
+        input.disabled = !rowCanEdit;
+        input.readOnly = !rowCanEdit;
         const total = sourceRoute.querySelector('.total-col')?.value;
         const km = total && !sourceRoute.driverReadingIsBaseline ? evaluateExpression(total) * (inMiles ? 1.61 : 1) : null;
         const error = sourceRoute.driverReadingError;
@@ -113,8 +155,8 @@ function refreshDriverRouteView(car) {
             const field = row.cells[4 + fieldIndex].firstElementChild;
             if (!field) return;
             if (document.activeElement !== field) field.value = sourceRoute.querySelector(selector).value;
-            field.disabled = !canEdit;
-            field.readOnly = !canEdit;
+            field.disabled = !rowCanEdit;
+            field.readOnly = !rowCanEdit;
         });
         row.cells[7].textContent = sourceRoute.querySelector('.row-tkm')?.value || '—';
     });

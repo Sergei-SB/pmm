@@ -1050,13 +1050,13 @@ function addRouteRow(routeName = 'Виконання БЗ Харків', dateVal
 
     if (truckActive) {
         tr.innerHTML = `
-            <td><input type="text" value="${routeName}" style="width: 190px; text-align: left; padding-left: 5px;" oninput="updateRouteTotals()"></td>
-            <td><input type="text" value="${dateVal}" style="width: 45px; text-align: center;"></td>
+            <td><input type="text" style="width: 190px; text-align: left; padding-left: 5px;" oninput="updateRouteTotals()"></td>
+            <td><input type="text" style="width: 45px; text-align: center;"></td>
             <td><input type="text" class="row-cargo" value="" style="width: 38px;" oninput="updateRouteTotals()"></td>
             <td><input type="text" value="" style="width: 38px;" oninput="updateRouteTotals()"></td>
             <td><input type="text" class="row-trailer" value="" style="width: 38px;" oninput="updateRouteTotals()"></td>
-            <td><input type="text" class="total-col" value="${totalVal}" style="width: 45px;" oninput="updateManualRouteTotal(this)"></td>
-            <td><button class="delete-row-btn" onclick="this.closest('tr').remove(); updateRouteTotals();">X</button></td>
+            <td><input type="text" class="total-col" style="width: 45px;" oninput="updateManualRouteTotal(this)"></td>
+            <td><button class="delete-row-btn" onclick="removeRouteRow(this)">X</button></td>
             <td><input type="text" value="о/с" style="width: 38px; text-align: center;"></td>
             <td><input type="text" class="row-tons" value="" style="width: 55px;" oninput="updateRouteTotals()"></td>
             <td><input type="text" class="row-tkm" value="" style="width: 55px;" readonly></td>
@@ -1064,18 +1064,22 @@ function addRouteRow(routeName = 'Виконання БЗ Харків', dateVal
         `;
     } else {
         tr.innerHTML = `
-            <td><input type="text" value="${routeName}" style="width: 340px; text-align: left; padding-left: 5px;" oninput="updateRouteTotals()"></td>
-            <td><input type="text" value="${dateVal}" style="width: 50px;"></td>
+            <td><input type="text" style="width: 340px; text-align: left; padding-left: 5px;" oninput="updateRouteTotals()"></td>
+            <td><input type="text" style="width: 50px;"></td>
             <td><input type="text" class="row-cargo" value="" style="width: 40px;"></td>
             <td><input type="text" value="" style="width: 40px;"></td>
             <td><input type="text" class="row-trailer" value="" style="width: 40px;"></td>
-            <td><input type="text" class="total-col" value="${totalVal}" style="width: 50px;" oninput="updateManualRouteTotal(this)"></td>
-            <td><button class="delete-row-btn" onclick="this.closest('tr').remove(); updateRouteTotals();">X</button></td>
+            <td><input type="text" class="total-col" style="width: 50px;" oninput="updateManualRouteTotal(this)"></td>
+            <td><button class="delete-row-btn" onclick="removeRouteRow(this)">X</button></td>
             <td><input type="text" value="о/с" style="width: 40px;"></td>
             <td><input type="text" class="row-odo" style="width: 90px;" readonly></td>
         `;
     }
 
+    const fields = tr.querySelectorAll('input');
+    fields[0].value = routeName;
+    fields[1].value = dateVal;
+    fields[5].value = totalVal;
     tr.addEventListener('click', () => {
         lastActiveRow = tr;
     });
@@ -1089,7 +1093,8 @@ function addRouteRow(routeName = 'Виконання БЗ Харків', dateVal
 }
 
 function applyPresetToActiveRow(text) {
-    if (!lastActiveRow) {
+    if (typeof isAwaitingRouteProtection === 'function' && isAwaitingRouteProtection()) return;
+    if (!lastActiveRow || !lastActiveRow.isConnected) {
         const rows = document.querySelectorAll('#routes-tbody tr');
         if (rows.length > 0) {
             lastActiveRow = rows[rows.length - 1];
@@ -1097,19 +1102,37 @@ function applyPresetToActiveRow(text) {
             const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
             const car = safeCars.find(c => Number(c.id) === Number(currentCarId));
             addRouteRow(text, '8:30', '', isCarTruck(car));
+            saveCarRoutesForPeriod();
             return;
         }
     }
 
+    if (typeof isProtectedRouteRow === 'function' && isProtectedRouteRow(lastActiveRow)) return;
     const input = lastActiveRow.querySelector('input[type="text"]');
     if (input) {
         input.value = text;
         updateRouteTotals();
+        saveCarRoutesForPeriod();
     }
+}
+
+function removeRouteRow(button) {
+    const row = button.closest('tr');
+    if (typeof isRouteRowReadOnly === 'function' && isRouteRowReadOnly(row)) return;
+    row.remove();
+    updateRouteTotals();
+    saveCarRoutesForPeriod();
+}
+
+function addEditableRouteRow() {
+    if (typeof isAwaitingRouteProtection === 'function' && isAwaitingRouteProtection()) return;
+    addRouteRow();
+    saveCarRoutesForPeriod();
 }
 
 function updateManualRouteTotal(input) {
     const row = input.closest('tr');
+    if (typeof isProtectedRouteRow === 'function' && isProtectedRouteRow(row)) return;
     delete row.dataset.driverOdometer;
     delete row.dataset.driverManualTotal;
     updateRouteTotals();

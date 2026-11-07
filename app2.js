@@ -306,6 +306,10 @@ function loadCarDataForActivePeriod() {
                 if (typeof addRouteRow === 'function') {
                     addRouteRow(rData.name || 'Виконання БЗ Харків', rData.time || '8:30', '', truckActive);
                     const lastRow = tbody.lastElementChild;
+                    if (lastRow && rData.routeLock?.id && rData.routeLock?.by) {
+                        lastRow.dataset.routeLockId = rData.routeLock.id;
+                        lastRow.dataset.routeLockBy = rData.routeLock.by;
+                    }
                     if (lastRow && (typeof rData.driverOdometer === 'string' || typeof rData.driverOdometer === 'number')) {
                         lastRow.dataset.driverOdometer = String(rData.driverOdometer);
                     }
@@ -329,6 +333,7 @@ function loadCarDataForActivePeriod() {
         }
     }
 
+    if (typeof applyRouteRowLocks === 'function') applyRouteRowLocks();
     const prevKey = getPrevPeriodKey(period);
     let prevEndOdo = '';
     let prevLeftFuel = '';
@@ -468,6 +473,7 @@ function saveCarRoutesForPeriod(periodToSave, carIdToSave, isManualSave = false)
 
     const period = periodToSave || getStrictActivePeriod();
     if (!period) return;
+    if (typeof isAwaitingRouteProtection === 'function' && isAwaitingRouteProtection()) return;
 
     if (typeof updateRouteTotals === 'function') {
         updateRouteTotals();
@@ -487,6 +493,7 @@ function saveCarRoutesForPeriod(periodToSave, carIdToSave, isManualSave = false)
         };
         if (row.dataset?.driverOdometer) savedRow.driverOdometer = row.dataset.driverOdometer;
         if (row.dataset?.driverManualTotal !== undefined) savedRow.driverManualTotal = row.dataset.driverManualTotal;
+        if (row.dataset?.routeLockId) savedRow.routeLock = { id: row.dataset.routeLockId, by: row.dataset.routeLockBy };
         rowsData.push(savedRow);
     });
 
