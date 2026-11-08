@@ -623,7 +623,7 @@ test('The trailer dialog adds registered tare to cargo once and saves only the s
         showModal() { this.open = true; }
         close() { this.open = false; }
     }
-    const ids = ['button', 'dialog', 'form', 'row', 'unit', 'cargo', 'total', 'cancel'];
+    const ids = ['button', 'dialog', 'form', 'row', 'unit', 'cargo', 'total', 'cancel', 'mass-line', 'mass'];
     const controls = Object.fromEntries(ids.map(id => [id, new Control()]));
     function route(value) {
         const tons = {value, removeAttribute() {}};
@@ -658,6 +658,13 @@ test('The trailer dialog adds registered tare to cargo once and saves only the s
     assert.equal(first.tons.value, '4');
     assert.equal(second.tons.value, '3.5');
     assert.deepEqual(JSON.parse(second.dataset.routeTrailer), {id: '456', plate: '456', massKg: 1500});
+    c.renderRouteTrailerMass([first, second, second], true);
+    assert.equal(controls.mass.textContent, `456 — ${(1500).toLocaleString('uk-UA')} кг`);
+    assert.equal(controls['mass-line'].hidden, false);
+    c.renderRouteTrailerMass([first], true);
+    assert.equal(controls.mass.textContent, '—');
+    c.renderRouteTrailerMass([second], false);
+    assert.equal(controls['mass-line'].hidden, true);
     controls.button.events.click();
     assert.equal(controls.cargo.value, '2');
     controls.cargo.value = '2,25';

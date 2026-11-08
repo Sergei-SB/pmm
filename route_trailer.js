@@ -29,6 +29,22 @@ function updateRouteTrailerButton(canEdit) {
     button.disabled = !canEdit;
 }
 
+function renderRouteTrailerMass(rows, visible) {
+    const line = document.getElementById('route-trailer-mass-line');
+    if (!line) return;
+    line.hidden = !visible;
+    if (!visible) return;
+
+    const masses = new Map();
+    for (const row of rows) {
+        const trailer = JSON.parse(row.dataset.routeTrailer || 'null');
+        if (!trailer?.plate || !Number.isFinite(trailer.massKg) || trailer.massKg <= 0) continue;
+        const label = `${trailer.plate} — ${trailer.massKg.toLocaleString('uk-UA')} кг`;
+        masses.set(`${trailer.id}:${trailer.massKg}`, label);
+    }
+    document.getElementById('route-trailer-mass').textContent = [...masses.values()].join('; ') || '—';
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const button = document.getElementById('route-trailer-button');
     const dialog = document.getElementById('route-trailer-dialog');

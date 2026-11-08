@@ -408,8 +408,13 @@
                                         <span>Всього пройдено: <strong id="sum-km">0</strong> км</span>
                                         <span>Витрачено <strong id="sum-fuel-copy">0.00</strong> л &approx; <strong id="sum-fuel-round-copy">0</strong> л</span>
                                     </div>
-                                    <div class="fuel-base-line">
-                                        <span>Витрата палива базова : <span id="base-val-text">13.0</span> л</span>
+                                    <div style="display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 16px;">
+                                        <div class="fuel-base-line">
+                                            <span>Витрата палива базова : <span id="base-val-text">13.0</span> л</span>
+                                        </div>
+                                        <div id="route-trailer-mass-line" hidden>
+                                            Маса причепа чи лафети: <strong id="route-trailer-mass">—</strong>
+                                        </div>
                                     </div>
                                     <div class="fuel-sub-line"><span id="markup-desc-text"></span></div>
                                 </div>
@@ -753,8 +758,8 @@
     <script src="broadcast_mail.js"></script>
     <script src="equipment_report.js?v=20261025-category-order"></script>
     <script src="driver_routes.js?v=20261108-route-trailer"></script>
-    <script src="route_trailer.js?v=20261108-route-trailer"></script>
-    <script src="app.js?v=20261108-towed-types"></script>
+    <script src="route_trailer.js?v=20261108-trailer-mass-line"></script>
+    <script src="app.js?v=20261108-trailer-mass-line"></script>
     <script src="app2.js?v=20261108-route-trailer"></script>
     <script src="aggregates_calc.js?v=20261025-inventory-rates"></script>
     <script src="destroyed_equipment.js?v=20261024-pumps"></script>
