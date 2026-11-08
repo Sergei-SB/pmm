@@ -144,7 +144,15 @@
                             actions.querySelectorAll('button').forEach(function (b) {b.disabled = true;});
                             feedback.style.color = '#334155';
                             feedback.textContent = choice === 'server' ? 'Застосовую версію із сайту…' : 'Зберігаю зміни…';
-                            try { await window.resolvePmmSyncConflict(item, choice); await load(); }
+                            try {
+                                var saved = await window.resolvePmmSyncConflict(item, choice);
+                                await load();
+                                if (saved && saved.addedVehicles) {
+                                    message.style.color = '#166534';
+                                    message.textContent = 'Сайт підтвердив додавання авто: ' + saved.addedVehicles + '. Решта відмінностей реєстру доступна для перевірки.';
+                                    message.scrollIntoView({block: 'nearest'});
+                                }
+                            }
                             catch (error) {
                                 feedback.style.color = '#b91c1c'; feedback.textContent = error.message;
                                 actions.querySelectorAll('button').forEach(function (b) {b.disabled = !report.canUpload && b.dataset.requiresUpload === 'true';});

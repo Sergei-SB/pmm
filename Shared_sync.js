@@ -323,6 +323,24 @@
         } catch (_) { return null; }
     }
 
+    function registryAdditions(localValue, remoteValue, baseValue) {
+        try {
+            var local = JSON.parse(localValue), remote = JSON.parse(remoteValue), base = JSON.parse(baseValue);
+            if (![local, remote, base].every(function (rows) {
+                return Array.isArray(rows) && rows.every(function (row) { return row && row.id != null; }) &&
+                    new Set(rows.map(function (row) { return String(row.id); })).size === rows.length;
+            })) return null;
+            var known = base.concat(remote);
+            var additions = local.filter(function (car) {
+                if (!String(car.plate || '').replace(/[\s—–-]/g, '')) return false;
+                return !known.some(function (row) {
+                    return String(row.id) === String(car.id) || registryVehicleMatch(car, row);
+                }) && !local.some(function (row) { return row !== car && registryVehicleMatch(car, row); });
+            });
+            return additions.length ? { value: JSON.stringify(remote.concat(additions)), count: additions.length } : null;
+        } catch (_) { return null; }
+    }
+
     function retainServerModifications(localValue, remoteValue) {
         var local = JSON.parse(localValue), remote = JSON.parse(remoteValue);
         if (![local, remote].every(function (value) {return value && typeof value === 'object' && !Array.isArray(value);})) {
@@ -1357,17 +1375,46 @@
         }
         var current = checkCurrent();
         var mergedValue = choice === 'merge' ? conflictMergeValue(item, current) : null;
+        var additions = null;
         if (choice === 'merge' && mergedValue === null) throw new Error('Є різні зміни одного поля. Потрібна перевірка обох версій.');
         if (choice === 'local' && item.kind === 'key' && item.id === 'cars_modifications_data' && !item.local.deleted && !item.remote.deleted) {
             mergedValue = retainServerModifications(item.local.value, item.remote.value);
         }
         if (choice === 'local' && item.kind === 'key' && item.id === 'user_cars_database_v2' && !item.local.deleted && !item.remote.deleted) {
             mergedValue = retainServerRegistry(item.local.value, item.remote.value, current.baseValue, true);
-            if (mergedValue === null) throw new Error('Не вдалося однозначно зіставити авто за VIN або номером. Реєстр збережено в обох версіях.');
+            if (mergedValue === null) {
+                additions = registryAdditions(item.local.value, item.remote.value, current.baseValue);
+                if (!additions) throw new Error('Не вдалося однозначно зіставити авто за VIN або номером. Реєстр збережено в обох версіях.');
+            }
         }
         if (typeof window.archiveLocalSiteChange !== 'function') throw new Error('Модуль історії змін недоступний');
         await window.archiveLocalSiteChange('conflict-review', item.id, JSON.stringify(item.local), JSON.stringify(item.remote));
         var p = checkCurrent();
+        if (additions) {
+            if (!isAdminRole()) throw new Error('Для запису на сайт увійдіть як адмін або розробник');
+            if (pushInFlight || awaitingFirstPull) throw new Error('Триває синхронізація. Повторіть збереження після її завершення.');
+            pushInFlight = true;
+            try {
+                // Submit only new rows on top of the reviewed server revision.
+                // Keep the original blocked candidate for any remaining differences.
+                var changes = {};
+                var role = getRole();
+                changes[item.id] = {value: additions.value, baseRev: Number(item.remote.rev) || 0, role: role};
+                var response = await fetchWithTimeout(SERVER_URL + '/api/shared-state', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({deviceId: deviceId, role: role, changes: changes, deletedKeys: []})
+                }, PUSH_TIMEOUT_MS);
+                if (!response.ok) throw new Error('Сайт не підтвердив додавання авто. Код відповіді ' + response.status + '.');
+                var result = await response.json();
+                if (!result.ok || !Object.prototype.hasOwnProperty.call(result.applied || {}, item.id)) {
+                    throw new Error('Сайт не підтвердив додавання авто. Оновіть перевірку та повторіть збереження.');
+                }
+                return {addedVehicles: additions.count};
+            } finally {
+                pushInFlight = false;
+                pullSharedEvent();
+            }
+        }
         if (item.kind === 'key') {
             // Preserve the local candidate even when the server is selected.
             if (!item.local.deleted) localSet('__sync_value_conflict_' + item.id, item.local.value);

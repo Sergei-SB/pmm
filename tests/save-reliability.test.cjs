@@ -484,6 +484,42 @@ test('Conflict button sends legacy duplicate plates using their stable IDs and r
     assert.deepEqual(saved, [{...server[0], note: '1 черга'}, {...server[1], note: '2 черга'}, server[2]]);
 });
 
+test('An unrelated registry conflict cannot block saving an independently added vehicle', async () => {
+    const {c, values, item, backups} = conflictContext();
+    for (const name of ['registryVehicleMatch', 'retainServerRegistry', 'registryAdditions']) {
+        vm.runInContext(extract('Shared_sync.js', name), c);
+    }
+    const key = 'user_cars_database_v2';
+    const base = [{id: 1, plate: 'OLD 01'}, {id: 2, plate: 'OLD 02'}];
+    const remote = [{...base[0], plate: 'REUSED 01'}, base[1], {id: 3, plate: 'REMOTE 03'}];
+    const added = {id: 4, plate: '456', model: 'New car'};
+    const browser = [{...base[0], note: 'Pending note'}, base[1], added];
+    const local = JSON.stringify(browser);
+    values[key] = local;
+    c.pending[key] = {value: local, blocked: true, baseValue: JSON.stringify(base)};
+    Object.assign(item, {id: key, local: {value: local, deleted: false}, remote: {value: JSON.stringify(remote), rev: 42, deleted: false}});
+    let accepted = false, submitted;
+    Object.assign(c, {
+        pushInFlight: false, awaitingFirstPull: false, SERVER_URL: 'https://test.invalid',
+        deviceId: 'test', PUSH_TIMEOUT_MS: 1000, pullSharedEvent() {},
+        fetchWithTimeout: async (_url, options) => {
+            assert.ok(backups.length, 'archive both versions before submission');
+            submitted = JSON.parse(options.body).changes[key];
+            return {ok: true, json: async () => ({ok: true, applied: accepted ? {[key]: 43} : {}})};
+        }
+    });
+    await assert.rejects(c.resolvePmmSyncConflict(item, 'local'), /не підтвердив додавання/);
+    assert.equal(c.pushInFlight, false);
+    accepted = true;
+    assert.equal((await c.resolvePmmSyncConflict(item, 'local')).addedVehicles, 1);
+    assert.equal(submitted.baseRev, 42);
+    assert.deepEqual(JSON.parse(submitted.value), [...remote, added]);
+    assert.equal(values[key], local);
+    assert.equal(c.pending[key].blocked, true);
+    assert.equal(c.registryAdditions(local, submitted.value, JSON.stringify(base)), null, 'already saved vehicle is not duplicated');
+    assert.equal(c.registryAdditions(local, JSON.stringify([...remote, {id: 4, plate: 'OTHER 04'}]), JSON.stringify(base)), null, 'occupied ID cannot be reused');
+});
+
 test('Manual cloud save retries a blocked vehicle addition and keeps the other device’s changes', async () => {
     const {c, values, revisions, backups} = conflictContext();
     for (const name of ['retainServerRegistry', 'registryVehicleMatch', 'reconcileSafeModificationsRecord',
