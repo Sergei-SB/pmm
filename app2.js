@@ -505,7 +505,9 @@ function saveCarRoutesForPeriod(periodToSave, carIdToSave, isManualSave = false)
 
     const savedFuelLeftVal = document.getElementById('fuel-left')?.textContent?.trim() || '';
     const savedFuelSpentVal = document.getElementById('fuel-spent')?.textContent?.trim() || '';
-    const savedAdblueLeftVal = document.getElementById('adblue-left')?.textContent?.trim() || '';
+    const hasAdBlue = typeof carsData !== 'undefined' && Array.isArray(carsData) &&
+        carsData.some(car => Number(car.id) === Number(targetCarId) && car.hasAdBlue);
+    const savedAdblueLeftVal = hasAdBlue ? (document.getElementById('adblue-left')?.textContent?.trim() || '') : '';
 
     const topFields = {
         fuelStart: document.getElementById('fuel-start')?.value || '',
@@ -514,8 +516,8 @@ function saveCarRoutesForPeriod(periodToSave, carIdToSave, isManualSave = false)
         odo1: odo1Val,
         odo2: odo2Val,
         savedFuelLeft: savedFuelLeftVal,
-        adblueStart: document.getElementById('adblue-start')?.value || '',
-        adblueReceived: document.getElementById('adblue-received')?.value || '',
+        adblueStart: hasAdBlue ? (document.getElementById('adblue-start')?.value || '') : '',
+        adblueReceived: hasAdBlue ? (document.getElementById('adblue-received')?.value || '') : '',
         savedAdblueLeft: savedAdblueLeftVal,
         updatedAt: new Date().toISOString()
     };

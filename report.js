@@ -534,16 +534,16 @@ function saveCurrentReportSilently() {
             reportData[carId] = {
                 fuelType: row.querySelector('.report-cell-input[data-field="fuelType"]')?.value || '',
                 prevFuel: row.querySelector('.report-cell-input[data-field="prevFuel"]')?.value || '',
-                prevAdBlue: row.querySelector('.report-cell-input[data-field="prevAdBlue"]')?.value || '',
+                prevAdBlue: row.querySelector('.report-cell-input[data-field="prevAdBlue"]:not([data-no-adblue])')?.value || '',
                 prevOdo: row.querySelector('.report-cell-input[data-field="prevOdo"]')?.value || '',
                 refuelFuel: row.querySelector('.report-cell-input[data-field="refuelFuel"]')?.value || '',
-                refuelAdBlue: row.querySelector('.report-cell-input[data-field="refuelAdBlue"]')?.value || '',
+                refuelAdBlue: row.querySelector('.report-cell-input[data-field="refuelAdBlue"]:not([data-no-adblue])')?.value || '',
                 refuelOil: row.querySelector('.report-cell-input[data-field="refuelOil"]')?.value || '',
                 refuelWasher: row.querySelector('.report-cell-input[data-field="refuelWasher"]')?.value || '',
                 note: row.querySelector('.report-cell-input[data-field="note"]')?.value || '',
                 docNo: row.querySelector('.report-cell-input[data-field="docNo"]')?.value || '',
                 leftFuel: row.querySelector('.report-cell-input[data-field="leftFuel"]')?.value || '',
-                leftAdBlue: row.querySelector('.report-cell-input[data-field="leftAdBlue"]')?.value || '',
+                leftAdBlue: row.querySelector('.report-cell-input[data-field="leftAdBlue"]:not([data-no-adblue])')?.value || '',
                 odo: row.querySelector('.report-cell-input[data-field="odo"]')?.value || '',
                 spentFuel: reportData[carId]?.spentFuel || ''
             };
@@ -1007,6 +1007,9 @@ function renderReportTable() {
         const lockAttr = canEditReport ? '' : 'disabled readonly style="background:#f1f2f6; cursor:not-allowed; color:#2c3e50;" title="Редагування доступне тільки для Адміна та Розробника"';
 
         const noAdblueAttr = car.hasAdBlue ? '' : 'disabled data-no-adblue="true" style="background:#e0e0e0; cursor:not-allowed;"';
+        if (!car.hasAdBlue) {
+            carData = {...carData, prevAdBlue: '', refuelAdBlue: '', leftAdBlue: ''};
+        }
 
         tr.innerHTML = `
             <td>${index + 1}</td>
@@ -1102,8 +1105,8 @@ function updateReportTotals() {
             abEndF += endF;
         }
 
-        sumStartAd += evaluateExpression(row.querySelector('.report-cell-input[data-field="prevAdBlue"]')?.value);
-        sumRefAd += evaluateExpression(row.querySelector('.report-cell-input[data-field="refuelAdBlue"]')?.value);
+        sumStartAd += evaluateExpression(row.querySelector('.report-cell-input[data-field="prevAdBlue"]:not([data-no-adblue])')?.value);
+        sumRefAd += evaluateExpression(row.querySelector('.report-cell-input[data-field="refuelAdBlue"]:not([data-no-adblue])')?.value);
         
         let oilVal = row.querySelector('.report-cell-input[data-field="refuelOil"]')?.value;
         let oilParsed = parseFluidEntries(oilVal);
@@ -1113,7 +1116,7 @@ function updateReportTotals() {
         let washerParsed = parseFluidEntries(washerVal);
         mergeFluidMaps(totalWasherMap, washerParsed);
 
-        sumEndAd += evaluateExpression(row.querySelector('.report-cell-input[data-field="leftAdBlue"]')?.value);
+        sumEndAd += evaluateExpression(row.querySelector('.report-cell-input[data-field="leftAdBlue"]:not([data-no-adblue])')?.value);
     });
 
     const subFilterEl = document.getElementById('report-subdivision-filter');
@@ -1765,7 +1768,7 @@ function calculateSubStatsDetailed(subName, periodList) {
                 } else {
                     carsStat.abFuel += refFuel;
                 }
-                carsStat.adblue += evaluateExpression(carRec.refuelAdBlue);
+                if (car.hasAdBlue) carsStat.adblue += evaluateExpression(carRec.refuelAdBlue);
                 
                 let oilParsed = parseFluidEntries(carRec.refuelOil);
                 mergeFluidMaps(carsStat.oilMap, oilParsed);
@@ -1869,7 +1872,7 @@ function calculateNoSubStatsDetailed(periodList) {
                 } else {
                     carsStat.abFuel += refFuel;
                 }
-                carsStat.adblue += evaluateExpression(carRec.refuelAdBlue);
+                if (car.hasAdBlue) carsStat.adblue += evaluateExpression(carRec.refuelAdBlue);
                 
                 let oilParsed = parseFluidEntries(carRec.refuelOil);
                 mergeFluidMaps(carsStat.oilMap, oilParsed);
@@ -1973,7 +1976,7 @@ function calculatePolkStatsDetailed(periodList) {
                 } else {
                     carsStat.abFuel += refFuel;
                 }
-                carsStat.adblue += evaluateExpression(carRec.refuelAdBlue);
+                if (car.hasAdBlue) carsStat.adblue += evaluateExpression(carRec.refuelAdBlue);
 
                 let oilParsed = parseFluidEntries(carRec.refuelOil);
                 mergeFluidMaps(carsStat.oilMap, oilParsed);
@@ -2137,6 +2140,9 @@ function transferDataToReport() {
     }
     if (adblueLeft !== '' && car && car.hasAdBlue) {
         savedReportData[targetCarId].leftAdBlue = adblueLeft;
+    }
+    if (!car?.hasAdBlue) {
+        Object.assign(savedReportData[targetCarId], {prevAdBlue: '', refuelAdBlue: '', leftAdBlue: ''});
     }
     if (finalOdo !== '') {
         savedReportData[targetCarId].odo = finalOdo;

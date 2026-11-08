@@ -1759,11 +1759,9 @@ window.executeTransferCarDataToReport = function () {
     reportStore[carId].refuelFuel = fuelRecVal;
     reportStore[carId].leftFuel = fuelLeftVal;
 
-    if (car && car.hasAdBlue) {
-        reportStore[carId].prevAdBlue = adblueStartVal;
-        reportStore[carId].refuelAdBlue = adblueRecVal;
-        reportStore[carId].leftAdBlue = adblueLeftVal;
-    }
+    reportStore[carId].prevAdBlue = car?.hasAdBlue ? adblueStartVal : '';
+    reportStore[carId].refuelAdBlue = car?.hasAdBlue ? adblueRecVal : '';
+    reportStore[carId].leftAdBlue = adblueLeftVal;
 
     reportStore[carId].prevOdo = odoStartVal;
     reportStore[carId].odo = odoEndVal;

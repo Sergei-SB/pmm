@@ -521,10 +521,36 @@ test('Card transfer recovers browser space and stores fuel and odometers in the 
     c.executeTransferCarDataToReport();
     assert.equal(quotaHits, 1);
     assert.equal(success, true);
-    assert.deepEqual(JSON.parse(stored.get(key)), {9: {note: 'Existing note', prevFuel: '14', refuelFuel: '', leftFuel: '14', prevOdo: '317595', odo: '317595'}, 10: {leftFuel: '25'}});
+    assert.deepEqual(JSON.parse(stored.get(key)), {9: {note: 'Existing note', prevFuel: '14', refuelFuel: '', leftFuel: '14', prevOdo: '317595', odo: '317595', prevAdBlue: '', refuelAdBlue: '', leftAdBlue: ''}, 10: {leftFuel: '25'}});
     assert.equal(stored.get(routeKey), route);
     assert.equal(queued.previous, previousReport);
     assert.deepEqual(JSON.parse(stored.get('meta')).carBases, {[dirtyKey]: 'original'});
+});
+
+test('Switching from an AdBlue vehicle cannot carry hidden values into another vehicle’s route or report', () => {
+    const fields = {'adblue-start': {value: '14.6'}, 'adblue-received': {value: '5'}, 'adblue-left': {textContent: '19.6'},
+        'fuel-start': {value: '25'}, 'fuel-left': {textContent: '25'}, 'odo-1': {value: '212971'}, 'odo-2': {value: '212971'}};
+    const period = '01.11-10.11';
+    const key = 'report_data_' + period;
+    const values = {[key]: JSON.stringify({2: {leftAdBlue: '14.6', note: 'Keep'}})};
+    const snapshots = {};
+    const c = contextWith([['app2.js', 'saveCarRoutesForPeriod'], ['documents.js', 'executeTransferCarDataToReport']], {
+        currentCarId: 1, carsData: [{id: 1, hasAdBlue: true}, {id: 2, hasAdBlue: false}], isRestoringState: false,
+        getStrictActivePeriod: () => period, getSortedPeriods: () => [period], getRoutesKey: id => String(id),
+        writeCarRouteSnapshot: (id, top) => { snapshots[id] = top; },
+        document: {getElementById: name => fields[name], querySelectorAll: () => []},
+        localStorage: {getItem: name => values[name] || null, setItem: (name, value) => {values[name] = value;}},
+        showDocToast() {}, escapeHtml: value => String(value)
+    });
+    c.executeTransferCarDataToReport();
+    c.currentCarId = 2;
+    c.executeTransferCarDataToReport();
+    const report = JSON.parse(values[key]);
+    assert.deepEqual([report[1].prevAdBlue, report[1].refuelAdBlue, report[1].leftAdBlue], ['14.6', '5', '19.6']);
+    assert.deepEqual([snapshots[1].adblueStart, snapshots[1].adblueReceived, snapshots[1].savedAdblueLeft], ['14.6', '5', '19.6']);
+    assert.deepEqual([report[2].prevAdBlue, report[2].refuelAdBlue, report[2].leftAdBlue], ['', '', '']);
+    assert.deepEqual([snapshots[2].adblueStart, snapshots[2].adblueReceived, snapshots[2].savedAdblueLeft], ['', '', '']);
+    assert.deepEqual([report[2].leftFuel, report[2].odo, report[2].note], ['25', '212971', 'Keep']);
 });
 
 test('An unrelated registry conflict cannot block saving an independently added vehicle', async () => {
