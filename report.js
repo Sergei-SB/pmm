@@ -850,6 +850,11 @@ function getTenDayVehicleValues(car, saved, previousReport, previousCard, card) 
         if (a === '' || b === '') return false;
         return a === b || Number(a.replace(',', '.')) === Number(b.replace(',', '.'));
     }
+    function odometerBefore(end, start) {
+        end = firstValue(end);
+        start = firstValue(start);
+        return end !== '' && start !== '' && Number(end.replace(',', '.')) < Number(start.replace(',', '.'));
+    }
     function closingValue(savedEnd, cardEnd, savedStart, cardStart, start, hasActivity, fallback) {
         const end = firstValue(savedEnd, cardEnd);
         const sourceStart = firstValue(firstValue(savedEnd) !== '' ? savedStart : cardStart);
@@ -880,7 +885,11 @@ function getTenDayVehicleValues(car, saved, previousReport, previousCard, card) 
     const refuelFuel = firstValue(saved.refuelFuel, card.fuelReceived);
     const spentFuel = firstValue(saved.spentFuel, card.fuelSpent);
     const fuelActivity = [saved.refuelFuel, card.fuelReceived, saved.spentFuel, card.fuelSpent].some(value => evaluateExpression(value) !== 0);
-    const cardHasMileage = firstValue(card.odo1) !== '' && firstValue(card.odo2) !== '' && !sameReading(firstValue(card.odo1), firstValue(card.odo2));
+    const cardHasMileage = odometerBefore(card.odo1, card.odo2);
+    const invalidReportOdo = odometerBefore(saved.odo, prevOdo);
+    const invalidCardOdo = odometerBefore(card.odo2, firstValue(prevOdo, card.odo1));
+    const discardReportFuel = invalidReportOdo && !fuelActivity && !cardHasMileage;
+    const discardCardFuel = invalidCardOdo && !fuelActivity && !cardHasMileage;
     const prevAdBlue = car.hasAdBlue ? firstValue(previousReport.leftAdBlue, previousCard.savedAdblueLeft, saved.prevAdBlue, card.adblueStart) : '';
     const refuelAdBlue = car.hasAdBlue ? firstValue(saved.refuelAdBlue, card.adblueReceived) : '';
     const adBlueActivity = [saved.refuelAdBlue, card.adblueReceived].some(value => evaluateExpression(value) !== 0) || cardHasMileage;
@@ -888,9 +897,9 @@ function getTenDayVehicleValues(car, saved, previousReport, previousCard, card) 
     return {
         refuelOil: '', refuelWasher: '', note: car.note || '', docNo: '', ...saved,
         prevFuel, prevOdo, refuelFuel, prevAdBlue, refuelAdBlue,
-        leftFuel: closingValue(saved.leftFuel, card.savedFuelLeft, saved.prevFuel, card.fuelStart, prevFuel,
+        leftFuel: closingValue(discardReportFuel ? '' : saved.leftFuel, discardCardFuel ? '' : card.savedFuelLeft, saved.prevFuel, card.fuelStart, prevFuel,
             fuelActivity || cardHasMileage, cardHasMileage && spentFuel === '' ? '' : balance(prevFuel, refuelFuel, spentFuel)),
-        odo: closingValue(saved.odo, card.odo2, saved.prevOdo, card.odo1, prevOdo, cardHasMileage, prevOdo),
+        odo: closingValue(invalidReportOdo ? '' : saved.odo, invalidCardOdo ? '' : card.odo2, saved.prevOdo, card.odo1, prevOdo, cardHasMileage, prevOdo),
         leftAdBlue: car.hasAdBlue ? closingValue(saved.leftAdBlue, card.savedAdblueLeft, saved.prevAdBlue, card.adblueStart,
             prevAdBlue, adBlueActivity, cardHasMileage ? '' : balance(prevAdBlue, refuelAdBlue)) : ''
     };

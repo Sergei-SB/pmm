@@ -190,6 +190,7 @@ test('A lower role cannot rewrite a route while a developer save is awaiting con
         ['app2.js', 'saveCarRoutesForPeriod']
     ], {
         getCurrentAppRole: () => role,
+        isLoadedCarRoute: () => true,
         currentCarId: 9, getStrictActivePeriod: () => '01.11-10.11', getRoutesKey: () => key,
         pending: {[key]: {role: 'developer', value: '{"rows":[{"inputs":["100"]}]}', baseValue: '{"rows":[{"inputs":["20"]}]}'}},
         isRestoringState: false, updateRouteTotals: () => assert.fail('A lower role must not rewrite the pending snapshot')
@@ -556,9 +557,16 @@ test('Switching from an AdBlue vehicle cannot carry hidden values into another v
     const key = 'report_data_' + period;
     const values = {[key]: JSON.stringify({2: {leftAdBlue: '14.6', note: 'Keep'}})};
     const snapshots = {};
-    const c = contextWith([['app2.js', 'saveCarRoutesForPeriod'], ['documents.js', 'executeTransferCarDataToReport']], {
+    const nextPeriod = '11.11-20.11';
+    const nextKey = nextPeriod + '_2';
+    values[nextKey] = JSON.stringify({topFields: {odo1: '100', odo2: '100', fuelStart: '10', savedFuelLeft: '10'}, rows: []});
+    const c = contextWith([
+        ['app2.js', 'isLoadedCarRoute'], ['app2.js', 'saveCarRoutesForPeriod'],
+        ['documents.js', 'executeTransferCarDataToReport'], ['report.js', 'evaluateExpression']
+    ], {
         currentCarId: 1, carsData: [{id: 1, hasAdBlue: true}, {id: 2, hasAdBlue: false}], isRestoringState: false,
-        getStrictActivePeriod: () => period, getSortedPeriods: () => [period], getRoutesKey: id => String(id),
+        loadedCarRouteKey: period + '_1',
+        getStrictActivePeriod: () => period, getSortedPeriods: () => [period, nextPeriod], getRoutesKey: (id, p) => p + '_' + id,
         writeCarRouteSnapshot: (id, top) => { snapshots[id] = top; },
         document: {getElementById: name => fields[name], querySelectorAll: () => []},
         localStorage: {getItem: name => values[name] || null, setItem: (name, value) => {values[name] = value;}},
@@ -567,12 +575,22 @@ test('Switching from an AdBlue vehicle cannot carry hidden values into another v
     c.executeTransferCarDataToReport();
     c.currentCarId = 2;
     c.executeTransferCarDataToReport();
+    assert.equal(snapshots[period + '_2'], undefined);
+    assert.equal(JSON.parse(values[key])[2].prevOdo, undefined, 'a stale card cannot overwrite another vehicle');
+    c.loadedCarRouteKey = period + '_2';
+    c.executeTransferCarDataToReport();
     const report = JSON.parse(values[key]);
     assert.deepEqual([report[1].prevAdBlue, report[1].refuelAdBlue, report[1].leftAdBlue], ['14.6', '5', '19.6']);
-    assert.deepEqual([snapshots[1].adblueStart, snapshots[1].adblueReceived, snapshots[1].savedAdblueLeft], ['14.6', '5', '19.6']);
+    const [first, second] = [snapshots[period + '_1'], snapshots[period + '_2']];
+    assert.deepEqual([first.adblueStart, first.adblueReceived, first.savedAdblueLeft], ['14.6', '5', '19.6']);
     assert.deepEqual([report[2].prevAdBlue, report[2].refuelAdBlue, report[2].leftAdBlue], ['', '', '']);
-    assert.deepEqual([snapshots[2].adblueStart, snapshots[2].adblueReceived, snapshots[2].savedAdblueLeft], ['', '', '']);
+    assert.deepEqual([second.adblueStart, second.adblueReceived, second.savedAdblueLeft], ['', '', '']);
     assert.deepEqual([report[2].leftFuel, report[2].odo, report[2].note], ['25', '212971', 'Keep']);
+    assert.deepEqual(JSON.parse(values[nextKey]).topFields, {odo1: '212971', odo2: '212971', fuelStart: '25', savedFuelLeft: '25'});
+    const activeNext = JSON.stringify({topFields: {odo1: '100', odo2: '120'}, rows: [{driverOdometer: '120'}]});
+    values[nextKey] = activeNext;
+    c.saveCarRoutesForPeriod();
+    assert.equal(values[nextKey], activeNext);
 });
 
 test('The ten-day report carries closing readings to the next opening and fills missing closing values', () => {
@@ -587,6 +605,10 @@ test('The ten-day report carries closing readings to the next opening and fills 
     assert.deepEqual([recorded.prevFuel, recorded.leftFuel, recorded.prevOdo, recorded.odo, recorded.leftAdBlue], ['25', '30', '212971', '213100', '14.6']);
     const zero = c.getTenDayVehicleValues({hasAdBlue: true}, {}, {leftFuel: 0, leftAdBlue: 0}, {savedFuelLeft: '30', odo2: '20'}, {fuelReceived: '7,5', fuelSpent: '2,5'});
     assert.deepEqual([zero.prevFuel, zero.leftFuel, zero.prevOdo, zero.odo, zero.prevAdBlue, zero.leftAdBlue], ['0', '5.00', '20', '20', '0', '0']);
+    const imported = {prevFuel: '29', leftFuel: '0', prevOdo: '240607', odo: '212971'};
+    const card = {fuelStart: '29', savedFuelLeft: '29', odo1: '240607', odo2: '240607'};
+    const repaired = c.getTenDayVehicleValues({}, imported, {leftFuel: '29', odo: '240607'}, null, card);
+    assert.deepEqual([repaired.prevFuel, repaired.leftFuel, repaired.prevOdo, repaired.odo], ['29', '29', '240607', '240607']);
 });
 
 test('A report vehicle number opens its card for the displayed period without saving the previous period', () => {

@@ -10,6 +10,7 @@
 
 let activeCarPeriod = getDefaultPeriodByCurrentDate();
 let isRestoringState = false;
+let loadedCarRouteKey = null;
 
 function getDefaultPeriodByCurrentDate() {
     const now = new Date();
@@ -124,6 +125,10 @@ function getPrevPeriodKey(currPeriod) {
 
 function getRoutesKey(carId, period) {
     return `isolated_car_routes_${period}_${carId}`;
+}
+
+function isLoadedCarRoute(carId, period) {
+    return loadedCarRouteKey === getRoutesKey(carId, period);
 }
 
 function getStrictActivePeriod() {
@@ -282,6 +287,7 @@ function hookIntoLoadCarCard() {
 }
 
 function loadCarDataForActivePeriod() {
+    loadedCarRouteKey = null;
     if (typeof currentCarId === 'undefined' || !currentCarId) return;
     isRestoringState = true;
 
@@ -429,6 +435,7 @@ function loadCarDataForActivePeriod() {
         odo2El.value = periodData.topFields.odo2;
     }
 
+    loadedCarRouteKey = dataKey;
     isRestoringState = false;
 }
 
@@ -472,7 +479,7 @@ function saveCarRoutesForPeriod(periodToSave, carIdToSave, isManualSave = false)
     if (!targetCarId) return;
 
     const period = periodToSave || getStrictActivePeriod();
-    if (!period) return;
+    if (!period || !isLoadedCarRoute(targetCarId, period)) return;
     if (typeof isAwaitingRouteProtection === 'function' && isAwaitingRouteProtection()) return;
 
     if (typeof updateRouteTotals === 'function') {
@@ -534,10 +541,29 @@ function saveCarRoutesForPeriod(periodToSave, carIdToSave, isManualSave = false)
             if (nextRaw) {
                 const nextObj = JSON.parse(nextRaw);
                 if (nextObj && nextObj.topFields) {
-                    if (odo2Val !== '') nextObj.topFields.odo1 = odo2Val;
-                    if (savedFuelLeftVal !== '') nextObj.topFields.fuelStart = savedFuelLeftVal;
-                    if (savedAdblueLeftVal !== '') nextObj.topFields.adblueStart = savedAdblueLeftVal;
-                    localStorage.setItem(nextStorageKey, JSON.stringify(nextObj));
+                    const next = nextObj.topFields;
+                    const hasRoutes = nextObj.rows?.some(row => row.driverOdometer ||
+                        row.inputs?.slice(2, 6).some(value => evaluateExpression(value) !== 0));
+                    // A later snapshot with activity keeps its own opening and closing.
+                    // When it only carries a balance, advance the two readings together.
+                    if (hasRoutes) return;
+                    function carryBalance(start, end, value) {
+                        const opening = next[start] ?? '';
+                        const closing = next[end] ?? '';
+                        if (value === '' || (closing !== '' &&
+                            (opening === '' || evaluateExpression(opening) !== evaluateExpression(closing)))) return;
+                        next[start] = value;
+                        next[end] = value;
+                    }
+                    carryBalance('odo1', 'odo2', odo2Val);
+                    if (!evaluateExpression(next.fuelReceived) && !evaluateExpression(next.fuelSpent)) {
+                        carryBalance('fuelStart', 'savedFuelLeft', savedFuelLeftVal);
+                    }
+                    if (!evaluateExpression(next.adblueReceived)) {
+                        carryBalance('adblueStart', 'savedAdblueLeft', savedAdblueLeftVal);
+                    }
+                    const nextValue = JSON.stringify(nextObj);
+                    if (nextValue !== nextRaw) localStorage.setItem(nextStorageKey, nextValue);
                 }
             }
         } catch (e) {}

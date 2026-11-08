@@ -1716,21 +1716,18 @@ function ensureTransferDataButtonAndDevImportButton() {
 }
 
 window.executeTransferCarDataToReport = function () {
-    if (typeof updateRouteTotals === 'function') {
-        updateRouteTotals();
-    }
-
     const period = (typeof getStrictActivePeriod === 'function')
         ? getStrictActivePeriod()
         : (document.getElementById('card-period-select')?.value || document.getElementById('car-period-select')?.value || '01.10-10.10');
-
-    if (typeof saveCarRoutesForPeriod === 'function') {
-        saveCarRoutesForPeriod(period);
-    }
-
-    const carId = (typeof currentCarId !== 'undefined' && currentCarId) ? currentCarId : 1;
+    const carId = typeof currentCarId !== 'undefined' ? currentCarId : null;
     const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
     const car = safeCars.find(c => Number(c.id) === Number(carId));
+    if (!car || !period || (typeof isLoadedCarRoute === 'function' && !isLoadedCarRoute(carId, period))) {
+        showDocToast('Відкрийте картку потрібного авто за вибраний період і повторіть перенесення.', '#dc2626');
+        return;
+    }
+    if (typeof updateRouteTotals === 'function') updateRouteTotals();
+    if (typeof saveCarRoutesForPeriod === 'function') saveCarRoutesForPeriod(period, carId);
 
     const fuelStartVal = document.getElementById('fuel-start')?.value?.trim() || '';
     const fuelRecVal = document.getElementById('fuel-received')?.value?.trim() || '';
