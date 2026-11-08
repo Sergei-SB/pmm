@@ -29,20 +29,28 @@ function updateRouteTrailerButton(canEdit) {
     button.disabled = !canEdit;
 }
 
-function renderRouteTrailerMass(rows, visible) {
+function renderRouteTrailerSummary(rows, visible) {
     const line = document.getElementById('route-trailer-mass-line');
-    if (!line) return;
-    line.hidden = !visible;
-    if (!visible) return;
+    const numbers = document.getElementById('route-trailer-numbers');
+    if (!line || !numbers) return;
 
+    const plates = new Map();
     const masses = new Map();
-    for (const row of rows) {
+    for (const row of visible ? rows : []) {
         const trailer = JSON.parse(row.dataset.routeTrailer || 'null');
-        if (!trailer?.plate || !Number.isFinite(trailer.massKg) || trailer.massKg <= 0) continue;
-        const label = `${trailer.plate} — ${trailer.massKg.toLocaleString('uk-UA')} кг`;
+        if (!trailer) continue;
+        const id = String(trailer.id);
+        const plate = carsData.find(car => String(car.id) === id)?.plate || trailer.plate;
+        if (!plate) continue;
+        plates.set(id, plate);
+        if (!Number.isFinite(trailer.massKg) || trailer.massKg <= 0) continue;
+        const label = `${plate} — ${trailer.massKg.toLocaleString('uk-UA')} кг`;
         masses.set(`${trailer.id}:${trailer.massKg}`, label);
     }
-    document.getElementById('route-trailer-mass').textContent = [...masses.values()].join('; ') || '—';
+    numbers.textContent = [...plates.values()].join(', ');
+    numbers.hidden = plates.size === 0;
+    document.getElementById('route-trailer-mass').textContent = [...masses.values()].join('; ');
+    line.hidden = masses.size === 0;
 }
 
 function readTrailerRouteSnapshot(key) {

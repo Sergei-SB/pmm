@@ -1305,8 +1305,8 @@ function updateRouteTotals() {
     if (subLineEl) {
         subLineEl.innerHTML = `<span id="markup-desc-text">${descriptionText}</span>`;
     }
-    if (typeof renderRouteTrailerMass === 'function') {
-        renderRouteTrailerMass(rows, truckActive && !getTowedVehicleCategory(car));
+    if (typeof renderRouteTrailerSummary === 'function') {
+        renderRouteTrailerSummary(rows, truckActive && !getTowedVehicleCategory(car));
     }
 
     const formulasContainer = document.getElementById('formulas-group-container');

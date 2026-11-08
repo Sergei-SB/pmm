@@ -623,7 +623,7 @@ test('The trailer dialog adds registered tare to cargo once and saves only the s
         showModal() { this.open = true; }
         close() { this.open = false; }
     }
-    const ids = ['button', 'dialog', 'form', 'row', 'unit', 'cargo', 'total', 'cancel', 'mass-line', 'mass'];
+    const ids = ['button', 'dialog', 'form', 'row', 'unit', 'cargo', 'total', 'cancel', 'numbers', 'mass-line', 'mass'];
     const controls = Object.fromEntries(ids.map(id => [id, new Control()]));
     function route(value) {
         const tons = {value, removeAttribute() {}};
@@ -658,12 +658,16 @@ test('The trailer dialog adds registered tare to cargo once and saves only the s
     assert.equal(first.tons.value, '4');
     assert.equal(second.tons.value, '3.5');
     assert.deepEqual(JSON.parse(second.dataset.routeTrailer), {id: '456', plate: '456', massKg: 1500});
-    c.renderRouteTrailerMass([first, second, second], true);
+    c.renderRouteTrailerSummary([first, second, second], true);
+    assert.equal(controls.numbers.textContent, '456');
+    assert.equal(controls.numbers.hidden, false);
     assert.equal(controls.mass.textContent, `456 — ${(1500).toLocaleString('uk-UA')} кг`);
     assert.equal(controls['mass-line'].hidden, false);
-    c.renderRouteTrailerMass([first], true);
-    assert.equal(controls.mass.textContent, '—');
-    c.renderRouteTrailerMass([second], false);
+    c.renderRouteTrailerSummary([first], true);
+    assert.equal(controls.numbers.hidden, true);
+    assert.equal(controls['mass-line'].hidden, true);
+    assert.equal(controls.mass.textContent, '');
+    c.renderRouteTrailerSummary([second], false);
     assert.equal(controls['mass-line'].hidden, true);
     controls.button.events.click();
     assert.equal(controls.cargo.value, '2');
