@@ -553,6 +553,30 @@ test('Switching from an AdBlue vehicle cannot carry hidden values into another v
     assert.deepEqual([report[2].leftFuel, report[2].odo, report[2].note], ['25', '212971', 'Keep']);
 });
 
+test('A report vehicle number opens its card for the displayed period without saving the previous period', () => {
+    const oldPeriod = '21.10-31.10';
+    const displayedPeriod = '01.11-10.11';
+    const select = {value: oldPeriod, options: [{value: oldPeriod}], appendChild(option) { this.options.push(option); }};
+    let active = false;
+    const opened = [], loaded = [];
+    const c = contextWith([['report.js', 'openReportCarCard']], {
+        openCarCard: id => {opened.push(id);},
+        document: {
+            getElementById: id => id === 'card-view' ? {classList: {contains: () => active}} : select,
+            createElement: () => ({})
+        },
+        loadCarDataForActivePeriod: () => loaded.push(select.value),
+        onCardPeriodChange: () => assert.fail('Navigation must not save the previous period')
+    });
+    c.openReportCarCard(9, displayedPeriod);
+    assert.equal(select.value, oldPeriod, 'denied card access leaves the period untouched');
+    active = true;
+    c.openReportCarCard(9, displayedPeriod);
+    assert.deepEqual(opened, [9, 9]);
+    assert.deepEqual(loaded, [displayedPeriod]);
+    assert.equal(select.options[1].value, displayedPeriod);
+});
+
 test('An unrelated registry conflict cannot block saving an independently added vehicle', async () => {
     const {c, values, item, backups} = conflictContext();
     for (const name of ['registryVehicleMatch', 'retainServerRegistry', 'registryAdditions']) {

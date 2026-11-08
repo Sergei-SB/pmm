@@ -818,6 +818,23 @@ window.applyReportRolePermissions = function() {
     }
 };
 
+function openReportCarCard(carId, period) {
+    window.openCarCard(carId);
+    if (!document.getElementById('card-view')?.classList.contains('active')) return;
+
+    const select = document.getElementById('card-period-select') || document.getElementById('car-period-select');
+    if (!select || !period || select.value === period) return;
+    if (!Array.from(select.options).some(option => option.value === period)) {
+        const option = document.createElement('option');
+        option.value = period;
+        option.textContent = period;
+        select.appendChild(option);
+    }
+    select.value = period;
+    // This is navigation. Loading the target period must not save the previous one.
+    loadCarDataForActivePeriod();
+}
+
 function renderReportTable() {
     upgradeReportControlsUI();
     const periods = getSavedPeriodsList();
@@ -1013,7 +1030,7 @@ function renderReportTable() {
 
         tr.innerHTML = `
             <td>${index + 1}</td>
-            <td><strong>${car.plate}</strong></td>
+            <td><button type="button" class="report-car-link" style="background:none; border:0; padding:0; color:inherit; font:inherit; font-weight:bold; text-decoration:underline; cursor:pointer;"></button></td>
             <td>${car.subdivision}</td>
             <td class="rep-row-fuel-type" style="padding: 2px;">
                 <input type="text" class="report-cell-input rep-fuel-type-input" data-car="${car.id}" data-field="fuelType" value="${car.fuelType || ''}" list="fuel-types-list" oninput="updateCarFuelTypeFromReport(${car.id}, this.value)" style="width: 100%; text-align: center; font-weight: bold; padding: 2px; border: 1px solid #bdc3c7; border-radius: 2px; font-size: 11px;" ${lockAttr}>
@@ -1032,6 +1049,10 @@ function renderReportTable() {
             <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="leftAdBlue" value="${carData.leftAdBlue}" ${noAdblueAttr || lockAttr}></td>
             <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="odo" value="${carData.odo}" ${lockAttr}></td>
         `;
+        const carLink = tr.querySelector('.report-car-link');
+        carLink.textContent = car.plate;
+        carLink.title = 'Картка авто та маршрути за ' + periodStr;
+        carLink.addEventListener('click', () => openReportCarCard(car.id, periodStr));
         tbody.appendChild(tr);
     });
 
