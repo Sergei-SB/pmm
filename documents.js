@@ -1758,6 +1758,7 @@ window.executeTransferCarDataToReport = function () {
     reportStore[carId].prevFuel = fuelStartVal;
     reportStore[carId].refuelFuel = fuelRecVal;
     reportStore[carId].leftFuel = fuelLeftVal;
+    reportStore[carId].spentFuel = document.getElementById('fuel-spent')?.textContent?.trim() || '';
 
     reportStore[carId].prevAdBlue = car?.hasAdBlue ? adblueStartVal : '';
     reportStore[carId].refuelAdBlue = car?.hasAdBlue ? adblueRecVal : '';
@@ -1765,6 +1766,7 @@ window.executeTransferCarDataToReport = function () {
 
     reportStore[carId].prevOdo = odoStartVal;
     reportStore[carId].odo = odoEndVal;
+    reportStore[carId].readingsTransferred = true;
     if (reportStore[carId].note === undefined && car) {
         reportStore[carId].note = car.note || '';
     }
@@ -1780,15 +1782,6 @@ window.executeTransferCarDataToReport = function () {
     if (typeof renderReportTable === 'function') {
         renderReportTable();
     }
-
-    // Також оновлюємо інпути в таблиці Звіт (10 днів), якщо вони вже відмальовані в DOM
-    const reportRowInputs = document.querySelectorAll(`#report-tbody input[data-car="${carId}"]`);
-    reportRowInputs.forEach(inp => {
-        const f = inp.getAttribute('data-field');
-        if (f && reportStore[carId][f] !== undefined) {
-            inp.value = reportStore[carId][f];
-        }
-    });
 
     const plateStr = car ? `${car.plate} (${car.model})` : `Авто #${carId}`;
     showDocToast(

@@ -507,7 +507,11 @@ test('Card transfer recovers browser space and stores fuel and odometers in the 
     }
     const localStorage = new Storage();
     const fields = {'fuel-start': {value: '14'}, 'fuel-left': {textContent: '14'}, 'odo-1': {value: '317595'}, 'odo-2': {value: '317595'}};
-    const c = contextWith([['Shared_sync.js', 'saveMeta'], ['Shared_sync.js', 'patchStorage'], ['documents.js', 'executeTransferCarDataToReport']], {
+    const c = contextWith([
+        ['Shared_sync.js', 'saveMeta'], ['Shared_sync.js', 'patchStorage'],
+        ['documents.js', 'executeTransferCarDataToReport'], ['report.js', 'getTenDayVehicleValues'],
+        ['report.js', 'saveCurrentReportSilently']
+    ], {
         Storage, localStorage, patched: false, applyingRemote: false, rawGetItem: Storage.prototype.getItem, rawSetItem: Storage.prototype.setItem,
         meta, META_KEY: 'meta', pending: {[dirtyKey]: {baseValue: 'original'}}, storageErrors: {},
         getKeyRev: name => meta.keys[name] || 0, localGet: name => stored.get(name) ?? null,
@@ -521,10 +525,28 @@ test('Card transfer recovers browser space and stores fuel and odometers in the 
     c.executeTransferCarDataToReport();
     assert.equal(quotaHits, 1);
     assert.equal(success, true);
-    assert.deepEqual(JSON.parse(stored.get(key)), {9: {note: 'Existing note', prevFuel: '14', refuelFuel: '', leftFuel: '14', prevOdo: '317595', odo: '317595', prevAdBlue: '', refuelAdBlue: '', leftAdBlue: ''}, 10: {leftFuel: '25'}});
+    const transferred = JSON.parse(stored.get(key));
+    assert.deepEqual(transferred, {9: {note: 'Existing note', prevFuel: '14', refuelFuel: '', leftFuel: '14', spentFuel: '', prevOdo: '317595', odo: '317595', prevAdBlue: '', refuelAdBlue: '', leftAdBlue: '', readingsTransferred: true}, 10: {leftFuel: '25'}});
     assert.equal(stored.get(routeKey), route);
     assert.equal(queued.previous, previousReport);
     assert.deepEqual(JSON.parse(stored.get('meta')).carBases, {[dirtyKey]: 'original'});
+
+    const previousPeriod = {leftFuel: '25', odo: '317400'};
+    const displayed = c.getTenDayVehicleValues({}, transferred[9], previousPeriod);
+    assert.deepEqual([displayed.prevFuel, displayed.leftFuel, displayed.prevOdo, displayed.odo],
+        ['14', '14', '317595', '317595']);
+
+    c.document.getElementById = () => ({value: '01.11-10.11'});
+    c.document.querySelectorAll = () => [{
+        querySelector(selector) {
+            if (selector === '.report-cell-input') return {getAttribute: () => '9'};
+            return {value: displayed[selector.match(/data-field="(\w+)"/)?.[1]] ?? ''};
+        }
+    }];
+    c.saveCurrentReportSilently();
+    const reopened = c.getTenDayVehicleValues({}, JSON.parse(stored.get(key))[9], previousPeriod);
+    assert.deepEqual([reopened.prevFuel, reopened.leftFuel, reopened.prevOdo, reopened.odo],
+        ['14', '14', '317595', '317595']);
 });
 
 test('Switching from an AdBlue vehicle cannot carry hidden values into another vehicle’s route or report', () => {

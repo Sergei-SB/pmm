@@ -532,6 +532,7 @@ function saveCurrentReportSilently() {
         if (carIdInput) {
             const carId = carIdInput.getAttribute('data-car');
             reportData[carId] = {
+                ...(reportData[carId]?.readingsTransferred === true ? {readingsTransferred: true} : {}),
                 fuelType: row.querySelector('.rep-row-fuel-type')?.textContent || '',
                 prevFuel: row.querySelector('.report-cell-input[data-field="prevFuel"]')?.value || '',
                 prevAdBlue: row.querySelector('.report-cell-input[data-field="prevAdBlue"]:not([data-no-adblue])')?.value || '',
@@ -861,6 +862,17 @@ function getTenDayVehicleValues(car, saved, previousReport, previousCard, card) 
         if (firstValue(start, received, spent) === '') return '';
         if (received === '' && spent === '') return start;
         return Math.max(0, evaluateExpression(start) + evaluateExpression(received) - evaluateExpression(spent)).toFixed(2);
+    }
+
+    // A transfer explicitly records both readings for this period. Only
+    // reports without a transfer need automatic carry-forward.
+    if (saved.readingsTransferred === true) {
+        return {
+            refuelOil: '', refuelWasher: '', note: car.note || '', docNo: '', ...saved,
+            prevAdBlue: car.hasAdBlue ? saved.prevAdBlue ?? '' : '',
+            refuelAdBlue: car.hasAdBlue ? saved.refuelAdBlue ?? '' : '',
+            leftAdBlue: car.hasAdBlue ? saved.leftAdBlue ?? '' : ''
+        };
     }
 
     const prevFuel = firstValue(previousReport.leftFuel, previousCard.savedFuelLeft, saved.prevFuel, card.fuelStart);
