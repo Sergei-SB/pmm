@@ -132,6 +132,8 @@
                     });
                     var actions = node('div', undefined, section);
                     actions.style.cssText = 'display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;';
+                    var feedback = node('div', '', section);
+                    feedback.setAttribute('role', 'status');
                     (item.canMerge ? ['merge', 'local', 'server'] : ['local', 'server']).forEach(function (choice) {
                         var button = node('button', choice === 'merge' ? 'Об’єднати без втрати змін' : choice === 'local' ? 'Зберегти мою версію на сайт' : 'Використати версію із сайту', actions);
                         button.type = 'button';
@@ -140,9 +142,11 @@
                         button.dataset.requiresUpload = choice !== 'server' ? 'true' : 'false';
                         button.onclick = async function () {
                             actions.querySelectorAll('button').forEach(function (b) {b.disabled = true;});
+                            feedback.style.color = '#334155';
+                            feedback.textContent = choice === 'server' ? 'Застосовую версію із сайту…' : 'Зберігаю зміни…';
                             try { await window.resolvePmmSyncConflict(item, choice); await load(); }
                             catch (error) {
-                                message.style.color = '#b91c1c'; message.textContent = error.message;
+                                feedback.style.color = '#b91c1c'; feedback.textContent = error.message;
                                 actions.querySelectorAll('button').forEach(function (b) {b.disabled = !report.canUpload && b.dataset.requiresUpload === 'true';});
                             }
                         };

@@ -281,18 +281,26 @@
             }) || (!explicit && !base.length)) return null;
             var result = remote.slice();
             var updated = new Set();
+            function matchVehicle(car, candidates, original) {
+                var matches = candidates.filter(function (saved) {
+                    return registryVehicleMatch(car, saved) || (original && registryVehicleMatch(original, saved));
+                });
+                if (matches.length <= 1) return matches[0];
+                // Some legacy entries share a plate or VIN. An existing ID
+                // can disambiguate matching identities without reassigning it.
+                return matches.find(function (saved) {
+                    return String(saved.id) === String(original ? original.id : car.id);
+                }) || null;
+            }
             for (var car of local) {
                 var sameId = base.find(function (old) {return String(old.id) === String(car.id);});
                 // Unchanged rows need no identity match, even when VIN and plate are blank.
-                if (sameId && JSON.stringify(car) === JSON.stringify(sameId)) continue;
-                var originals = base.filter(function (old) {return registryVehicleMatch(car, old);});
-                if (originals.length > 1) return null;
-                var original = originals[0];
-                var matches = remote.filter(function (saved) {
-                    return registryVehicleMatch(car, saved) || (original && registryVehicleMatch(original, saved));
-                });
-                if (matches.length > 1) return null;
-                var saved = matches[0];
+                if (!explicit && sameId && JSON.stringify(car) === JSON.stringify(sameId)) continue;
+                var original = matchVehicle(car, base);
+                if (original === null) return null;
+                var saved = matchVehicle(car, remote, original);
+                if (saved === null) return null;
+                if (!saved && sameId && JSON.stringify(car) === JSON.stringify(sameId)) continue;
                 if (!saved) {
                     if (original && JSON.stringify(car) === JSON.stringify(original)) continue;
                     if (original && !explicit) return null;
@@ -305,7 +313,9 @@
                 updated.add(saved.id);
                 var next = Object.assign({}, saved);
                 Object.keys(car).forEach(function (field) {
-                    if (field !== 'id' && (original ? JSON.stringify(car[field]) !== JSON.stringify(original[field]) : explicit)) next[field] = car[field];
+                    var changedLocally = original && JSON.stringify(car[field]) !== JSON.stringify(original[field]);
+                    var missingServerNote = explicit && field === 'note' && !String(saved.note || '').trim() && !!String(car.note || '').trim();
+                    if (field !== 'id' && (changedLocally || (!original && explicit) || missingServerNote)) next[field] = car[field];
                 });
                 result[remote.indexOf(saved)] = next;
             }
@@ -1407,7 +1417,14 @@
         saveMeta();
         refreshAllViewsSafely();
         setStatus('ok');
-        if (choice !== 'server' && item.kind === 'key') await flushPending();
+        if (choice !== 'server' && item.kind === 'key') {
+            await flushPending();
+            if (item.id === 'user_cars_database_v2' && pending[item.id]) {
+                throw new Error(lastSafetyWarning || (pending[item.id].blocked
+                    ? 'Реєстр на сайті змінився. Оновіть перевірку, щоб порівняти актуальні версії.'
+                    : 'Сайт ще не підтвердив запис реєстру. Зміни залишилися в черзі.'));
+            }
+        }
         else pullServer(false);
         schedulePush(0); scheduleDocPush(0);
     };

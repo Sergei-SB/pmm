@@ -441,13 +441,49 @@ test('Developer registry save matches the same vehicle across reordered IDs and 
     values[key] = encode(local);
     c.pending[key] = {value: encode(local), blocked: true, baseValue: encode([original])};
     Object.assign(item, {id: key, local: {value: encode(local), deleted: false}, remote: {value: encode(remote), rev: 42, deleted: false}});
+    c.flushPending = async () => {
+        assert.equal(c.pending[key].role, 'developer');
+        delete c.pending[key];
+    };
     await c.resolvePmmSyncConflict(item, 'local');
     assert.deepEqual(JSON.parse(values[key]), expected);
-    assert.equal(c.pending[key].role, 'developer');
     assert.equal(backups.length, 1);
     assert.equal(c.retainServerRegistry(encode([{id: 23, plate: 'XX 000 X'}]), encode(remote), null, true), null);
     assert.deepEqual(JSON.parse(c.retainServerRegistry(encode(local), encode(remote), encode([original]), false)), expected);
 });
+test('Conflict button sends legacy duplicate plates using their stable IDs and requires server confirmation', async () => {
+    const {c, values, item, revisions} = conflictContext();
+    for (const name of ['registryVehicleMatch', 'retainServerRegistry', 'buildPayload', 'flushPending']) {
+        vm.runInContext(extract('Shared_sync.js', name), c);
+    }
+    const key = 'user_cars_database_v2';
+    const browser = [{id: 1, plate: 'TEST 01', note: '1 черга'}, {id: 2, plate: 'TEST 01', note: '2 черга'}];
+    const server = [{...browser[0], note: '', driver: 'Remote edit'}, {...browser[1], note: ''}, {id: 3, plate: 'TEST 03'}];
+    values[key] = JSON.stringify(browser);
+    Object.assign(item, {id: key, local: {value: values[key], deleted: false}, remote: {value: JSON.stringify(server), rev: 42, deleted: false}});
+    let fail = true, saved;
+    Object.assign(c, {
+        manualBackupInProgress: false, pushInFlight: false, pullInFlight: false, awaitingFirstPull: false,
+        lastSafetyWarning: '', statusText: '', deviceId: 'test', SERVER_URL: 'https://test.invalid', PUSH_TIMEOUT_MS: 1000,
+        retryDelay: 1000, RETRY_MIN_MS: 1000, RETRY_MAX_MS: 10000, pullSharedEvent() {},
+        hasPendingPrivilegedRouteSave: () => false, getKeyRev: name => revisions[name] || 0,
+        fetchWithTimeout: async (_url, options) => {
+            const change = JSON.parse(options.body).changes[key];
+            assert.equal(change.baseRev, 42);
+            if (fail) return {ok: false, status: 503};
+            saved = JSON.parse(change.value);
+            return {ok: true, json: async () => ({ok: true, applied: {[key]: 43}})};
+        }
+    });
+    c.pending[key] = {value: values[key], blocked: true, baseValue: values[key]};
+    await assert.rejects(c.resolvePmmSyncConflict(item, 'local'), /ще не підтвердив/);
+    assert.ok(c.pending[key]);
+    fail = false;
+    await c.flushPending();
+    assert.equal(c.pending[key], undefined);
+    assert.deepEqual(saved, [{...server[0], note: '1 черга'}, {...server[1], note: '2 черга'}, server[2]]);
+});
+
 test('Manual cloud save retries a blocked vehicle addition and keeps the other device’s changes', async () => {
     const {c, values, revisions, backups} = conflictContext();
     for (const name of ['retainServerRegistry', 'registryVehicleMatch', 'reconcileSafeModificationsRecord',
