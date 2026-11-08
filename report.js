@@ -532,7 +532,7 @@ function saveCurrentReportSilently() {
         if (carIdInput) {
             const carId = carIdInput.getAttribute('data-car');
             reportData[carId] = {
-                fuelType: row.querySelector('.report-cell-input[data-field="fuelType"]')?.value || '',
+                fuelType: row.querySelector('.rep-row-fuel-type')?.textContent || '',
                 prevFuel: row.querySelector('.report-cell-input[data-field="prevFuel"]')?.value || '',
                 prevAdBlue: row.querySelector('.report-cell-input[data-field="prevAdBlue"]:not([data-no-adblue])')?.value || '',
                 prevOdo: row.querySelector('.report-cell-input[data-field="prevOdo"]')?.value || '',
@@ -1030,11 +1030,9 @@ function renderReportTable() {
 
         tr.innerHTML = `
             <td>${index + 1}</td>
-            <td><button type="button" class="report-car-link" style="background:none; border:0; padding:0; color:inherit; font:inherit; font-weight:bold; text-decoration:underline; cursor:pointer;"></button></td>
+            <td><button type="button" class="report-car-link" style="background:none; border:0; padding:0; color:inherit; font:inherit; font-weight:bold; cursor:pointer;"></button></td>
             <td>${car.subdivision}</td>
-            <td class="rep-row-fuel-type" style="padding: 2px;">
-                <input type="text" class="report-cell-input rep-fuel-type-input" data-car="${car.id}" data-field="fuelType" value="${car.fuelType || ''}" list="fuel-types-list" oninput="updateCarFuelTypeFromReport(${car.id}, this.value)" style="width: 100%; text-align: center; font-weight: bold; padding: 2px; border: 1px solid #bdc3c7; border-radius: 2px; font-size: 11px;" ${lockAttr}>
-            </td>
+            <td class="rep-row-fuel-type" style="padding: 2px; font-weight: bold;"></td>
             <td style="text-align: left; padding-left: 10px;">${car.model}</td>
             <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="prevFuel" value="${carData.prevFuel}" ${lockAttr}></td>
             <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="prevAdBlue" value="${carData.prevAdBlue}" ${noAdblueAttr || lockAttr}></td>
@@ -1053,6 +1051,7 @@ function renderReportTable() {
         carLink.textContent = car.plate;
         carLink.title = 'Картка авто та маршрути за ' + periodStr;
         carLink.addEventListener('click', () => openReportCarCard(car.id, periodStr));
+        tr.querySelector('.rep-row-fuel-type').textContent = car.fuelType || '';
         tbody.appendChild(tr);
     });
 
@@ -1065,30 +1064,6 @@ function renderReportTable() {
     }
     if (typeof updateRoleUI === 'function') {
         updateRoleUI();
-    }
-}
-
-function updateCarFuelTypeFromReport(carId, val) {
-    const newVal = String(val || '').trim();
-    const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
-    const car = sourceCars.find(c => Number(c.id) === Number(carId));
-    if (car) {
-        car.fuelType = newVal;
-        try {
-            localStorage.setItem('cars_custom_data', JSON.stringify(sourceCars));
-        } catch(e) {}
-    }
-    const row = document.querySelector(`.report-cell-input[data-car="${carId}"][data-field="fuelType"]`)?.closest('tr');
-    if (row) {
-        row.setAttribute('data-fuel-type', newVal.toUpperCase());
-    }
-    saveCurrentReportSilently();
-    updateReportTotals();
-    if (typeof renderSubdivisionsView === 'function') {
-        const subView = document.getElementById('subdivisions-view');
-        if (subView && subView.classList.contains('active')) {
-            renderSubdivisionsView();
-        }
     }
 }
 
@@ -1109,8 +1084,7 @@ function updateReportTotals() {
     let dpEndF = 0, abEndF = 0, sumEndAd = 0;
 
     document.querySelectorAll('#report-tbody tr').forEach(row => {
-        const fInput = row.querySelector('.report-cell-input[data-field="fuelType"]');
-        const fType = fInput ? fInput.value.trim().toUpperCase() : (row.querySelector('.rep-row-fuel-type')?.textContent.trim().toUpperCase() || '');
+        const fType = row.querySelector('.rep-row-fuel-type')?.textContent.trim().toUpperCase() || '';
 
         const startF = evaluateExpression(row.querySelector('.report-cell-input[data-field="prevFuel"]')?.value);
         const refF = evaluateExpression(row.querySelector('.report-cell-input[data-field="refuelFuel"]')?.value);
