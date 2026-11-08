@@ -553,6 +553,20 @@ test('Switching from an AdBlue vehicle cannot carry hidden values into another v
     assert.deepEqual([report[2].leftFuel, report[2].odo, report[2].note], ['25', '212971', 'Keep']);
 });
 
+test('The ten-day report carries closing readings to the next opening and fills missing closing values', () => {
+    const c = contextWith([['report.js', 'evaluateExpression'], ['report.js', 'getTenDayVehicleValues']]);
+    const previous = {leftFuel: '25', odo: '212971', leftAdBlue: '14.6'};
+    const stale = {prevFuel: '46', leftFuel: '46.00', prevOdo: '16200', prevAdBlue: '14.6', leftAdBlue: '14.6'};
+    const values = c.getTenDayVehicleValues({hasAdBlue: false}, stale, previous, {savedFuelLeft: '30'}, null);
+    assert.deepEqual([values.prevFuel, values.leftFuel, values.prevOdo, values.odo], ['25', '25', '212971', '212971']);
+    assert.deepEqual([values.prevAdBlue, values.refuelAdBlue, values.leftAdBlue], ['', '', '']);
+    assert.equal(stale.prevFuel, '46', 'rendering does not rewrite stored data');
+    const recorded = c.getTenDayVehicleValues({hasAdBlue: true}, {prevFuel: '46', leftFuel: '30', prevOdo: '212971', odo: '213100'}, previous, null, null);
+    assert.deepEqual([recorded.prevFuel, recorded.leftFuel, recorded.prevOdo, recorded.odo, recorded.leftAdBlue], ['25', '30', '212971', '213100', '14.6']);
+    const zero = c.getTenDayVehicleValues({hasAdBlue: true}, {}, {leftFuel: 0, leftAdBlue: 0}, {savedFuelLeft: '30', odo2: '20'}, {fuelReceived: '7,5', fuelSpent: '2,5'});
+    assert.deepEqual([zero.prevFuel, zero.leftFuel, zero.prevOdo, zero.odo, zero.prevAdBlue, zero.leftAdBlue], ['0', '5.00', '20', '20', '0', '0']);
+});
+
 test('A report vehicle number opens its card for the displayed period without saving the previous period', () => {
     const oldPeriod = '21.10-31.10';
     const displayedPeriod = '01.11-10.11';

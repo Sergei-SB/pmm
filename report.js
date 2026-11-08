@@ -835,6 +835,55 @@ function openReportCarCard(carId, period) {
     loadCarDataForActivePeriod();
 }
 
+function getTenDayVehicleValues(car, saved, previousReport, previousCard, card) {
+    saved = saved || {};
+    previousReport = previousReport || {};
+    previousCard = previousCard || {};
+    card = card || {};
+
+    function firstValue(...values) {
+        const found = values.find(value => value != null && String(value).trim() !== '');
+        return found == null ? '' : String(found);
+    }
+    function sameReading(a, b) {
+        if (a === '' || b === '') return false;
+        return a === b || Number(a.replace(',', '.')) === Number(b.replace(',', '.'));
+    }
+    function closingValue(savedEnd, cardEnd, savedStart, cardStart, start, hasActivity, fallback) {
+        const end = firstValue(savedEnd, cardEnd);
+        const sourceStart = firstValue(firstValue(savedEnd) !== '' ? savedStart : cardStart);
+        // A stored closing equal to its old opening is a carry-forward when
+        // there were no recorded transactions. Use the corrected opening.
+        if (start !== '' && !hasActivity && sameReading(end, sourceStart)) return start;
+        return firstValue(end, fallback);
+    }
+    function balance(start, received, spent = '') {
+        if (firstValue(start, received, spent) === '') return '';
+        if (received === '' && spent === '') return start;
+        return Math.max(0, evaluateExpression(start) + evaluateExpression(received) - evaluateExpression(spent)).toFixed(2);
+    }
+
+    const prevFuel = firstValue(previousReport.leftFuel, previousCard.savedFuelLeft, saved.prevFuel, card.fuelStart);
+    const prevOdo = firstValue(previousReport.odo, previousCard.odo2, saved.prevOdo, card.odo1);
+    const refuelFuel = firstValue(saved.refuelFuel, card.fuelReceived);
+    const spentFuel = firstValue(saved.spentFuel, card.fuelSpent);
+    const fuelActivity = [saved.refuelFuel, card.fuelReceived, saved.spentFuel, card.fuelSpent].some(value => evaluateExpression(value) !== 0);
+    const cardHasMileage = firstValue(card.odo1) !== '' && firstValue(card.odo2) !== '' && !sameReading(firstValue(card.odo1), firstValue(card.odo2));
+    const prevAdBlue = car.hasAdBlue ? firstValue(previousReport.leftAdBlue, previousCard.savedAdblueLeft, saved.prevAdBlue, card.adblueStart) : '';
+    const refuelAdBlue = car.hasAdBlue ? firstValue(saved.refuelAdBlue, card.adblueReceived) : '';
+    const adBlueActivity = [saved.refuelAdBlue, card.adblueReceived].some(value => evaluateExpression(value) !== 0) || cardHasMileage;
+
+    return {
+        refuelOil: '', refuelWasher: '', note: car.note || '', docNo: '', ...saved,
+        prevFuel, prevOdo, refuelFuel, prevAdBlue, refuelAdBlue,
+        leftFuel: closingValue(saved.leftFuel, card.savedFuelLeft, saved.prevFuel, card.fuelStart, prevFuel,
+            fuelActivity || cardHasMileage, cardHasMileage && spentFuel === '' ? '' : balance(prevFuel, refuelFuel, spentFuel)),
+        odo: closingValue(saved.odo, card.odo2, saved.prevOdo, card.odo1, prevOdo, cardHasMileage, prevOdo),
+        leftAdBlue: car.hasAdBlue ? closingValue(saved.leftAdBlue, card.savedAdblueLeft, saved.prevAdBlue, card.adblueStart,
+            prevAdBlue, adBlueActivity, cardHasMileage ? '' : balance(prevAdBlue, refuelAdBlue)) : ''
+    };
+}
+
 function renderReportTable() {
     upgradeReportControlsUI();
     const periods = getSavedPeriodsList();
@@ -913,110 +962,15 @@ function renderReportTable() {
         }
         tr.setAttribute('data-fuel-type', (car.fuelType || '').toUpperCase());
 
-        let autoPrevFuel = '';
-        let autoPrevAdBlue = '';
-        let autoPrevOdo = '';
-
-        if (prevPeriodKey) {
+        function cardTop(period) {
+            if (!period) return null;
             try {
-                const prevCardRaw = localStorage.getItem(`isolated_car_routes_${prevPeriodKey}_${car.id}`);
-                if (prevCardRaw) {
-                    const prevCard = JSON.parse(prevCardRaw);
-                    if (prevCard && prevCard.topFields) {
-                        if (prevCard.topFields.savedFuelLeft !== undefined && prevCard.topFields.savedFuelLeft !== '') {
-                            autoPrevFuel = prevCard.topFields.savedFuelLeft;
-                        }
-                        if (prevCard.topFields.savedAdblueLeft !== undefined && prevCard.topFields.savedAdblueLeft !== '') {
-                            autoPrevAdBlue = prevCard.topFields.savedAdblueLeft;
-                        }
-                        if (prevCard.topFields.odo2 !== undefined && prevCard.topFields.odo2 !== '') {
-                            autoPrevOdo = prevCard.topFields.odo2;
-                        }
-                    }
-                }
-            } catch (e) {}
-
-            if (prevPeriodSavedData[car.id]) {
-                if (prevPeriodSavedData[car.id].leftFuel) autoPrevFuel = prevPeriodSavedData[car.id].leftFuel;
-                if (prevPeriodSavedData[car.id].leftAdBlue) autoPrevAdBlue = prevPeriodSavedData[car.id].leftAdBlue;
-                if (prevPeriodSavedData[car.id].odo) autoPrevOdo = prevPeriodSavedData[car.id].odo;
-            }
+                return JSON.parse(localStorage.getItem(`isolated_car_routes_${period}_${car.id}`) || 'null')?.topFields;
+            } catch (_) { return null; }
         }
 
-        let currCardTop = null;
-        try {
-            const currCardRaw = localStorage.getItem(`isolated_car_routes_${periodStr}_${car.id}`);
-            if (currCardRaw) {
-                const currCard = JSON.parse(currCardRaw);
-                if (currCard && currCard.topFields) currCardTop = currCard.topFields;
-            }
-        } catch (e) {}
-
-        if (!carData) {
-            let initLeftFuel = currCardTop?.savedFuelLeft || '';
-            if (initLeftFuel === '' && currCardTop && (currCardTop.fuelStart || currCardTop.fuelReceived)) {
-                const st = evaluateExpression(currCardTop.fuelStart) || 0;
-                const rc = evaluateExpression(currCardTop.fuelReceived) || 0;
-                const sp = evaluateExpression(currCardTop.fuelSpent) || 0;
-                if (st > 0 || rc > 0) {
-                    initLeftFuel = Math.max(0, (st + rc) - sp).toFixed(2);
-                }
-            } else if (initLeftFuel === '' && autoPrevFuel !== '') {
-                initLeftFuel = autoPrevFuel;
-            }
-
-            carData = {
-                fuelType: car.fuelType || '',
-                prevFuel: autoPrevFuel !== '' ? autoPrevFuel : (currCardTop?.fuelStart || ''),
-                prevAdBlue: autoPrevAdBlue !== '' ? autoPrevAdBlue : (currCardTop?.adblueStart || ''),
-                prevOdo: autoPrevOdo !== '' ? autoPrevOdo : (currCardTop?.odo1 || ''),
-                refuelFuel: currCardTop?.fuelReceived || '',
-                refuelAdBlue: currCardTop?.adblueReceived || '',
-                refuelOil: '',
-                refuelWasher: '',
-                note: car.note || '',
-                docNo: '',
-                leftFuel: initLeftFuel,
-                leftAdBlue: currCardTop?.savedAdblueLeft || '',
-                odo: currCardTop?.odo2 || ''
-            };
-        } else {
-            if ((carData.prevFuel === '' || carData.prevFuel == null) && autoPrevFuel !== '') {
-                carData.prevFuel = autoPrevFuel;
-            }
-            if ((carData.prevAdBlue === '' || carData.prevAdBlue == null) && autoPrevAdBlue !== '') {
-                carData.prevAdBlue = autoPrevAdBlue;
-            }
-            if ((carData.prevOdo === '' || carData.prevOdo == null) && autoPrevOdo !== '') {
-                carData.prevOdo = autoPrevOdo;
-            }
-            if (carData.leftFuel === '' || carData.leftFuel == null) {
-                if (currCardTop?.savedFuelLeft) {
-                    carData.leftFuel = currCardTop.savedFuelLeft;
-                } else if (currCardTop && (currCardTop.fuelStart || currCardTop.fuelReceived)) {
-                    const st = evaluateExpression(currCardTop.fuelStart) || 0;
-                    const rc = evaluateExpression(currCardTop.fuelReceived) || 0;
-                    const sp = evaluateExpression(currCardTop.fuelSpent) || 0;
-                    if (st > 0 || rc > 0) {
-                        carData.leftFuel = Math.max(0, (st + rc) - sp).toFixed(2);
-                    }
-                } else if (carData.prevFuel || carData.refuelFuel) {
-                    const st = evaluateExpression(carData.prevFuel) || 0;
-                    const rc = evaluateExpression(carData.refuelFuel) || 0;
-                    const sp = evaluateExpression(carData.spentFuel) || 0;
-                    if (st > 0 || rc > 0) {
-                        carData.leftFuel = Math.max(0, (st + rc) - sp).toFixed(2);
-                    }
-                }
-            }
-            if ((carData.leftAdBlue === '' || carData.leftAdBlue == null) && currCardTop?.savedAdblueLeft) {
-                carData.leftAdBlue = currCardTop.savedAdblueLeft;
-            }
-            if ((carData.odo === '' || carData.odo == null) && currCardTop?.odo2) {
-                carData.odo = currCardTop.odo2;
-            }
-        }
-
+        carData = getTenDayVehicleValues(car, carData, prevPeriodSavedData[car.id],
+            cardTop(prevPeriodKey), cardTop(periodStr));
         const role = (typeof window.getCurrentAppRole === 'function')
             ? window.getCurrentAppRole()
             : ((typeof currentRole !== 'undefined') ? currentRole : 'user');
@@ -1024,9 +978,6 @@ function renderReportTable() {
         const lockAttr = canEditReport ? '' : 'disabled readonly style="background:#f1f2f6; cursor:not-allowed; color:#2c3e50;" title="Редагування доступне тільки для Адміна та Розробника"';
 
         const noAdblueAttr = car.hasAdBlue ? '' : 'disabled data-no-adblue="true" style="background:#e0e0e0; cursor:not-allowed;"';
-        if (!car.hasAdBlue) {
-            carData = {...carData, prevAdBlue: '', refuelAdBlue: '', leftAdBlue: ''};
-        }
 
         tr.innerHTML = `
             <td>${index + 1}</td>
