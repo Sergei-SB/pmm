@@ -282,6 +282,9 @@
             var result = remote.slice();
             var updated = new Set();
             for (var car of local) {
+                var sameId = base.find(function (old) {return String(old.id) === String(car.id);});
+                // Unchanged rows need no identity match, even when VIN and plate are blank.
+                if (sameId && JSON.stringify(car) === JSON.stringify(sameId)) continue;
                 var originals = base.filter(function (old) {return registryVehicleMatch(car, old);});
                 if (originals.length > 1) return null;
                 var original = originals[0];
@@ -292,6 +295,7 @@
                 var saved = matches[0];
                 if (!saved) {
                     if (original && JSON.stringify(car) === JSON.stringify(original)) continue;
+                    if (original && !explicit) return null;
                     // IDs are foreign keys for routes, reports and documents.
                     if (result.some(function (item) {return String(item.id) === String(car.id);})) return null;
                     result.push(car);
@@ -1215,8 +1219,7 @@
                 if (Date.now() >= deadline) throw new Error('Сервер ще не відповів');
                 await new Promise(function (resolve) { setTimeout(resolve, 100); });
             }
-            // Only independent property edits can be reconciled here. Genuine
-            // field collisions, registry deletions and file conflicts stay blocked.
+            // Retry safe vehicle changes against the current server records.
             return typeof window.reconcilePmmModificationsConflict === 'function'
                 ? window.reconcilePmmModificationsConflict() : undefined;
         }).then(function () {
@@ -1292,7 +1295,7 @@
 
     // A visible review is required for genuinely different versions. Never
     // clear a blocked outbox or choose the server merely to turn the dot green.
-    window.inspectPmmSyncConflicts = async function () {
+    window.inspectPmmSyncConflicts = async function (includeFiles) {
         var response = await fetchWithTimeout(SERVER_URL + '/api/shared-state', {cache: 'no-store'}, PULL_TIMEOUT_MS);
         if (!response.ok) throw new Error('Сервер недоступний: HTTP ' + response.status);
         var state = await response.json();
@@ -1305,7 +1308,7 @@
             item.canMerge = conflictMergeValue(item, p) !== null;
             result.push(item);
         });
-        if (Object.keys(documentPending).some(function (id) { return documentPending[id].blocked; })) {
+        if (includeFiles !== false && Object.keys(documentPending).some(function (id) { return documentPending[id].blocked; })) {
             var filesResponse = await fetchWithTimeout(SERVER_URL + '/api/shared-idb', {cache: 'no-store'}, DOCS_TIMEOUT_MS);
             if (!filesResponse.ok) throw new Error('Не вдалося перевірити документи');
             var files = (await filesResponse.json()).files || [];
@@ -1322,9 +1325,12 @@
             warning: lastSafetyWarning || window.localBackupFailure || '', canUpload: isAdminRole()};
     };
     window.reconcilePmmModificationsConflict = async function () {
-        var p = pending.cars_modifications_data;
-        if (!p || !p.blocked || !isAdminRole()) return;
-        var report = await window.inspectPmmSyncConflicts();
+        if (!isAdminRole() || !['cars_modifications_data', 'user_cars_database_v2'].some(function (key) {
+            return pending[key] && pending[key].blocked;
+        })) return;
+        var report = await window.inspectPmmSyncConflicts(false);
+        var registry = report.conflicts.find(function (entry) { return entry.kind === 'key' && entry.id === 'user_cars_database_v2'; });
+        if (registry && await reconcileSafeModificationsRecord(registry.remote, registry.id)) refreshAllViewsSafely();
         var item = report.conflicts.find(function (entry) { return entry.id === 'cars_modifications_data' && entry.canMerge; });
         if (item) await window.resolvePmmSyncConflict(item, 'merge');
     };

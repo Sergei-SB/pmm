@@ -448,6 +448,44 @@ test('Developer registry save matches the same vehicle across reordered IDs and 
     assert.equal(c.retainServerRegistry(encode([{id: 23, plate: 'XX 000 X'}]), encode(remote), null, true), null);
     assert.deepEqual(JSON.parse(c.retainServerRegistry(encode(local), encode(remote), encode([original]), false)), expected);
 });
+test('Manual cloud save retries a blocked vehicle addition and keeps the other device’s changes', async () => {
+    const {c, values, revisions, backups} = conflictContext();
+    for (const name of ['retainServerRegistry', 'registryVehicleMatch', 'reconcileSafeModificationsRecord',
+        'reconcilePmmModificationsConflict', 'forcePushAllDataToServer']) {
+        vm.runInContext(extract('Shared_sync.js', name), c);
+    }
+    const key = 'user_cars_database_v2';
+    const original = {id: 1, model: 'Vehicle without VIN or plate'};
+    const added = {id: 2, plate: 'TEST 02', model: 'New vehicle'};
+    const remote = [{...original, note: 'Saved on another device'}];
+    const base = JSON.stringify([original]);
+    values[key] = JSON.stringify([original, added]);
+    c.pending = {[key]: {value: values[key], baseValue: base, blocked: true, role: 'developer'}};
+    const received = [];
+    Object.assign(c, {
+        manualSavePromise: null, manualBackupInProgress: false, lastSafetyWarning: '',
+        pushInFlight: false, pullInFlight: false, filesInFlight: false, awaitingFirstPull: false, storageErrors: {},
+        document: {getElementById: () => null}, callIfExists() {}, pushChangedDocs() {},
+        SERVER_URL: 'https://test.invalid', DOCS_TIMEOUT_MS: 1000, deviceId: 'test',
+        fetchWithTimeout: async () => ({ok: true, json: async () => ({ok: true})}),
+        inspectPmmSyncConflicts: async includeFiles => {
+            assert.equal(includeFiles, false);
+            return {conflicts: [{kind: 'key', id: key, remote: {value: JSON.stringify(remote), rev: 42}}]};
+        },
+        flushPending: async () => {
+            assert.equal(c.pending[key].blocked, false);
+            assert.equal(revisions[key], 42);
+            received.push(...JSON.parse(c.pending[key].value));
+            delete c.pending[key];
+        }
+    });
+    await c.forcePushAllDataToServer(false);
+    assert.deepEqual(received, [...remote, added]);
+    assert.equal(backups.length, 1);
+    const removed = {...original, plate: 'TEST 01'};
+    assert.equal(c.retainServerRegistry(JSON.stringify([{...removed, note: 'Local edit'}]), '[]', JSON.stringify([removed]), false), null);
+});
+
 test('Fresh demo data is not added to an existing real server registry', () => {
     const values = { user_cars_database_v2: '[{"id":1},{"id":2},{"id":3}]' };
     const c = contextWith([['Shared_sync.js', 'isCarKey'], ['Shared_sync.js', 'mergeCarValue'], ['Shared_sync.js', 'applyRemoteKeys']], {
