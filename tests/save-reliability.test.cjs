@@ -609,6 +609,8 @@ test('The ten-day report carries closing readings to the next opening and fills 
     const card = {fuelStart: '29', savedFuelLeft: '29', odo1: '240607', odo2: '240607'};
     const repaired = c.getTenDayVehicleValues({}, imported, {leftFuel: '29', odo: '240607'}, null, card);
     assert.deepEqual([repaired.prevFuel, repaired.leftFuel, repaired.prevOdo, repaired.odo], ['29', '29', '240607', '240607']);
+    const unknown = c.getTenDayVehicleValues({}, {}, null, null, {fuelSpent: '0'});
+    assert.equal(unknown.leftFuel, '', 'zero recorded consumption does not imply a known opening balance');
 });
 
 test('A report vehicle number opens its card for the displayed period without saving the previous period', () => {

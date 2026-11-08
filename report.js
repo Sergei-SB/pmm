@@ -864,7 +864,7 @@ function getTenDayVehicleValues(car, saved, previousReport, previousCard, card) 
         return firstValue(end, fallback);
     }
     function balance(start, received, spent = '') {
-        if (firstValue(start, received, spent) === '') return '';
+        if (start === '' && evaluateExpression(received) === 0 && evaluateExpression(spent) === 0) return '';
         if (received === '' && spent === '') return start;
         return Math.max(0, evaluateExpression(start) + evaluateExpression(received) - evaluateExpression(spent)).toFixed(2);
     }
