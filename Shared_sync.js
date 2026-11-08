@@ -425,7 +425,18 @@
     var statusText = 'Синхронізація...';
     var statusColor = '#95a5a6';
 
-    function saveMeta() { writeJSON(META_KEY, meta); }
+    function saveMeta() {
+        var bases = Object.assign({}, meta.carBases);
+        Object.keys(bases).forEach(function (key) {
+            // A confirmed snapshot identical to the local value is already
+            // available as previousValue when the next edit is queued.
+            if (/^(report_data_|isolated_car_routes_)/.test(key) && !pending[key] &&
+                typeof bases[key] === 'string' && getKeyRev(key) > 0 && localGet(key) === bases[key]) {
+                delete bases[key];
+            }
+        });
+        writeJSON(META_KEY, Object.assign({}, meta, {carBases: bases}));
+    }
     function savePending() { writeJSON(PENDING_KEY, pending); }
 
     function getLastRev() { return Number(meta.lastRev) || 0; }
@@ -593,7 +604,13 @@
                 window.archiveLocalSiteChange('localStorage', String(key), prev, String(value)).catch(function () {});
             }
             try {
-                rawSetItem.call(this, key, value);
+                try {
+                    rawSetItem.call(this, key, value);
+                } catch (error) {
+                    if (!isLocal || error.name !== 'QuotaExceededError' || !/^(report_data_|isolated_car_routes_)/.test(key)) throw error;
+                    saveMeta();
+                    rawSetItem.call(this, key, value);
+                }
                 if (isLocal) delete storageErrors[key];
             } catch (error) {
                 if (isLocal) {

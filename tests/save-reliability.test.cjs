@@ -484,6 +484,49 @@ test('Conflict button sends legacy duplicate plates using their stable IDs and r
     assert.deepEqual(saved, [{...server[0], note: '1 черга'}, {...server[1], note: '2 черга'}, server[2]]);
 });
 
+test('Card transfer recovers browser space and stores fuel and odometers in the selected report', () => {
+    const key = 'report_data_01.11-10.11';
+    const routeKey = 'isolated_car_routes_9_01.11-10.11';
+    const previousReport = JSON.stringify({9: {note: 'Existing note'}, 10: {leftFuel: '25'}});
+    const route = JSON.stringify({topFields: {}, rows: [], padding: 'x'.repeat(2500)});
+    const dirtyKey = 'report_data_pending';
+    const meta = {keys: {[key]: 4, [routeKey]: 5, [dirtyKey]: 6}, carBases: {[key]: previousReport, [routeKey]: route, [dirtyKey]: 'original'}};
+    const stored = new Map([[key, previousReport], [routeKey, route], ['meta', JSON.stringify(meta)]]);
+    const total = () => [...stored.values()].reduce((sum, value) => sum + value.length, 0);
+    const quota = total() + 20;
+    let quotaHits = 0, queued, success = false;
+    class Storage {
+        getItem(name) { return stored.get(name) ?? null; }
+        setItem(name, value) {
+            if (total() - (stored.get(name)?.length || 0) + value.length > quota) {
+                quotaHits++;
+                throw Object.assign(new Error('Storage full'), {name: 'QuotaExceededError'});
+            }
+            stored.set(name, value);
+        }
+    }
+    const localStorage = new Storage();
+    const fields = {'fuel-start': {value: '14'}, 'fuel-left': {textContent: '14'}, 'odo-1': {value: '317595'}, 'odo-2': {value: '317595'}};
+    const c = contextWith([['Shared_sync.js', 'saveMeta'], ['Shared_sync.js', 'patchStorage'], ['documents.js', 'executeTransferCarDataToReport']], {
+        Storage, localStorage, patched: false, applyingRemote: false, rawGetItem: Storage.prototype.getItem, rawSetItem: Storage.prototype.setItem,
+        meta, META_KEY: 'meta', pending: {[dirtyKey]: {baseValue: 'original'}}, storageErrors: {},
+        getKeyRev: name => meta.keys[name] || 0, localGet: name => stored.get(name) ?? null,
+        writeJSON: (name, value) => stored.set(name, JSON.stringify(value)),
+        isSyncedKey: () => true, queueLocalChange: (name, value, deleted, previous) => { queued = {name, value, deleted, previous}; },
+        currentCarId: 9, carsData: [{id: 9, plate: 'TEST 09'}], getStrictActivePeriod: () => '01.11-10.11',
+        document: {getElementById: name => fields[name], querySelectorAll: () => []},
+        showDocToast: () => { success = true; }, escapeHtml: value => String(value)
+    });
+    c.patchStorage();
+    c.executeTransferCarDataToReport();
+    assert.equal(quotaHits, 1);
+    assert.equal(success, true);
+    assert.deepEqual(JSON.parse(stored.get(key)), {9: {note: 'Existing note', prevFuel: '14', refuelFuel: '', leftFuel: '14', prevOdo: '317595', odo: '317595'}, 10: {leftFuel: '25'}});
+    assert.equal(stored.get(routeKey), route);
+    assert.equal(queued.previous, previousReport);
+    assert.deepEqual(JSON.parse(stored.get('meta')).carBases, {[dirtyKey]: 'original'});
+});
+
 test('An unrelated registry conflict cannot block saving an independently added vehicle', async () => {
     const {c, values, item, backups} = conflictContext();
     for (const name of ['registryVehicleMatch', 'retainServerRegistry', 'registryAdditions']) {
