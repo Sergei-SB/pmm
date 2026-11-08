@@ -566,6 +566,7 @@ function getAllEquipmentItemsUnified() {
 // Перевірка, чи є авто вантажним
 function isCarTruck(car) {
     if (!car) return false;
+    if (getTowedVehicleCategory(car)) return true;
     const vType = String(car.vehicleType || "").toLowerCase().trim();
     if (vType === 'легковий' || vType === 'мотоцикл' || vType === 'квадроцикл') return false;
     if (vType.includes("вантаж")) return true;
@@ -592,6 +593,8 @@ function isCarTruck(car) {
 // Точне визначення групи автомобіля для фільтрації кнопками
 function getCarGroup(car) {
     if (!car) return 'легковий';
+    const towedCategory = getTowedVehicleCategory(car);
+    if (towedCategory) return TOWED_VEHICLE_TYPES[towedCategory];
     const vType = String(car.vehicleType || "").toLowerCase().trim();
     const cat = String(car.category || "").toLowerCase().trim();
     
@@ -603,7 +606,7 @@ function getCarGroup(car) {
     return 'легковий';
 }
 
-// Фільтрація кнопками: Усі / Легкові / Вантажні / Мотоцикли / Квадроцикли
+// Фільтрація реєстру за типом транспортного засобу
 function isRegistryDeveloper() {
     const role = typeof window.getCurrentAppRole === 'function' ? window.getCurrentAppRole()
         : (typeof currentRole !== 'undefined' ? currentRole : (window.currentRole || 'user'));
@@ -626,7 +629,9 @@ function filterCarsByCategory(category) {
         'легковий': 'btn-cat-car',
         'вантажний': 'btn-cat-truck',
         'мотоцикл': 'btn-cat-moto',
-        'квадроцикл': 'btn-cat-quad'
+        'квадроцикл': 'btn-cat-quad',
+        'причіп': 'btn-cat-trailer',
+        'лафета': 'btn-cat-laffette'
     };
 
     Object.keys(btnMap).forEach(key => {
@@ -659,7 +664,7 @@ function updateCarVehicleType(carId, newType) {
         if (newType === 'мотоцикл') car.category = 'motorcycle';
         else if (newType === 'квадроцикл') car.category = 'quad';
         else if (newType === 'вантажний') car.category = 'truck';
-        else car.category = 'passenger';
+        else car.category = getTowedVehicleCategory({vehicleType: newType}) || 'passenger';
         
         saveCarsModificationsToStorage();
         renderCarsTable();
@@ -773,6 +778,8 @@ function renderCarsTable(filterQuery = '') {
                     <option value="вантажний" ${group === 'вантажний' ? 'selected' : ''}>Вантажний</option>
                     <option value="мотоцикл" ${group === 'мотоцикл' ? 'selected' : ''}>Мотоцикл</option>
                     <option value="квадроцикл" ${group === 'квадроцикл' ? 'selected' : ''}>Квадроцикл</option>
+                    <option value="причіп" ${group === 'причіп' ? 'selected' : ''}>Причіп</option>
+                    <option value="лафета" ${group === 'лафета' ? 'selected' : ''}>Лафета</option>
                 </select>
             </td>
             <td><span onclick="openCarCard(${car.id})" style="cursor: pointer; color: #000; font-weight: bold; text-decoration: none;" title="Відкрити картку авто">${car.plate || ''}</span></td>

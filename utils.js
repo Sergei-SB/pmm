@@ -101,7 +101,9 @@ function openAddCarModal() {
         HQ: "Штабні автомобілі",
         SPECIAL: "Спецтехніка",
         MOTORCYCLE: "Мотоцикли",
-        QUAD: "Квадроцикли"
+        QUAD: "Квадроцикли",
+        TRAILER: "Причепи",
+        LAFFETTE: "Лафети"
     };
 
     const nextNumber = (typeof carsData !== 'undefined' && Array.isArray(carsData) && carsData.length > 0)
@@ -239,7 +241,7 @@ function openAddCarModal() {
         const consVal = parseFloat(consInput.value) || 10.0;
         const driverVal = modal.querySelector('#newcar-driver').value.trim() || 'Водій';
 
-        let vehicleTypeUA = "легковий";
+        let vehicleTypeUA = TOWED_VEHICLE_TYPES[selKey.toLowerCase()] || "легковий";
         const upperKey = selKey.toUpperCase();
         if (upperKey === "TRUCK" || upperKey === "MINIBUS" || upperKey === "SPECIAL" || upperKey === "ADBLUE") {
             vehicleTypeUA = "вантажний";
@@ -272,7 +274,8 @@ function executeAddCarWithCategory(categoryKey, vehicleTypeStr, categoryDisplayN
     const upperKey = (categoryKey || 'PASSENGER').toUpperCase();
 
     let assignedFormulas = [1, 2, 3, 4];
-    if (upperKey === 'TRUCK' || upperKey === 'SPECIAL' || upperKey === 'ADBLUE' || upperKey === 'MINIBUS') {
+    if (upperKey === 'TRUCK' || upperKey === 'SPECIAL' || upperKey === 'ADBLUE' || upperKey === 'MINIBUS' ||
+        Object.hasOwn(TOWED_VEHICLE_TYPES, upperKey.toLowerCase())) {
         assignedFormulas = [5, 1, 2, 3, 6, 7]; 
     } else if (upperKey === 'MOTORCYCLE') {
         assignedFormulas = [8, 9];
@@ -405,9 +408,10 @@ function applyCategoryChangesToCar(car, newCategoryKey) {
     let assignedFormulas = [1, 2, 3, 4];
     let vehicleTypeUA = "легковий";
 
-    if (upperKey === 'TRUCK' || upperKey === 'SPECIAL' || upperKey === 'ADBLUE' || upperKey === 'MINIBUS') {
+    const towedType = TOWED_VEHICLE_TYPES[car.category];
+    if (upperKey === 'TRUCK' || upperKey === 'SPECIAL' || upperKey === 'ADBLUE' || upperKey === 'MINIBUS' || towedType) {
         assignedFormulas = [5, 1, 2, 3, 6, 7];
-        vehicleTypeUA = "вантажний";
+        vehicleTypeUA = towedType || "вантажний";
     } else if (upperKey === 'MOTORCYCLE') {
         assignedFormulas = [8, 9];
         vehicleTypeUA = "мотоцикл";

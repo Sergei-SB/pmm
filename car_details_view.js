@@ -7,6 +7,8 @@ window.activeReportCarId = null;
 // Допоміжна функція для визначення ключа категорії автомобіля
 function resolveCarCategoryKey(car) {
     if (!car) return 'passenger';
+    const towedCategory = getTowedVehicleCategory(car);
+    if (towedCategory) return towedCategory;
     const cat = String(car.category || '').toLowerCase().trim();
     if (cat === 'adblue' || cat === 'truck_adblue') return 'adblue';
 
@@ -44,14 +46,18 @@ function ensureCategoryDropdownsPopulated() {
         HQ: "Штабні автомобілі",
         SPECIAL: "Спецтехніка",
         MOTORCYCLE: "Мотоцикли",
-        QUAD: "Квадроцикли"
+        QUAD: "Квадроцикли",
+        TRAILER: "Причепи",
+        LAFFETTE: "Лафети"
     };
 
     ['det-input-category', 'card-input-category'].forEach(selectId => {
         const selectEl = document.getElementById(selectId);
         if (selectEl) {
-            const hasNewText = Array.from(selectEl.options).some(o => o.textContent === "Вантажні автомобілі з AdBlue");
-            if (selectEl.options.length === 0 || !hasNewText) {
+            const options = Array.from(selectEl.options);
+            const hasCurrentCategories = Object.entries(categoriesMap).every(([key, label]) =>
+                options.some(option => option.value === key.toLowerCase() && option.textContent === label));
+            if (!hasCurrentCategories) {
                 const currentVal = selectEl.value;
                 selectEl.innerHTML = '';
                 for (let key in categoriesMap) {

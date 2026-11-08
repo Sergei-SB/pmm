@@ -7,12 +7,16 @@ const path=require('node:path');
 const root=path.resolve(__dirname,'..');
 function fixture(role){
     const source=ts.createSourceFile('app.js',fs.readFileSync(path.join(root,'app.js'),'utf8'),ts.ScriptTarget.Latest,true);
-    const names=['isRegistryDeveloper','syncRegistryDeveloperVisibility','filterCarsByCategory','updateCarVehicleType'];
+    const names=['isRegistryDeveloper','syncRegistryDeveloperVisibility','filterCarsByCategory','updateCarVehicleType','getCarGroup','isCarTruck'];
     const functions=source.statements.filter(node=>ts.isFunctionDeclaration(node)&&names.includes(node.name?.text)).map(node=>node.getText(source));
+    const carsSource=ts.createSourceFile('cars.js',fs.readFileSync(path.join(root,'cars.js'),'utf8'),ts.ScriptTarget.Latest,true);
+    const towedTypes=carsSource.statements.filter(node=>
+        node.name?.text==='getTowedVehicleCategory' ||
+        node.declarationList?.declarations.some(decl=>decl.name.getText(carsSource)==='TOWED_VEHICLE_TYPES'));
     let renders=0,saves=0;const classes=new Set();
     const c={window:null,currentRole:role,getCurrentAppRole:()=>c.currentRole,document:{documentElement:{classList:{toggle:(name,on)=>on?classes.add(name):classes.delete(name)}},getElementById:()=>null},
         carsData:[{id:1,vehicleType:'легковий',category:'passenger'}],renderCarsTable:()=>renders++,saveCarsModificationsToStorage:()=>saves++};
-    c.window=c;vm.createContext(c);vm.runInContext("let currentCategoryFilter='all';\n"+functions.join('\n'),c);
+    c.window=c;vm.createContext(c);vm.runInContext("let currentCategoryFilter='all';\n"+towedTypes.map(node=>node.getText(carsSource)).concat(functions).join('\n'),c);
     return {c,classes,renders:()=>renders,saves:()=>saves};
 }
 test('Only developer sees registry category controls and can change vehicle type',()=>{
@@ -36,4 +40,18 @@ test('Visibility rule is scoped to registry and applies to header and row cells'
     assert.match(html,/<th class="registry-developer-only">Тип авто<\/th>/);
     assert.match(app,/<td class="registry-developer-only">\s*<select/);
     for(const file of ['admin.js','developer_panel.js'])assert.ok(fs.readFileSync(path.join(root,file),'utf8').includes('syncRegistryDeveloperVisibility()'));
+});
+
+test('Trailer and lafette save as separate registry types and use the truck calculation path',()=>{
+    const {c,saves}=fixture('developer');
+    for(const [type,category] of [['причіп','trailer'],['лафета','laffette']]){
+        c.updateCarVehicleType(1,type);
+        assert.equal(c.carsData[0].category,category);
+        assert.equal(c.getCarGroup(c.carsData[0]),type);
+        assert.equal(c.isCarTruck(c.carsData[0]),true);
+        assert.equal(c.isCarTruck({category}),true);
+        c.filterCarsByCategory(type);
+        assert.equal(vm.runInContext('currentCategoryFilter',c),type);
+    }
+    assert.equal(saves(),2);
 });

@@ -12,8 +12,19 @@ const VEHICLE_CATEGORIES = {
     HQ: "Штабні автомобілі",
     SPECIAL: "Спецтехніка",
     MOTORCYCLE: "Мотоцикли",
-    QUAD: "Квадроцикли"
+    QUAD: "Квадроцикли",
+    TRAILER: "Причепи",
+    LAFFETTE: "Лафети"
 };
+
+const TOWED_VEHICLE_TYPES = {trailer: 'причіп', laffette: 'лафета'};
+
+function getTowedVehicleCategory(car) {
+    const type = String(car?.vehicleType || '').trim().toLowerCase();
+    const category = String(car?.category || '').trim().toLowerCase();
+    return Object.keys(TOWED_VEHICLE_TYPES).find(key => TOWED_VEHICLE_TYPES[key] === type)
+        || (Object.hasOwn(TOWED_VEHICLE_TYPES, category) ? category : '');
+}
 
 let carsData = [
     {
@@ -463,6 +474,8 @@ function renderCarsTable(filterQuery = '') {
                     <option value="вантажний" ${group === 'вантажний' ? 'selected' : ''}>Вантажний</option>
                     <option value="мотоцикл" ${group === 'мотоцикл' ? 'selected' : ''}>Мотоцикл</option>
                     <option value="квадроцикл" ${group === 'квадроцикл' ? 'selected' : ''}>Квадроцикл</option>
+                    <option value="причіп" ${group === 'причіп' ? 'selected' : ''}>Причіп</option>
+                    <option value="лафета" ${group === 'лафета' ? 'selected' : ''}>Лафета</option>
                 </select>
             </td>
             <td><span onclick="openCarCard(${car.id})" style="cursor: pointer; color: #000; font-weight: bold; text-decoration: none;" title="Відкрити картку авто">${car.plate || ''}</span></td>
