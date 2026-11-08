@@ -1630,9 +1630,9 @@ function ensureTransferDataButtonAndDevImportButton() {
             }
             transferBtn.style.backgroundColor = '#2980b9';
             transferBtn.style.color = '#ffffff';
-            transferBtn.style.padding = '10px 18px';
+            transferBtn.style.padding = '7px 12px';
             transferBtn.style.borderRadius = '6px';
-            transferBtn.style.fontSize = '13px';
+            transferBtn.style.fontSize = '12px';
             transferBtn.style.fontWeight = 'bold';
             transferBtn.style.cursor = 'pointer';
             transferBtn.style.boxShadow = '0 3px 8px rgba(41, 128, 185, 0.3)';
