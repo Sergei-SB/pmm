@@ -1191,7 +1191,13 @@ function updateRouteTotals() {
 
     const odo2 = document.getElementById('odo-2');
     if (odo2) {
-        odo2.value = hasOdometer || currentOdo > 0 ? currentOdo : "";
+        if (getTowedVehicleCategory(car) && odo2.dataset.trailerDistance !== undefined) {
+            const base = parseTrailerOdometer(startOdoInput);
+            const distance = Number(odo2.dataset.trailerDistance);
+            odo2.value = base !== null || distance ? Number(((base ?? 0) + distance).toFixed(6)) : '';
+        } else {
+            odo2.value = hasOdometer || currentOdo > 0 ? currentOdo : "";
+        }
     }
 
     document.querySelectorAll('#sum-km').forEach(el => {

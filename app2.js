@@ -303,6 +303,8 @@ function loadCarDataForActivePeriod() {
     const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
     const car = safeCars.find(c => Number(c.id) === Number(currentCarId));
     const truckActive = (car && typeof isCarTruck === 'function') ? isCarTruck(car) : false;
+    const trailerReadings = getTowedVehicleCategory(car)
+        ? getTrailerMileageForPeriod(period, safeCars).get(String(car.id)) : null;
 
     const tbody = document.getElementById('routes-tbody');
     if (tbody) {
@@ -386,7 +388,10 @@ function loadCarDataForActivePeriod() {
 
     const odo1El = document.getElementById('odo-1');
     if (odo1El) {
-        if (periodData && periodData.topFields && periodData.topFields.odo1 !== undefined && periodData.topFields.odo1 !== '') {
+        delete odo1El.dataset.trailerBaseEdited;
+        if (trailerReadings) {
+            odo1El.value = trailerReadings.prevOdo;
+        } else if (periodData && periodData.topFields && periodData.topFields.odo1 !== undefined && periodData.topFields.odo1 !== '') {
             odo1El.value = periodData.topFields.odo1;
         } else if (prevEndOdo !== '') {
             odo1El.value = prevEndOdo;
@@ -427,12 +432,18 @@ function loadCarDataForActivePeriod() {
         adBlueRecEl.value = (periodData && periodData.topFields) ? (periodData.topFields.adblueReceived || '') : '';
     }
 
+    const odo2El = document.getElementById('odo-2');
+    if (odo2El) {
+        odo2El.readOnly = Boolean(trailerReadings);
+        if (trailerReadings) odo2El.dataset.trailerDistance = trailerReadings.distance;
+        else delete odo2El.dataset.trailerDistance;
+    }
+
     if (typeof updateRouteTotals === 'function') {
         updateRouteTotals();
     }
 
-    const odo2El = document.getElementById('odo-2');
-    if (odo2El && !odo2El.value && periodData && periodData.topFields && periodData.topFields.odo2) {
+    if (!trailerReadings && odo2El && !odo2El.value && periodData && periodData.topFields && periodData.topFields.odo2) {
         odo2El.value = periodData.topFields.odo2;
     }
 
@@ -531,7 +542,22 @@ function saveCarRoutesForPeriod(periodToSave, carIdToSave, isManualSave = false)
         updatedAt: new Date().toISOString()
     };
 
+    const isTowed = typeof getTowedVehicleCategory === 'function' &&
+        getTowedVehicleCategory(carsData.find(car => Number(car.id) === Number(targetCarId)));
+    if (isTowed) {
+        const previous = readTrailerRouteSnapshot(dataKey)?.topFields || {};
+        if (document.getElementById('odo-1')?.dataset.trailerBaseEdited) {
+            const base = parseTrailerOdometer(odo1Val);
+            if (odo1Val.trim() !== '' && base === null) return;
+            topFields.trailerOdometerBase = base === null ? '' : String(base);
+            topFields.odo1 = topFields.trailerOdometerBase;
+        } else {
+            topFields.odo1 = previous.odo1 ?? '';
+            if (Object.hasOwn(previous, 'trailerOdometerBase')) topFields.trailerOdometerBase = previous.trailerOdometerBase;
+        }
+    }
     writeCarRouteSnapshot(dataKey, topFields, rowsData);
+    if (isTowed) return;
 
     const periods = getSortedPeriods();
     const curIdx = periods.indexOf(period);
@@ -578,6 +604,9 @@ function manualSaveCarRoutes() {
 
 document.addEventListener('input', function(e) {
     if (isRestoringState) return;
+    if (e.target.id === 'odo-1' && document.getElementById('odo-2')?.dataset.trailerDistance !== undefined) {
+        e.target.dataset.trailerBaseEdited = 'true';
+    }
     if (
         e.target.closest('#routes-tbody') ||
         e.target.id === 'fuel-start' ||

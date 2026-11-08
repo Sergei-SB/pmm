@@ -690,6 +690,58 @@ test('The server protects the registered trailer even when swapping to one of eq
     assert.equal(protectRouteRows(previous, changed, 'admin').blocked, false);
 });
 
+test('Trailer odometers add only the attached kilometers and recalculate across periods', () => {
+    const periods = ['01.11-10.11', '11.11-20.11', '21.11-30.11'];
+    const [first, second, third] = periods;
+    const fleet = [{id: 456, category: 'laffette'}, {id: 457, category: 'trailer'}, {id: 9}, {id: 14, isMiles: true}];
+    const snapshots = new Map();
+    const key = (period, id) => `isolated_car_routes_${period}_${id}`;
+    const set = (period, id, record) => snapshots.set(key(period, id), JSON.stringify(record));
+    const trip = (id, withTrailer, total) => ({trailer: {id}, inputs: ['', '', '', '', withTrailer, total]});
+    set(first, 456, {topFields: {odo1: '100', odo2: '900'}});
+    set(second, 456, {topFields: {odo1: '100'}});
+    set(first, 9, {rows: [trip('456', '20+5', '60'), trip('456', '', '40'), trip('457', '12', '12')]});
+    set(first, 14, {rows: [trip('456', '10', '40')]});
+    set(second, 9, {rows: [trip('456', '18,5', '30')]});
+    const c = contextWith([
+        ['app2.js', 'parsePeriodDateVal'], ['report.js', 'evaluateExpression'],
+        ['route_trailer.js', 'readTrailerRouteSnapshot'], ['route_trailer.js', 'parseTrailerOdometer'],
+        ['route_trailer.js', 'getTrailerMileageForPeriod']
+    ], {
+        localStorage: {get length() { return snapshots.size; }, key: i => [...snapshots.keys()][i], getItem: k => snapshots.get(k)},
+        getTowedVehicleCategory: car => ['trailer', 'laffette'].includes(car.category) ? car.category : ''
+    });
+    const odo = (period, id = '456') => {
+        const reading = c.getTrailerMileageForPeriod(period, fleet).get(id);
+        return [reading.prevOdo, reading.odo];
+    };
+    assert.deepEqual(odo(first), ['100', '141.1']);
+    assert.deepEqual(odo(first, '457'), ['0', '12']);
+    assert.deepEqual(odo(second), ['141.1', '159.6']);
+    assert.deepEqual(odo(second), ['141.1', '159.6']);
+    assert.deepEqual(odo(third), ['159.6', '159.6']);
+    snapshots.delete(key(first, 14));
+    assert.deepEqual(odo(second), ['125', '143.5']);
+    set(second, 456, {topFields: {trailerOdometerBase: '200'}});
+    assert.deepEqual(odo(second), ['200', '218.5']);
+
+    vm.runInContext(extract('app2.js', 'saveCarRoutesForPeriod'), c);
+    const inputs = {'odo-1': {value: '218.5', dataset: {}}, 'odo-2': {value: '218.5'}};
+    Object.assign(c, {
+        currentCarId: 456, carsData: fleet, isRestoringState: false,
+        isLoadedCarRoute: () => true, getRoutesKey: (id, period) => key(period, id),
+        document: {getElementById: id => inputs[id], querySelectorAll: () => []},
+        writeCarRouteSnapshot: (k, topFields, rows) => snapshots.set(k, JSON.stringify({topFields, rows}))
+    });
+    c.saveCarRoutesForPeriod(third, 456);
+    assert.equal(c.readTrailerRouteSnapshot(key(third, 456)).topFields.odo1, '');
+    assert.deepEqual(odo(third), ['218.5', '218.5']);
+    inputs['odo-1'].value = '250';
+    inputs['odo-1'].dataset.trailerBaseEdited = 'true';
+    c.saveCarRoutesForPeriod(third, 456);
+    assert.deepEqual(odo(third), ['250', '250']);
+});
+
 test('A report vehicle number opens its card for the displayed period without saving the previous period', () => {
     const oldPeriod = '21.10-31.10';
     const displayedPeriod = '01.11-10.11';

@@ -45,6 +45,82 @@ function renderRouteTrailerMass(rows, visible) {
     document.getElementById('route-trailer-mass').textContent = [...masses.values()].join('; ') || '—';
 }
 
+function readTrailerRouteSnapshot(key) {
+    try {
+        return JSON.parse(localStorage.getItem(key) || 'null');
+    } catch (_) {
+        return null;
+    }
+}
+
+function parseTrailerOdometer(value) {
+    const reading = String(value ?? '').trim().replace(',', '.');
+    return /^\d+(?:\.\d+)?$/.test(reading) && Number.isFinite(Number(reading)) ? Number(reading) : null;
+}
+
+function getTrailerMileageForPeriod(period, fleet) {
+    const targetDate = parsePeriodDateVal(period);
+    const units = new Map(fleet.map(car => [String(car.id), car]));
+    const trailers = new Map([...units].filter(([, car]) => getTowedVehicleCategory(car)).map(([id]) => [id, new Map()]));
+    if (!trailers.size || !targetDate) return new Map();
+
+    function entry(id, date) {
+        const periods = trailers.get(id);
+        if (!periods.has(date)) periods.set(date, {distance: 0, base: null, legacy: null});
+        return periods.get(date);
+    }
+
+    for (let index = 0; index < localStorage.length; index++) {
+        const key = localStorage.key(index);
+        const match = key?.match(/^isolated_car_routes_(\d{2}\.\d{2}(?:\.\d{4})?-\d{2}\.\d{2}(?:\.\d{4})?)_(\d+)$/);
+        if (!match) continue;
+        const date = parsePeriodDateVal(match[1]);
+        if (!date || date > targetDate) continue;
+        const vehicleId = match[2];
+        const snapshot = readTrailerRouteSnapshot(key);
+        if (trailers.has(vehicleId)) {
+            const top = snapshot?.topFields;
+            if (!top) continue;
+            const readings = entry(vehicleId, date);
+            if (Object.hasOwn(top, 'trailerOdometerBase')) readings.base = parseTrailerOdometer(top.trailerOdometerBase);
+            else readings.legacy = parseTrailerOdometer(top.odo1);
+            continue;
+        }
+        if (!Array.isArray(snapshot?.rows)) continue;
+        const multiplier = units.get(vehicleId)?.isMiles ? 1.61 : 1;
+        for (const row of snapshot.rows) {
+            const trailerId = String(row?.trailer?.id ?? '');
+            if (!trailers.has(trailerId)) continue;
+            const distance = evaluateExpression(row.inputs?.[4]) * multiplier;
+            if (Number.isFinite(distance) && distance > 0) entry(trailerId, date).distance += distance;
+        }
+    }
+
+    const result = new Map();
+    for (const [id, periods] of trailers) {
+        let running = null;
+        let anchored = false;
+        let opening;
+        let distance = 0;
+        for (const [date, values] of [...periods].sort(([a], [b]) => a - b)) {
+            const base = values.base ?? (anchored ? null : values.legacy);
+            if (base !== null) {
+                running = base;
+                anchored = true;
+            }
+            if (running === null && values.distance) running = 0;
+            if (date === targetDate) {
+                opening = running;
+                distance = values.distance;
+            }
+            if (running !== null) running += values.distance;
+        }
+        const display = value => value === null ? '' : String(Number(value.toFixed(6)));
+        result.set(id, {prevOdo: display(opening === undefined ? running : opening), odo: display(running), distance});
+    }
+    return result;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const button = document.getElementById('route-trailer-button');
     const dialog = document.getElementById('route-trailer-dialog');

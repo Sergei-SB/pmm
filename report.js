@@ -753,6 +753,11 @@ window.applyReportRolePermissions = function() {
 
     const inputs = document.querySelectorAll('#report-tbody input.report-cell-input, #report-tbody select, #report-table tbody input, #report-table tbody select');
     inputs.forEach(inp => {
+        if (inp.hasAttribute('data-trailer-odometer')) {
+            inp.disabled = !canEdit;
+            inp.readOnly = true;
+            return;
+        }
         if (!canEdit) {
             inp.setAttribute('disabled', 'true');
             inp.setAttribute('readonly', 'true');
@@ -965,6 +970,7 @@ function renderReportTable() {
     const selectedSub = subFilterEl ? subFilterEl.value : 'all';
 
     const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
+    const trailerMileage = getTrailerMileageForPeriod(periodStr, sourceCars);
     const filteredCars = sourceCars.filter(car => {
         if (shouldHideItemInReport('car', car.id, car.note, periodStr)) return false;
         if (!car.plate || String(car.plate).trim() === '' || String(car.plate).trim() === '—') return false;
@@ -992,6 +998,11 @@ function renderReportTable() {
 
         carData = getTenDayVehicleValues(car, carData, prevPeriodSavedData[car.id],
             cardTop(prevPeriodKey), cardTop(periodStr));
+        const trailerReading = trailerMileage.get(String(car.id));
+        if (trailerReading) {
+            carData.prevOdo = trailerReading.prevOdo;
+            carData.odo = trailerReading.odo;
+        }
         const role = (typeof window.getCurrentAppRole === 'function')
             ? window.getCurrentAppRole()
             : ((typeof currentRole !== 'undefined') ? currentRole : 'user');
@@ -999,6 +1010,7 @@ function renderReportTable() {
         const lockAttr = canEditReport ? '' : 'disabled readonly style="background:#f1f2f6; cursor:not-allowed; color:#2c3e50;" title="Редагування доступне тільки для Адміна та Розробника"';
 
         const noAdblueAttr = car.hasAdBlue ? '' : 'disabled data-no-adblue="true" style="background:#e0e0e0; cursor:not-allowed;"';
+        const odoAttr = trailerReading ? 'readonly data-trailer-odometer title="Розраховано за кілометрами з причепом або лафетою"' : lockAttr;
 
         tr.innerHTML = `
             <td>${index + 1}</td>
@@ -1008,7 +1020,7 @@ function renderReportTable() {
             <td style="text-align: left; padding-left: 10px;">${car.model}</td>
             <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="prevFuel" value="${carData.prevFuel}" ${lockAttr}></td>
             <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="prevAdBlue" value="${carData.prevAdBlue}" ${noAdblueAttr || lockAttr}></td>
-            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="prevOdo" value="${carData.prevOdo}" ${lockAttr}></td>
+            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="prevOdo" value="${carData.prevOdo}" ${odoAttr}></td>
             <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="refuelFuel" value="${carData.refuelFuel}" ${lockAttr}></td>
             <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="refuelAdBlue" value="${carData.refuelAdBlue}" ${noAdblueAttr || lockAttr}></td>
             <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="refuelOil" value="${carData.refuelOil}" ${lockAttr}></td>
@@ -1017,7 +1029,7 @@ function renderReportTable() {
             <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="docNo" value="${carData.docNo}" ${lockAttr}></td>
             <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="leftFuel" value="${carData.leftFuel}" ${lockAttr}></td>
             <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="leftAdBlue" value="${carData.leftAdBlue}" ${noAdblueAttr || lockAttr}></td>
-            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="odo" value="${carData.odo}" ${lockAttr}></td>
+            <td><input type="text" class="report-cell-input" data-car="${car.id}" data-field="odo" value="${carData.odo}" ${odoAttr}></td>
         `;
         const carLink = tr.querySelector('.report-car-link');
         carLink.textContent = car.plate;
