@@ -338,10 +338,12 @@
                             </div>
                         </div>
 
-                        <div class="transfer-btn-container" style="display: flex; align-items: center; justify-content: center; flex: 1; min-width: 180px;">
+                        <div class="transfer-btn-container" style="flex: 1; min-width: 180px; flex-direction: column; gap: 6px;">
                             <button id="transfer-data-btn" class="action-btn transfer-btn" onclick="transferDataToReport()" style="display: none; background-color: #2980b9; color: white; padding: 7px 12px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; align-items: center; gap: 6px; box-shadow: 0 3px 8px rgba(41, 128, 185, 0.3); white-space: nowrap;">
                                 📤 Перенесення даних у Звіт (10 днів)
                             </button>
+                            <button id="route-trailer-button" type="button" class="action-btn" hidden
+                                style="align-self: flex-end; padding: 6px 10px; font-size: 12px;">Причіп / лафета</button>
                         </div>
 
                         <div class="odometer-panel">
@@ -356,6 +358,24 @@
                             </div>
                         </div>
                     </div>
+
+                    <dialog id="route-trailer-dialog" aria-labelledby="route-trailer-title"
+                        style="width: min(420px, 90vw); box-sizing: border-box; border: 1px solid #95a5a6; border-radius: 6px; padding: 18px;">
+                        <form id="route-trailer-form" style="display: grid; gap: 10px;">
+                            <strong id="route-trailer-title">Причіп / лафета</strong>
+                            <label for="route-trailer-row">Рядок маршруту</label>
+                            <select id="route-trailer-row" required></select>
+                            <label for="route-trailer-unit">Номер причепа або лафети</label>
+                            <select id="route-trailer-unit"></select>
+                            <label for="route-trailer-cargo">Маса вантажу, т</label>
+                            <input id="route-trailer-cargo" type="text" inputmode="decimal" placeholder="0">
+                            <output id="route-trailer-total" aria-live="polite"></output>
+                            <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                                <button id="route-trailer-cancel" type="button">Скасувати</button>
+                                <button type="submit" class="action-btn">Застосувати</button>
+                            </div>
+                        </form>
+                    </dialog>
 
                     <div class="routes-container">
                         <table id="routes-table">
@@ -732,9 +752,10 @@
     <script src="permissions_registry.js"></script>
     <script src="broadcast_mail.js"></script>
     <script src="equipment_report.js?v=20261025-category-order"></script>
-    <script src="driver_routes.js?v=20261107-route-protection"></script>
+    <script src="driver_routes.js?v=20261108-route-trailer"></script>
+    <script src="route_trailer.js?v=20261108-route-trailer"></script>
     <script src="app.js?v=20261108-towed-types"></script>
-    <script src="app2.js?v=20261108-correct-car-balances"></script>
+    <script src="app2.js?v=20261108-route-trailer"></script>
     <script src="aggregates_calc.js?v=20261025-inventory-rates"></script>
     <script src="destroyed_equipment.js?v=20261024-pumps"></script>
     <script src="documents.js?v=20261108-correct-car-balances"></script>

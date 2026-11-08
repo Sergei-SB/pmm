@@ -330,6 +330,7 @@ function loadCarDataForActivePeriod() {
                             }
                         });
                     }
+                    if (lastRow && rData.trailer) setRouteTrailer(lastRow, rData.trailer);
                 }
             });
         } else {
@@ -500,6 +501,7 @@ function saveCarRoutesForPeriod(periodToSave, carIdToSave, isManualSave = false)
         };
         if (row.dataset?.driverOdometer) savedRow.driverOdometer = row.dataset.driverOdometer;
         if (row.dataset?.driverManualTotal !== undefined) savedRow.driverManualTotal = row.dataset.driverManualTotal;
+        if (row.dataset?.routeTrailer) savedRow.trailer = JSON.parse(row.dataset.routeTrailer);
         if (row.dataset?.routeLockId) savedRow.routeLock = { id: row.dataset.routeLockId, by: row.dataset.routeLockBy };
         rowsData.push(savedRow);
     });

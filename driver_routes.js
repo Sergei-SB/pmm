@@ -60,6 +60,7 @@ function applyRouteRowLocks(canEdit = canEditDriverRoutes()) {
     if (notice) notice.hidden = !awaitingProtection;
     const addButton = document.getElementById('add-card-route-row');
     if (addButton) addButton.disabled = awaitingProtection || !canEdit;
+    if (typeof updateRouteTrailerButton === 'function') updateRouteTrailerButton(canEdit && !awaitingProtection);
     document.querySelectorAll('#routes-tbody tr').forEach(row => {
         const locked = isProtectedRouteRow(row);
         row.title = locked ? 'Рядок захищено розробником або адміністратором' : '';

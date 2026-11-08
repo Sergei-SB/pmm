@@ -613,6 +613,76 @@ test('The ten-day report carries closing readings to the next opening and fills 
     assert.equal(unknown.leftFuel, '', 'zero recorded consumption does not imply a known opening balance');
 });
 
+test('The trailer dialog adds registered tare to cargo once and saves only the selected route', () => {
+    class Control {
+        constructor() { this.value = ''; this.events = {}; this.options = []; }
+        addEventListener(name, handler) { this.events[name] = handler; }
+        replaceChildren(...items) { this.options = items; this.value = items[0]?.value || ''; }
+        add(item) { this.options.push(item); }
+        setCustomValidity(message) { this.validationMessage = message; }
+        showModal() { this.open = true; }
+        close() { this.open = false; }
+    }
+    const ids = ['button', 'dialog', 'form', 'row', 'unit', 'cargo', 'total', 'cancel'];
+    const controls = Object.fromEntries(ids.map(id => [id, new Control()]));
+    function route(value) {
+        const tons = {value, removeAttribute() {}};
+        return {tons, cells: [], dataset: {}, isConnected: true, querySelector: () => tons};
+    }
+    const first = route('4');
+    const second = route('2');
+    const saved = [];
+    const c = contextWith([['report.js', 'evaluateExpression']], {
+        currentCarId: 9, lastActiveRow: second, carsData: [
+            {id: 9, vehicleType: 'вантажний'}, {id: 456, plate: '456', category: 'laffette', emptyWeight: '1 500'}
+        ],
+        isCarTruck: car => car?.vehicleType === 'вантажний',
+        getTowedVehicleCategory: car => car?.category === 'laffette' ? 'laffette' : '',
+        canEditDriverRoutes: () => true, isRouteRowReadOnly: () => false, isLoadedCarRoute: () => true,
+        getStrictActivePeriod: () => '01.11-10.11', saveCarRoutesForPeriod: (...args) => saved.push(args),
+        Option: class { constructor(text, value) { Object.assign(this, {text, value}); } },
+        document: {
+            getElementById: id => controls[id.replace('route-trailer-', '')],
+            addEventListener: (_name, init) => init(), querySelectorAll: () => [first, second]
+        }
+    });
+    vm.runInContext(fs.readFileSync(path.join(root, 'route_trailer.js'), 'utf8'), c);
+    c.updateRouteTrailerButton(true);
+    assert.equal(controls.button.hidden, false);
+    controls.button.events.click();
+    assert.equal(controls.row.value, '1');
+    assert.equal(controls.cargo.value, '2');
+    controls.unit.value = '456';
+    controls.unit.events.change();
+    controls.form.events.submit({preventDefault() {}});
+    assert.equal(first.tons.value, '4');
+    assert.equal(second.tons.value, '3.5');
+    assert.deepEqual(JSON.parse(second.dataset.routeTrailer), {id: '456', plate: '456', massKg: 1500});
+    controls.button.events.click();
+    assert.equal(controls.cargo.value, '2');
+    controls.cargo.value = '2,25';
+    controls.form.events.submit({preventDefault() {}});
+    assert.equal(second.tons.value, '3.75');
+    assert.equal(c.getRouteTrailerTotal(1500, '-1'), null);
+    second.isConnected = false;
+    controls.form.events.submit({preventDefault() {}});
+    assert.deepEqual(saved, [['01.11-10.11', 9], ['01.11-10.11', 9]]);
+    c.currentCarId = 456;
+    c.updateRouteTrailerButton(true);
+    assert.equal(controls.button.hidden, true);
+});
+
+test('The server protects the registered trailer even when swapping to one of equal mass', async () => {
+    const {protectRouteRows} = await import('../route_locks.ts');
+    const trailer = {id: '456', plate: '456', massKg: 1500};
+    const row = {name: 'Маршрут', inputs: ['Маршрут', '8:30', '10', '', '', '10', 'о/с', '1.5', '15', '100'],
+        trailer, routeLock: {id: 'existing', by: 'admin'}};
+    const previous = JSON.stringify({rows: [row]});
+    const changed = JSON.stringify({rows: [{...row, trailer: {...trailer, id: '457', plate: '457'}}]});
+    assert.equal(protectRouteRows(previous, changed, 'user').blocked, true);
+    assert.equal(protectRouteRows(previous, changed, 'admin').blocked, false);
+});
+
 test('A report vehicle number opens its card for the displayed period without saving the previous period', () => {
     const oldPeriod = '21.10-31.10';
     const displayedPeriod = '01.11-10.11';
