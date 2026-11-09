@@ -576,6 +576,11 @@ async function startServer(): Promise<void> {
     });
   });
 
+  app.get('/api/storage-transfer', (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ok: true, storage: githubStorage ? 'github' : 'local-disk', ...githubStorage?.transferStats});
+  });
+
   // Notify connected users immediately after the shared save is confirmed.
   // Existing polling remains available if a proxy or browser blocks SSE.
   app.get('/api/shared-events', (_req, res) => {

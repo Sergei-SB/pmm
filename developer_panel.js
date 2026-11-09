@@ -2595,6 +2595,17 @@ window.renderDeveloperPanel = function() {
                 </div>
             </div>
         `;
+    } else if (currentDevSubTab === 'transfer') {
+        subTabContentHtml = `
+            <section style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:20px;">
+                <h3 style="margin-top:0;">Передача даних на GitHub</h3>
+                <p>Враховано обсяг підтверджених записів спільної бази на GitHub. Повний трафік Render, зокрема відповіді браузерам і невдалі запити, тут не враховано.</p>
+                <label>Період <select id="dev-transfer-period" onchange="window.renderDevTransferStats(this.value)">
+                    ${[1, 2, 5, 7, 15, 30, 60, 90].map(days => `<option value="${days}">${days} дн.</option>`).join('')}
+                </select></label>
+                <button type="button" class="action-btn" onclick="window.refreshDevTransferStats()">Оновити</button>
+                <div id="dev-transfer-stats" aria-live="polite"></div>
+            </section>`;
     } else if (currentDevSubTab === 'database') {
         subTabContentHtml = `
             <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 22px;">
@@ -2638,10 +2649,17 @@ window.renderDeveloperPanel = function() {
             <button type="button" data-active="${currentDevSubTab==='database'}" onclick="switchDevSubTab('database')" style="${subTabBtnStyle('database')}">
                 💾 База даних та Бекап
             </button>
+            <button type="button" data-active="${currentDevSubTab==='transfer'}" onclick="switchDevSubTab('transfer')" style="${subTabBtnStyle('transfer')}">
+                📈 Передача даних
+            </button>
         </nav><div class="dev-admin-content">
         ${subTabContentHtml}</div></div>
     `;
     if (currentDevSubTab === 'logs') window.renderPmmSharedActivity();
+    if (currentDevSubTab === 'transfer') {
+        window.renderDevTransferStats();
+        if (!devTransferStats && !devTransferRequest) window.refreshDevTransferStats();
+    }
     } catch (err) {
         console.error('Помилка відмальовки панелі розробника:', err);
         const container = getDevPanelContainer();
@@ -2655,6 +2673,72 @@ window.renderDeveloperPanel = function() {
             `;
         }
     }
+};
+
+let devTransferStats;
+let devTransferRequest;
+let devTransferPeriod = 1;
+
+window.refreshDevTransferStats = function () {
+    if (devTransferRequest) return devTransferRequest;
+    const base = String(window.APP_SERVER_URL || 'https://pmm-server.onrender.com').replace(/\/+$/, '');
+    devTransferRequest = fetch(base + '/api/storage-transfer', {cache: 'no-store', signal: AbortSignal.timeout(20000)})
+        .then(response => {
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return response.json();
+        })
+        .then(data => { devTransferStats = data; })
+        .catch(() => { devTransferStats = {error: true}; })
+        .finally(() => {
+            devTransferRequest = null;
+            window.renderDevTransferStats();
+        });
+    window.renderDevTransferStats();
+    return devTransferRequest;
+};
+
+window.renderDevTransferStats = function (period) {
+    const target = document.getElementById('dev-transfer-stats');
+    const select = document.getElementById('dev-transfer-period');
+    if (!target || !select) return;
+    if (period !== undefined) devTransferPeriod = Number(period);
+    select.value = String(devTransferPeriod);
+    if (!devTransferStats || devTransferRequest) { target.textContent = 'Завантаження статистики…'; return; }
+    if (devTransferStats.error || devTransferStats.ok !== true) {
+        target.textContent = 'Статистика недоступна. Спробуйте оновити.';
+        return;
+    }
+    if (devTransferStats.storage !== 'github' || !devTransferStats.compression) {
+        target.textContent = 'Облік стислих передач на цьому сервері вимкнено.';
+        return;
+    }
+    const today = Date.parse(devTransferStats.today + 'T00:00:00Z');
+    if (!Number.isFinite(today)) { target.textContent = 'Сервер не повернув дату статистики.'; return; }
+    const cutoff = new Date(today - (devTransferPeriod - 1) * 86400000).toISOString().slice(0, 10);
+    const entries = Object.entries(devTransferStats.days || {}).filter(([date]) =>
+        date >= cutoff && date <= devTransferStats.today).sort(([a], [b]) => b.localeCompare(a));
+    const mb = bytes => (bytes / 1000000).toLocaleString('uk-UA', {maximumFractionDigits: 3}) + ' МБ';
+    const totals = entries.reduce((sum, [, day]) => ({
+        sentBytes: sum.sentBytes + day.sentBytes, plainBytes: sum.plainBytes + day.plainBytes, saves: sum.saves + day.saves
+    }), {sentBytes: 0, plainBytes: 0, saves: 0});
+    const summary = document.createElement('p');
+    summary.textContent = entries.length ? `Передано ${mb(totals.sentBytes)} · Без стискання було б ${mb(totals.plainBytes)} · Збережень ${totals.saves}`
+        : 'За цей період ще немає підтверджених записів. Облік починається після ввімкнення стискання.';
+    target.replaceChildren(summary);
+    if (!entries.length) return;
+    const table = document.createElement('table');
+    const header = table.createTHead().insertRow();
+    for (const title of ['Дата (Київ)', 'Передано', 'Було б без стискання', 'Збережень']) {
+        const cell = document.createElement('th');
+        cell.textContent = title;
+        header.appendChild(cell);
+    }
+    const rows = table.createTBody();
+    for (const [date, day] of entries) {
+        const row = rows.insertRow();
+        for (const value of [date, mb(day.sentBytes), mb(day.plainBytes), day.saves]) row.insertCell().textContent = value;
+    }
+    target.appendChild(table);
 };
 
 window.renderPmmSharedActivity = function () {
