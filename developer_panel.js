@@ -2599,7 +2599,7 @@ window.renderDeveloperPanel = function() {
         subTabContentHtml = `
             <section style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:20px;">
                 <h3 style="margin-top:0;">Передача даних на GitHub</h3>
-                <p>Враховано обсяг підтверджених записів спільної бази на GitHub. Повний трафік Render, зокрема відповіді браузерам і невдалі запити, тут не враховано.</p>
+                <p>Враховано обсяг підтверджених записів спільної бази на GitHub. Розміри повних знімків для порівняння обчислюються без повторної передачі. Повний трафік Render тут не враховано.</p>
                 <label>Період <select id="dev-transfer-period" onchange="window.renderDevTransferStats(this.value)">
                     ${[1, 2, 5, 7, 15, 30, 60, 90].map(days => `<option value="${days}">${days} дн.</option>`).join('')}
                 </select></label>
@@ -2719,16 +2719,20 @@ window.renderDevTransferStats = function (period) {
         date >= cutoff && date <= devTransferStats.today).sort(([a], [b]) => b.localeCompare(a));
     const mb = bytes => (bytes / 1000000).toLocaleString('uk-UA', {maximumFractionDigits: 3}) + ' МБ';
     const totals = entries.reduce((sum, [, day]) => ({
-        sentBytes: sum.sentBytes + day.sentBytes, plainBytes: sum.plainBytes + day.plainBytes, saves: sum.saves + day.saves
-    }), {sentBytes: 0, plainBytes: 0, saves: 0});
+        sentBytes: sum.sentBytes + day.sentBytes, plainBytes: sum.plainBytes + day.plainBytes,
+        gzipBytes: sum.gzipBytes + (day.gzipBytes ?? day.sentBytes),
+        saves: sum.saves + day.saves, deltaSaves: sum.deltaSaves + (day.deltaSaves ?? 0)
+    }), {sentBytes: 0, plainBytes: 0, gzipBytes: 0, saves: 0, deltaSaves: 0});
+    const mode = devTransferStats.mode === 'delta' ? 'Лише зміни' : 'Повний стислий знімок';
     const summary = document.createElement('p');
-    summary.textContent = entries.length ? `Передано ${mb(totals.sentBytes)} · Без стискання було б ${mb(totals.plainBytes)} · Збережень ${totals.saves}`
-        : 'За цей період ще немає підтверджених записів. Облік починається після ввімкнення стискання.';
+    summary.textContent = entries.length
+        ? `Режим «${mode}» · Передано ${mb(totals.sentBytes)} · Повний стислий знімок ≈ ${mb(totals.gzipBytes)} · Повний без стискання ≈ ${mb(totals.plainBytes)} · Записів лише змін ${totals.deltaSaves} із ${totals.saves}`
+        : `Режим «${mode}». За цей період ще немає підтверджених записів.`;
     target.replaceChildren(summary);
     if (!entries.length) return;
     const table = document.createElement('table');
     const header = table.createTHead().insertRow();
-    for (const title of ['Дата (Київ)', 'Передано', 'Було б без стискання', 'Збережень']) {
+    for (const title of ['Дата (Київ)', 'Передано', 'Повний зі стисканням ≈', 'Повний без стискання ≈', 'Лише зміни / Усі записи']) {
         const cell = document.createElement('th');
         cell.textContent = title;
         header.appendChild(cell);
@@ -2736,7 +2740,8 @@ window.renderDevTransferStats = function (period) {
     const rows = table.createTBody();
     for (const [date, day] of entries) {
         const row = rows.insertRow();
-        for (const value of [date, mb(day.sentBytes), mb(day.plainBytes), day.saves]) row.insertCell().textContent = value;
+        for (const value of [date, mb(day.sentBytes), mb(day.gzipBytes ?? day.sentBytes), mb(day.plainBytes),
+            `${day.deltaSaves ?? 0} / ${day.saves}`]) row.insertCell().textContent = value;
     }
     target.appendChild(table);
 };
