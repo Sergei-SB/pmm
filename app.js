@@ -246,7 +246,7 @@ function loadCarsModifications() {
         if (stored) {
             const mods = JSON.parse(stored);
             const allProps = [
-                'model', 'plate', 'note', 'driver', 'engineNo', 'vin',
+                'model', 'plate', 'note', 'driver', 'passportNo', 'engineNo', 'vin',
                 'vehicleType', 'category', 'subdivision', 'consumption',
                 'fuelType', 'year', 'transmission', 'tankCapacity', 'drive',
                 'emptyWeight', 'totalWeight', 'gears', 'engineVolume', 'kw',
@@ -288,6 +288,7 @@ function saveCarsModificationsToStorage() {
             plate: car.plate,
             note: car.note,
             driver: car.driver,
+            passportNo: car.passportNo,
             engineNo: car.engineNo,
             vin: car.vin,
             vehicleType: car.vehicleType,
@@ -800,8 +801,13 @@ function renderCarsTable(filterQuery = '') {
             <td>${car.kw || 0}</td>
             <td>${car.engineNo || ''}</td>
             <td><input type="text" class="table-cell-input" value="${car.driver || ''}" oninput="updateCarProp(${car.id}, 'driver', this.value)"></td>
+            <td class="cars-passport-col"></td>
             <td class="cars-report-col" style="text-align: center; ${isAdminOrDev ? '' : 'display: none;'}"><button class="action-btn" style="padding: 2px 8px; font-size: 11px;" onclick="openCarDetails(${car.id})">Звіт</button></td>
         `;
+        const passportCell = tr.querySelector('.cars-passport-col');
+        const passportNo = car.passportNo ?? '';
+        passportCell.textContent = passportNo;
+        passportCell.title = passportNo;
         tbody.appendChild(tr);
     });
 

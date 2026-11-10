@@ -159,6 +159,7 @@ function renderCarDetailsData() {
         'kw': car.kw,
         'engineNo': car.engineNo,
         'consumption': car.consumption,
+        'passportNo': car.passportNo,
         'fuelType': car.fuelType || car.fuel || 'ДП'
     };
 
@@ -222,6 +223,7 @@ window.updateCarPropertyFromDetails = function(prop, val) {
     else if (prop === 'kw') car.kw = parseFloat(val) || val;
     else if (prop === 'engineNo') car.engineNo = val;
     else if (prop === 'consumption') car.consumption = parseFloat(val) || val;
+    else if (prop === 'passportNo') car.passportNo = val;
 
     if (typeof saveCarsToStorage === 'function') saveCarsToStorage();
     if (typeof saveCarsModificationsToStorage === 'function') saveCarsModificationsToStorage();

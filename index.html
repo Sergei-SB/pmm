@@ -87,7 +87,7 @@
             reader.readAsDataURL(file);
         }
     </script>
-    <link rel="stylesheet" href="style.css?v=20261107-driver-odometer">
+    <link rel="stylesheet" href="style.css?v=20261110-passport-number">
     <style>
         html:not(.registry-developer) #base-view .registry-developer-only { display: none !important; }
         table thead tr, 
@@ -279,6 +279,7 @@
                             <th>кВт</th>
                             <th>№ двигуна</th>
                             <th>Водій</th>
+                            <th class="cars-passport-col">Паспорт №</th>
                             <th id="cars-report-col-th" class="cars-report-col" style="display: none;">Звіт</th>
                         </tr>
                     </thead>
@@ -682,6 +683,7 @@
                             <tr><td>Потужність (кВт)</td><td><input type="text" class="table-cell-input" id="det-input-kw" oninput="updateCarPropertyFromDetails('kw', this.value)"></td></tr>
                             <tr><td>№ двигуна</td><td><input type="text" class="table-cell-input" id="det-input-engineNo" oninput="updateCarPropertyFromDetails('engineNo', this.value)"></td></tr>
                             <tr><td>Норма витрати</td><td><input type="text" class="table-cell-input" id="det-input-consumption" oninput="updateCarPropertyFromDetails('consumption', this.value)"></td></tr>
+                            <tr><td><label for="det-input-passportNo">Паспорт №</label></td><td><input type="text" class="table-cell-input" id="det-input-passportNo" oninput="updateCarPropertyFromDetails('passportNo', this.value)"></td></tr>
                         </table>
                     </div>
 
@@ -749,7 +751,7 @@
     <script src="chainsaws.js?v=20261025-auto-limits"></script>
     <script src="pumps.js?v=20261025-auto-limits"></script>
     <script src="utils.js?v=20261108-towed-types"></script>
-    <script src="car_details_view.js?v=20261108-towed-types"></script>
+    <script src="car_details_view.js?v=20261110-passport-number"></script>
     <script src="admin.js?v=20261026-registry-dev"></script>
     <script src="developer.js"></script>
     <script src="moderator.js"></script>
@@ -761,7 +763,7 @@
     <script src="equipment_report.js?v=20261025-category-order"></script>
     <script src="driver_routes.js?v=20261108-route-trailer"></script>
     <script src="route_trailer.js?v=20261108-trailer-numbers"></script>
-    <script src="app.js?v=20261108-trailer-numbers"></script>
+    <script src="app.js?v=20261110-passport-number"></script>
     <script src="app2.js?v=20261108-trailer-mileage"></script>
     <script src="aggregates_calc.js?v=20261025-inventory-rates"></script>
     <script src="destroyed_equipment.js?v=20261024-pumps"></script>
