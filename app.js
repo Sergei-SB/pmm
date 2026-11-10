@@ -784,7 +784,7 @@ function renderCarsTable(filterQuery = '') {
                 </select>
             </td>
             <td><span onclick="openCarCard(${car.id})" style="cursor: pointer; color: #000; font-weight: bold; text-decoration: none;" title="Відкрити картку авто">${car.plate || ''}</span></td>
-            <td>${car.model || ''}</td>
+            <td><button type="button" class="car-model-button" title="Відкрити картку авто"></button></td>
             <td>${car.subdivision || '—'}</td>
             <td>${car.consumption || 0} л</td>
             <td>${car.fuelType || '—'}</td>
@@ -804,6 +804,10 @@ function renderCarsTable(filterQuery = '') {
             <td class="cars-passport-col"></td>
             <td class="cars-report-col" style="text-align: center; ${isAdminOrDev ? '' : 'display: none;'}"><button class="action-btn" style="padding: 2px 8px; font-size: 11px;" onclick="openCarDetails(${car.id})">Звіт</button></td>
         `;
+        const modelButton = tr.querySelector('.car-model-button');
+        modelButton.textContent = car.model || '';
+        modelButton.hidden = !car.model;
+        modelButton.onclick = () => openCarCard(car.id);
         const passportCell = tr.querySelector('.cars-passport-col');
         const passportNo = car.passportNo ?? '';
         passportCell.textContent = passportNo;
