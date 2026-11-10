@@ -75,8 +75,8 @@
         return new Intl.NumberFormat('uk-UA', {maximumFractionDigits: digits, useGrouping: false}).format(value);
     }
 
-    function formulaLine(group, baseRate) {
-        const parts = group.result.calculatedResults
+    function createFormulaLine(group, baseRate, closingFuel) {
+        const formulas = group.result.calculatedResults
             .filter(item => item.type !== 'work' && item.type !== 'adblue' && item.km)
             .map(item => {
                 const rate = item.type === 'cargoTransport' ? '0,9' : formatNumber(baseRate, 6);
@@ -84,7 +84,25 @@
                 return `${formatNumber(item.km)} × ${rate} / 100${modifier} = ${formatNumber(item.resVal)}`;
             });
         const fuel = group.result.totalFuel;
-        return `${parts.length ? parts.join('; ') + ' · Разом ' : 'Витрачено '}${formatNumber(fuel)} л ≈ ${Math.round(fuel)} л`;
+        const fuelLabel = formulas.length ? 'Разом' : 'Витрачено';
+        const parts = [
+            `${formatNumber(group.distance)} км ·`,
+            ...formulas.map((formula, index) => formula + (index === formulas.length - 1 ? ' ·' : ';')),
+            `${fuelLabel} ${formatNumber(fuel)} л ≈ ${Math.round(fuel)} л`
+        ];
+        if (closingFuel !== undefined) {
+            parts[parts.length - 1] += ' ·';
+            parts.push(`Залишок ${formatNumber(closingFuel)} л`);
+        }
+        const line = document.createElement('div');
+        line.className = 'daily-route-formula';
+        for (const text of parts) {
+            const part = document.createElement('span');
+            part.textContent = text;
+            if (line.childElementCount) line.append(' ');
+            line.appendChild(part);
+        }
+        return line;
     }
 
     function addDayButton(label, insert, routeDay, disabled, unavailable = false) {
@@ -128,13 +146,7 @@
             insertDecoration(start, 'daily-route-date').textContent = title;
             const cell = insertDecoration(end, 'daily-route-footer');
             cell.appendChild(addDayButton('+ Додати рядок маршруту', () => cell.parentElement, group.day, disabled));
-            const line = document.createElement('div');
-            line.className = 'daily-route-formula';
-            line.textContent = `${formatNumber(group.distance)} км · ${formulaLine(group, baseRate)}`;
-            if (group === groups.at(-1)) {
-                line.textContent += ` · Залишок ${formatNumber(closingFuel)} л`;
-            }
-            cell.appendChild(line);
+            cell.appendChild(createFormulaLine(group, baseRate, group === groups.at(-1) ? closingFuel : undefined));
 
             const nextDay = group.day + 1;
             const unavailable = nextDay > days.length || groups.some(item => item.day === nextDay);
