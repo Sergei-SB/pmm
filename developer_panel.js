@@ -745,7 +745,7 @@ window.updateRoleUI = function() {
 
     const addRouteBtn = document.getElementById('add-card-route-row');
     if (addRouteBtn) {
-        addRouteBtn.style.setProperty("display", canEditRoutes ? "inline-block" : "none", "important");
+        addRouteBtn.style.display = canEditRoutes ? "inline-block" : "none";
     }
 
     const presetBtns = document.querySelectorAll('#card-view .preset-btn');
