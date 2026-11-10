@@ -79,6 +79,73 @@ test('Driver odometer supplies the shared route total and preserves the original
     assert.equal(row.dataset.driverManualTotal, undefined);
 });
 
+test('Daily mode groups routes, saves the last balance and leaves the ten-day calculation available', () => {
+    const period = '01.11-10.11';
+    const fields = {
+        'odo-1': {value: '1000'}, 'odo-2': {set value(number) {this.text = String(number);}, get value() {return this.text || '';}},
+        'fuel-start': {value: '40'}, 'fuel-received': {value: '15'},
+        'fuel-spent': {}, 'fuel-left': {}, 'adblue-spent': {}
+    };
+    function route(day, distance) {
+        const inputs = [{value: 'Виконання БЗ Харків'}, {value: '8:30'}, ...Array.from({length: 3}, () => ({value: ''})), {value: distance}];
+        return {
+            dataset: day ? {routeDay: String(day)} : {},
+            querySelectorAll: () => inputs,
+            querySelector: selector => ({'input[type="text"]': inputs[0], '.total-col': inputs[5]}[selector])
+        };
+    }
+    const rows = [route(1, '20'), route(1, '30'), {dataset: {dailyDecoration: 'true'}}, route(2, '50')];
+    const store = new Map();
+    const c = contextWith([
+        ['app.js', 'updateRouteTotals'], ['app.js', 'evaluateExpression'], ['app.js', 'fmt'],
+        ['app2.js', 'saveCarRoutesForPeriod'], ['documents.js', 'executeTransferCarDataToReport']
+    ], {
+        currentCarId: 9, carsData: [{id: 9, consumption: 21.5, hasAdBlue: true}],
+        isRestoringState: false, routeEditorRole: () => 'developer',
+        getCarGroup: () => 'вантажний', isCarTruck: () => true, getTowedVehicleCategory: () => null,
+        getStrictActivePeriod: () => period, getSortedPeriods: () => [period],
+        getRoutesKey: () => 'routes', isLoadedCarRoute: () => true,
+        document: {
+            addEventListener() {},
+            getElementById: id => fields[id],
+            querySelector: () => null,
+            querySelectorAll: selector => selector === '#routes-tbody tr' ? rows : []
+        },
+        localStorage: {getItem: key => store.get(key) ?? null, setItem: (key, value) => store.set(key, value)},
+        writeCarRouteSnapshot: (key, topFields, rows) => store.set(key, JSON.stringify({topFields, rows})),
+        showDocToast() {}, escapeHtml: String
+    });
+    for (const file of ['formulas.js', 'daily_routes.js']) {
+        vm.runInContext(fs.readFileSync(path.join(root, file), 'utf8'), c);
+    }
+    let rendered;
+    c.renderDailyRoutes = (result, closingFuel) => {rendered = {result, closingFuel};};
+    const example = c.calculateDailyRoutes([route(undefined, '100')], 21.5, [1, 2, 3], false);
+    assert.equal(example.groups[0].day, 0);
+    assert.equal(example.totalFuel, 21.53);
+    assert.deepEqual(Array.from(example.calculatedResults, item => item.resVal.toFixed(2)), ['8.51', '4.06', '8.95']);
+    const gap = c.calculateDailyRoutes([route(2, '100')], 21.5, [1, 2, 3], false);
+    assert.deepEqual(Array.from(gap.groups, group => [group.day, group.rows.length]), [[1, 0], [2, 1]]);
+
+    c.setDailyRouteCalculation(true);
+    assert.deepEqual(Array.from(rendered.result.groups, group => [group.day, group.distance, group.result.totalFuel]),
+        [[1, 50, 10.77], [2, 50, 10.77]]);
+    assert.equal(rendered.closingFuel, '33.46');
+    assert.equal(fields['fuel-spent'].textContent, '21.54');
+    assert.equal(fields['fuel-left'].textContent, '33.46');
+    assert.equal(fields['adblue-spent'].textContent, '1.08');
+    c.executeTransferCarDataToReport();
+    assert.equal(JSON.parse(store.get('report_data_' + period))[9].leftFuel, '33.46');
+    const saved = JSON.parse(store.get('routes'));
+    assert.deepEqual(saved.rows.map(row => row.routeDay), [1, 1, 2]);
+    assert.equal(saved.topFields.savedFuelLeft, '33.46');
+
+    c.setDailyRouteCalculation(false);
+    assert.equal(fields['fuel-spent'].textContent, '21.53');
+    assert.equal(fields['fuel-left'].textContent, '33.47');
+    assert.equal(JSON.parse(store.get('routes')).topFields.savedFuelLeft, '33.46');
+});
+
 function routeRepairContext() {
     const key = 'isolated_car_routes_21.10-31.10_9';
     const remote = JSON.stringify({topFields: {fuelStart: '24', updatedAt: 'old'}, rows: [{km: '10'}]});

@@ -18,7 +18,12 @@
     color: #475569;
     font-size: 11px;
     font-weight: 600;
-    cursor: not-allowed;
+    cursor: pointer;
+}
+#dev-panel-view .dev-calculation-buttons button[aria-pressed="true"] {
+    border-color: #1f5144;
+    background: #1f5144;
+    color: #fff;
 }
 #dev-panel-view .dev-admin-brand{display:none}
 #dev-panel-view .dev-admin-content{min-width:0}

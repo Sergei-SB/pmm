@@ -183,7 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (button.hidden || !canEditDriverRoutes() || !isLoadedCarRoute(carId, period)) return;
         rows = [];
         routeSelect.replaceChildren();
-        document.querySelectorAll('#routes-tbody tr').forEach((row, index) => {
+        Array.from(document.querySelectorAll('#routes-tbody tr')).filter(row => !row.dataset?.dailyDecoration).forEach((row, index) => {
             const tons = row.querySelector('.row-tons');
             if (!tons || tons.disabled || isRouteRowReadOnly(row)) return;
             const name = row.cells[0]?.querySelector('input')?.value || 'Маршрут';

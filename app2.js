@@ -312,7 +312,7 @@ function loadCarDataForActivePeriod() {
             tbody.innerHTML = '';
             periodData.rows.forEach(rData => {
                 if (typeof addRouteRow === 'function') {
-                    addRouteRow(rData.name || 'Виконання БЗ Харків', rData.time || '8:30', '', truckActive);
+                    addRouteRow(rData.name || 'Виконання БЗ Харків', rData.time || '8:30', '', truckActive, rData.routeDay);
                     const lastRow = tbody.lastElementChild;
                     if (lastRow && rData.routeLock?.id && rData.routeLock?.by) {
                         lastRow.dataset.routeLockId = rData.routeLock.id;
@@ -440,7 +440,7 @@ function loadCarDataForActivePeriod() {
     }
 
     if (typeof updateRouteTotals === 'function') {
-        updateRouteTotals();
+        updateRouteTotals(true);
     }
 
     if (!trailerReadings && odo2El && !odo2El.value && periodData && periodData.topFields && periodData.topFields.odo2) {
@@ -500,7 +500,7 @@ function saveCarRoutesForPeriod(periodToSave, carIdToSave, isManualSave = false)
 
     const dataKey = getRoutesKey(targetCarId, period);
     const rowsData = [];
-    const rows = document.querySelectorAll('#routes-tbody tr');
+    const rows = Array.from(document.querySelectorAll('#routes-tbody tr')).filter(row => !row.dataset?.dailyDecoration);
 
     rows.forEach(row => {
         const inputs = row.querySelectorAll('input');
@@ -511,6 +511,7 @@ function saveCarRoutesForPeriod(periodToSave, carIdToSave, isManualSave = false)
             inputs: inputValues
         };
         if (row.dataset?.driverOdometer) savedRow.driverOdometer = row.dataset.driverOdometer;
+        if (row.dataset?.routeDay) savedRow.routeDay = Number(row.dataset.routeDay);
         if (row.dataset?.driverManualTotal !== undefined) savedRow.driverManualTotal = row.dataset.driverManualTotal;
         if (row.dataset?.routeTrailer) savedRow.trailer = JSON.parse(row.dataset.routeTrailer);
         if (row.dataset?.routeLockId) savedRow.routeLock = { id: row.dataset.routeLockId, by: row.dataset.routeLockBy };

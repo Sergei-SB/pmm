@@ -190,6 +190,42 @@ th {
     cursor: pointer;
 }
 
+#daily-route-legend {
+    display: none;
+}
+
+#card-view.daily-route-mode #add-card-route-row,
+#card-view.daily-route-mode .calc-main-row {
+    display: none !important;
+}
+
+#card-view.daily-route-mode #daily-route-legend {
+    display: block;
+    margin-top: 4px;
+}
+
+#routes-table .daily-route-date td,
+#routes-table .daily-route-footer td {
+    padding: 4px 6px;
+    text-align: left;
+    white-space: normal;
+    background: #f4f8f5;
+}
+
+#routes-table .daily-route-date td {
+    font-weight: bold;
+}
+
+.daily-route-formula {
+    margin: 4px 0;
+    font-variant-numeric: tabular-nums;
+}
+
+#routes-table .daily-route-action {
+    padding: 3px 7px;
+    font-size: 11px;
+}
+
 /* ==========================================
    ДЕСЯТИДЕННИЙ ЗВІТ
    ========================================== */

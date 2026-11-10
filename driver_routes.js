@@ -60,8 +60,12 @@ function applyRouteRowLocks(canEdit = canEditDriverRoutes()) {
     if (notice) notice.hidden = !awaitingProtection;
     const addButton = document.getElementById('add-card-route-row');
     if (addButton) addButton.disabled = awaitingProtection || !canEdit;
+    document.querySelectorAll('#routes-tbody .daily-route-action').forEach(button => {
+        button.disabled = awaitingProtection || !canEdit || Boolean(button.dataset.unavailable);
+    });
     if (typeof updateRouteTrailerButton === 'function') updateRouteTrailerButton(canEdit && !awaitingProtection);
     document.querySelectorAll('#routes-tbody tr').forEach(row => {
+        if (row.dataset?.dailyDecoration) return;
         const locked = isProtectedRouteRow(row);
         row.title = locked ? 'Рядок захищено розробником або адміністратором' : '';
         row.querySelectorAll('input, .delete-row-btn').forEach(control => {
@@ -80,7 +84,7 @@ function refreshDriverRouteView(car) {
     const panel = document.getElementById('driver-route-panel');
     if (!panel || panel.hidden) return;
     const tbody = document.getElementById('driver-routes-tbody');
-    const sourceRows = Array.from(document.querySelectorAll('#routes-tbody tr'));
+    const sourceRows = Array.from(document.querySelectorAll('#routes-tbody tr')).filter(row => !row.dataset?.dailyDecoration);
     if (!car && typeof carsData !== 'undefined' && Array.isArray(carsData) && typeof currentCarId !== 'undefined') {
         car = carsData.find(item => Number(item.id) === Number(currentCarId));
     }

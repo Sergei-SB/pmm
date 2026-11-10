@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="admin_layout.css?v=20261110-calculation-buttons">
+    <link rel="stylesheet" href="admin_layout.css?v=20261110-daily-routes">
     <title>Облік палива та конструктор документів А4</title>
     <meta name="description" content="Система обліку палива, транспортних засобів, агрегатів та конструктор документів А4 зі збереженням шаблонів фрагментів." />
     <meta property="og:title" content="Облік палива та конструктор документів А4" />
@@ -87,7 +87,7 @@
             reader.readAsDataURL(file);
         }
     </script>
-    <link rel="stylesheet" href="style.css?v=20261110-car-model-no-underline">
+    <link rel="stylesheet" href="style.css?v=20261110-daily-routes">
     <style>
         html:not(.registry-developer) #base-view .registry-developer-only { display: none !important; }
         table thead tr, 
@@ -420,6 +420,7 @@
                                         </div>
                                     </div>
                                     <div class="fuel-sub-line"><span id="markup-desc-text"></span></div>
+                                    <div id="daily-route-legend"></div>
                                 </div>
                             </div>
                         </div>
@@ -725,8 +726,8 @@
             <div class="card-header-panel" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
                 <h2>⚙️ Окрема Панель управління та безпеки Розробника</h2>
                 <div class="dev-calculation-buttons" role="group" aria-label="Підрахунки">
-                    <button type="button" id="btn-dev-ten-day-calculation" disabled>Підрахунок 10 днів</button>
-                    <button type="button" id="btn-dev-daily-calculation" disabled>Щоденний підрахунок</button>
+                    <button type="button" id="btn-dev-ten-day-calculation" aria-pressed="true" onclick="setDailyRouteCalculation(false)">Підрахунок 10 днів</button>
+                    <button type="button" id="btn-dev-daily-calculation" aria-pressed="false" onclick="setDailyRouteCalculation(true)">Щоденний підрахунок</button>
                 </div>
                 <div id="dev-panel-header-actions" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                     <button class="action-btn" onclick="refreshDevPanelData()" style="background-color: #2980b9; font-weight: bold;">🔄 Оновити дані</button>
@@ -765,10 +766,11 @@
     <script src="permissions_registry.js"></script>
     <script src="broadcast_mail.js"></script>
     <script src="equipment_report.js?v=20261025-category-order"></script>
-    <script src="driver_routes.js?v=20261108-route-trailer"></script>
-    <script src="route_trailer.js?v=20261108-trailer-numbers"></script>
-    <script src="app.js?v=20261110-car-model-link"></script>
-    <script src="app2.js?v=20261108-trailer-mileage"></script>
+    <script src="driver_routes.js?v=20261110-daily-routes"></script>
+    <script src="route_trailer.js?v=20261110-daily-routes"></script>
+    <script src="daily_routes.js?v=1"></script>
+    <script src="app.js?v=20261110-daily-routes"></script>
+    <script src="app2.js?v=20261110-daily-routes"></script>
     <script src="aggregates_calc.js?v=20261025-inventory-rates"></script>
     <script src="destroyed_equipment.js?v=20261024-pumps"></script>
     <script src="documents.js?v=20261108-correct-car-balances"></script>

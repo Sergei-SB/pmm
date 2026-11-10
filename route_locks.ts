@@ -20,7 +20,7 @@ function editableRow(row: Row): string {
   const inputs = Array.isArray(row.inputs) ? row.inputs : [];
   // The last cell and (for trucks) T-км are display calculations.
   const editable = inputs.length === 10 ? inputs.slice(0, 8) : inputs.slice(0, 7);
-  return JSON.stringify([row.name, row.time, editable, row.driverOdometer ?? '', row.driverManualTotal ?? '', row.trailer ?? null]);
+  return JSON.stringify([row.name, row.time, editable, row.driverOdometer ?? '', row.driverManualTotal ?? '', row.trailer ?? null, row.routeDay ?? null]);
 }
 
 function isPlaceholder(row: Row): boolean {

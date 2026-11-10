@@ -96,10 +96,18 @@ function printCarCardReport() {
     if (!car) return;
 
     const printWindow = window.open('', '_blank');
+    const daily = window.isDailyRouteCalculation?.();
     
     let routesRowsHtml = '';
-    const rows = document.querySelectorAll('#routes-tbody tr');
+    const rows = Array.from(document.querySelectorAll('#routes-tbody tr')).filter(row => !row.dataset?.dailyDecoration);
+    const printDayRow = (row, selector) => {
+        const text = row?.querySelector(selector)?.textContent;
+        return text ? `<tr><td colspan="9" style="text-align:left;">${escapeHtml(text)}</td></tr>` : '';
+    };
     rows.forEach((row, idx) => {
+        if (daily && row.previousElementSibling?.classList.contains('daily-route-date')) {
+            routesRowsHtml += printDayRow(row.previousElementSibling, 'td');
+        }
         const inputs = row.querySelectorAll('input');
         const routeName = inputs[0] ? inputs[0].value : '';
         const timeVal = inputs[1] ? inputs[1].value : '';
@@ -123,12 +131,18 @@ function printCarCardReport() {
                 <td>${odoVal}</td>
             </tr>
         `;
+        if (daily && row.nextElementSibling?.classList.contains('daily-route-footer')) {
+            routesRowsHtml += printDayRow(row.nextElementSibling, '.daily-route-formula');
+        }
     });
 
     const formulasContainer = document.getElementById('formulas-group-container');
-    const formulasHtml = formulasContainer ? formulasContainer.innerHTML : '';
+    const formulasHtml = daily
+        ? escapeHtml(document.getElementById('daily-route-legend')?.textContent)
+        : (formulasContainer ? formulasContainer.innerHTML : '');
 
     const sumKm = document.getElementById('sum-km')?.textContent || '0';
+    const printKm = daily && car.isMiles ? fmt(Number(sumKm) * 1.61, 1) : sumKm;
     const sumFuel = document.getElementById('sum-fuel')?.textContent || '0';
     const sumFuelRound = document.getElementById('sum-fuel-round')?.textContent || '0';
     const fuelStart = document.getElementById('fuel-start')?.value || '0';
@@ -197,7 +211,7 @@ function printCarCardReport() {
                     </div>
 
                     <div class="summary-box">
-                        Всього пройдено: ${sumKm} км &nbsp;|&nbsp; Витрачено: ${sumFuel} л (&approx; ${sumFuelRound} л) &nbsp;|&nbsp; Залишок: ${fuelLeft} л (Поч: ${fuelStart} л, Отрим: ${fuelReceived} л)
+                        Всього пройдено: ${printKm} км &nbsp;|&nbsp; Витрачено: ${sumFuel} л (&approx; ${sumFuelRound} л) &nbsp;|&nbsp; Залишок: ${fuelLeft} л (Поч: ${fuelStart} л, Отрим: ${fuelReceived} л)
                     </div>
                 </div>
 
@@ -1051,12 +1065,13 @@ function initDefaultRoutes(isTruck) {
     if (!tbody) return;
     tbody.innerHTML = '';
     
-    for (let i = 0; i < 7; i++) {
-        addRouteRow('Виконання БЗ Харків', '8:30', '', isTruck);
+    const daily = window.isDailyRouteCalculation?.();
+    for (let i = 0; i < (daily ? 1 : 7); i++) {
+        addRouteRow('Виконання БЗ Харків', '8:30', '', isTruck, daily ? 1 : null);
     }
 }
 
-function addRouteRow(routeName = 'Виконання БЗ Харків', dateVal = '8:30', totalVal = '', forceIsTruck = null) {
+function addRouteRow(routeName = 'Виконання БЗ Харків', dateVal = '8:30', totalVal = '', forceIsTruck = null, routeDay = null, before = null) {
     const tbody = document.getElementById('routes-tbody');
     if (!tbody) return;
     const tr = document.createElement('tr');
@@ -1101,7 +1116,9 @@ function addRouteRow(routeName = 'Виконання БЗ Харків', dateVal
         lastActiveRow = tr;
     });
 
-    tbody.appendChild(tr);
+    if (routeDay) tr.dataset.routeDay = routeDay;
+    if (before) tbody.insertBefore(tr, before);
+    else tbody.appendChild(tr);
     lastActiveRow = tr;
     updateRouteTotals();
     if (typeof updateRoleUI === 'function') {
@@ -1112,13 +1129,13 @@ function addRouteRow(routeName = 'Виконання БЗ Харків', dateVal
 function applyPresetToActiveRow(text) {
     if (typeof isAwaitingRouteProtection === 'function' && isAwaitingRouteProtection()) return;
     if (!lastActiveRow || !lastActiveRow.isConnected) {
-        const rows = document.querySelectorAll('#routes-tbody tr');
+        const rows = Array.from(document.querySelectorAll('#routes-tbody tr')).filter(row => !row.dataset?.dailyDecoration);
         if (rows.length > 0) {
             lastActiveRow = rows[rows.length - 1];
         } else {
             const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
             const car = safeCars.find(c => Number(c.id) === Number(currentCarId));
-            addRouteRow(text, '8:30', '', isCarTruck(car));
+            addRouteRow(text, '8:30', '', isCarTruck(car), window.isDailyRouteCalculation?.() ? 1 : null);
             saveCarRoutesForPeriod();
             return;
         }
@@ -1155,7 +1172,7 @@ function updateManualRouteTotal(input) {
     updateRouteTotals();
 }
 
-function updateRouteTotals() {
+function updateRouteTotals(renderRestoredDays = false) {
     let totalKm = 0;
     let startOdoInput = document.getElementById('odo-1')?.value || '';
     let startOdo = evaluateExpression(startOdoInput);
@@ -1167,7 +1184,7 @@ function updateRouteTotals() {
     const isMilesCar = car && car.isMiles;
     const group = getCarGroup(car);
 
-    const rows = document.querySelectorAll('#routes-tbody tr');
+    const rows = Array.from(document.querySelectorAll('#routes-tbody tr')).filter(row => !row.dataset?.dailyDecoration);
     rows.forEach(row => {
         const kmInput = row.querySelector('.total-col');
         const odoInput = row.querySelector('.row-odo');
@@ -1282,7 +1299,13 @@ function updateRouteTotals() {
 
     let baseRate = baseConsumption * (1 + markupPercent / 100);
 
-    const calcResult = calculateRouteFuel(rows, baseRate, carFormulas, isMilesCar);
+    let dailyResult = null;
+    if (window.isDailyRouteCalculation?.()) {
+        const dailyFormulas = carFormulas.filter(id => id !== 7);
+        if (hasAdBlue) dailyFormulas.push(7);
+        dailyResult = window.calculateDailyRoutes(rows, baseRate, dailyFormulas, isMilesCar);
+    }
+    const calcResult = dailyResult || calculateRouteFuel(rows, baseRate, carFormulas, isMilesCar);
 
     totalFuelRounded = Math.round(calcResult.totalFuel);
 
@@ -1376,13 +1399,16 @@ function updateRouteTotals() {
     let fuelStart = evaluateExpression(document.getElementById('fuel-start')?.value);
     let fuelReceived = evaluateExpression(document.getElementById('fuel-received')?.value);
     let fuelSpent = calcResult.totalFuel;
-    let fuelLeft = fuelReceived + fuelStart - fuelSpent;
+    const fuelLeft = fmt(fuelReceived + fuelStart - fuelSpent, 2);
+    if (dailyResult && (renderRestoredDays || !isRestoringState)) {
+        window.renderDailyRoutes(dailyResult, fuelLeft);
+    }
 
     const fuelSpentEl = document.getElementById('fuel-spent');
     if (fuelSpentEl) fuelSpentEl.textContent = fmt(fuelSpent, 2);
 
     const fuelLeftEl = document.getElementById('fuel-left');
-    if (fuelLeftEl) fuelLeftEl.textContent = fmt(fuelLeft, 2);
+    if (fuelLeftEl) fuelLeftEl.textContent = fuelLeft;
 
     if (car && car.hasAdBlue) {
         let adblueStart = evaluateExpression(document.getElementById('adblue-start')?.value);
@@ -1405,7 +1431,7 @@ function updateRouteTotals() {
 
 document.addEventListener('click', function(e) {
     const tr = e.target.closest('#routes-tbody tr');
-    if (tr) {
+    if (tr && !tr.dataset.dailyDecoration) {
         lastActiveRow = tr;
     }
 });
