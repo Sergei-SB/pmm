@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="admin_layout.css?v=20261026-dual-admin">
+    <link rel="stylesheet" href="admin_layout.css?v=20261110-calculation-buttons">
     <title>Облік палива та конструктор документів А4</title>
     <meta name="description" content="Система обліку палива, транспортних засобів, агрегатів та конструктор документів А4 зі збереженням шаблонів фрагментів." />
     <meta property="og:title" content="Облік палива та конструктор документів А4" />
@@ -724,6 +724,10 @@
         <section id="dev-panel-view" class="view-section">
             <div class="card-header-panel" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
                 <h2>⚙️ Окрема Панель управління та безпеки Розробника</h2>
+                <div class="dev-calculation-buttons" role="group" aria-label="Підрахунки">
+                    <button type="button" id="btn-dev-ten-day-calculation" disabled>Підрахунок 10 днів</button>
+                    <button type="button" id="btn-dev-daily-calculation" disabled>Щоденний підрахунок</button>
+                </div>
                 <div id="dev-panel-header-actions" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                     <button class="action-btn" onclick="refreshDevPanelData()" style="background-color: #2980b9; font-weight: bold;">🔄 Оновити дані</button>
                     <button class="action-btn" onclick="exportFullDatabaseBackup()" style="background-color: #27ae60; font-weight: bold;">📥 Скачати Бекап Бази</button>

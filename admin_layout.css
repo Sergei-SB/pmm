@@ -5,6 +5,21 @@
 #dev-panel-view .dev-admin-layout-switch button{background:transparent;color:#475569;border:0;border-radius:6px;padding:8px 12px;cursor:pointer;font:600 12px Arial,sans-serif}
 #dev-panel-view .dev-admin-layout-switch button[aria-pressed=true]{background:#1f5144;color:#fff;box-shadow:0 2px 4px #153e3020}
 #dev-panel-view .dev-admin-layout-switch button:focus-visible{outline:2px solid #16a085;outline-offset:2px}
+#dev-panel-view .dev-calculation-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+#dev-panel-view .dev-calculation-buttons button {
+    padding: 5px 8px;
+    border: 1px solid #94a3b8;
+    border-radius: 5px;
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: not-allowed;
+}
 #dev-panel-view .dev-admin-brand{display:none}
 #dev-panel-view .dev-admin-content{min-width:0}
 #dev-panel-view.dev-admin-modern{background:#f3f6f4;color:#203a32;border-radius:18px;padding:24px;box-sizing:border-box}
