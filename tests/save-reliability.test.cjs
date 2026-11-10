@@ -79,6 +79,39 @@ test('Driver odometer supplies the shared route total and preserves the original
     assert.equal(row.dataset.driverManualTotal, undefined);
 });
 
+test('Daily mode replaces legacy starter rows while preserving saved trips and route locks', () => {
+    let daily = true;
+    const starters = [];
+    const c = contextWith([['app2.js', 'getSavedCardRouteRows'], ['app.js', 'initDefaultRoutes']], {
+        isDailyRouteCalculation: () => daily,
+        document: {getElementById: () => ({})},
+        addRouteRow: (...args) => starters.push(args)
+    });
+    const blank = {
+        name: 'Виконання БЗ Харків', time: '8:30',
+        inputs: ['Виконання БЗ Харків', '8:30', '', '', '', '', 'о/с', '0', '', '235538']
+    };
+    const oldRows = Array.from({length: 7}, () => ({...blank}));
+    assert.equal(c.getSavedCardRouteRows(oldRows, true).length, 0);
+    c.initDefaultRoutes(true);
+    assert.equal(starters.length, 1);
+    assert.equal(starters[0][4], 1);
+    assert.equal(c.getSavedCardRouteRows(oldRows, false), oldRows);
+    assert.equal(c.getSavedCardRouteRows([{...blank, routeDay: 1}], false).length, 0);
+    starters.length = 0;
+    daily = false;
+    c.initDefaultRoutes(true);
+    assert.equal(starters.length, 7);
+    assert.ok(starters.every(args => args[4] === null));
+
+    const manual = [{...blank, routeDay: 1}, {...blank, routeDay: 1}];
+    assert.equal(c.getSavedCardRouteRows(manual, true), manual);
+    const withTrip = oldRows.map((row, index) => index === 0 ? {...row, inputs: row.inputs.with(5, '100')} : row);
+    assert.equal(c.getSavedCardRouteRows(withTrip, true), withTrip);
+    const protectedRow = {...blank, routeLock: {id: 'existing', by: 'admin'}};
+    assert.deepEqual(Array.from(c.getSavedCardRouteRows([...oldRows.slice(0, 6), protectedRow], true)), [protectedRow]);
+});
+
 test('Daily mode groups routes, saves the last balance and leaves the ten-day calculation available', () => {
     const period = '01.11-10.11';
     const fields = {

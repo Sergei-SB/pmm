@@ -286,6 +286,28 @@ function hookIntoLoadCarCard() {
     }
 }
 
+function getSavedCardRouteRows(rows, daily) {
+    if (!Array.isArray(rows)) return [];
+    const isBlankStarter = row => {
+        if (!row || row.name !== 'Виконання БЗ Харків' || row.time !== '8:30' ||
+            row.trailer || row.driverOdometer != null || row.driverManualTotal != null) return false;
+        const inputs = row.inputs;
+        if (!Array.isArray(inputs) || ![8, 10].includes(inputs.length)) return false;
+        return inputs[0] === row.name && inputs[1] === row.time &&
+            inputs.slice(2, 6).every(value => value === '') && inputs[6] === 'о/с' &&
+            (inputs.length === 8 || inputs.slice(7, 9).every(value => value === '' || /^0+(?:[.,]0+)?$/.test(value)));
+    };
+
+    // Older saves can contain a full set of generated rows even when no trip was entered.
+    if (daily && rows.length === 7 && rows.every(row => row && row.routeDay == null && isBlankStarter(row))) {
+        return rows.filter(row => row.routeLock);
+    }
+    if (!daily && rows.length === 1 && rows[0]?.routeDay === 1 && !rows[0].routeLock && isBlankStarter(rows[0])) {
+        return [];
+    }
+    return rows;
+}
+
 function loadCarDataForActivePeriod() {
     loadedCarRouteKey = null;
     if (typeof currentCarId === 'undefined' || !currentCarId) return;
@@ -308,9 +330,10 @@ function loadCarDataForActivePeriod() {
 
     const tbody = document.getElementById('routes-tbody');
     if (tbody) {
-        if (periodData && periodData.rows && Array.isArray(periodData.rows) && periodData.rows.length > 0) {
+        const savedRows = getSavedCardRouteRows(periodData?.rows, window.isDailyRouteCalculation?.());
+        if (savedRows.length > 0) {
             tbody.innerHTML = '';
-            periodData.rows.forEach(rData => {
+            savedRows.forEach(rData => {
                 if (typeof addRouteRow === 'function') {
                     addRouteRow(rData.name || 'Виконання БЗ Харків', rData.time || '8:30', '', truckActive, rData.routeDay);
                     const lastRow = tbody.lastElementChild;
