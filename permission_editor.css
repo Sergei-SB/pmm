@@ -1,0 +1,74 @@
+#maintenance-screen[hidden], #permission-editor-menu[hidden] {
+    display: none;
+}
+
+#maintenance-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 2000000;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    background: #172936;
+    color: #fff;
+}
+
+body.maintenance-blocked #custom-admin-modal {
+    z-index: 2000001 !important;
+}
+
+#maintenance-screen h1 {
+    transform: rotate(-28deg);
+    font-size: clamp(24px, 7vw, 110px);
+    white-space: nowrap;
+}
+
+#maintenance-screen button {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+}
+
+#permission-editor-markers {
+    position: fixed;
+    inset: 0;
+    z-index: 8500;
+    pointer-events: none;
+}
+
+.permission-editor-marker {
+    position: absolute;
+    pointer-events: auto;
+    width: 18px;
+    height: 18px;
+    border: 1px solid #fff;
+    border-radius: 4px;
+    background: #a32132;
+    color: #fff;
+    font: bold 15px/16px Arial, sans-serif;
+    cursor: pointer;
+}
+
+#permission-editor-menu {
+    position: fixed;
+    z-index: 8600;
+    min-width: 210px;
+    padding: 12px;
+    border: 1px solid #aab8c4;
+    border-radius: 8px;
+    background: #fff;
+    color: #223344;
+    box-shadow: 0 4px 18px #17293640;
+}
+
+#permission-editor-menu label {
+    display: flex;
+    gap: 8px;
+    margin-top: 7px;
+    align-items: center;
+}
+
+[data-editor-denied] {
+    display: none !important;
+    visibility: hidden !important;
+}

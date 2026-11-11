@@ -972,6 +972,9 @@
                 var registryReconciled = await reconcileSafeModificationsRecord(incomingKeys.user_cars_database_v2, 'user_cars_database_v2');
                 var routesReconciled = await reconcileSafeRouteRecords(incomingKeys);
                 var changed = applyRemoteKeys(incomingKeys, awaitingFirstPull);
+                if (incomingKeys.dev_maintenance_editor_v1) {
+                    window.dispatchEvent(new Event('pmm-maintenance-sync'));
+                }
                 if (Array.isArray(data.activity)) {
                     window.pmmSharedActivity = data.activity;
                     callIfExists('renderPmmSharedActivity');

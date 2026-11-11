@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="admin_layout.css?v=20261110-daily-routes">
+    <link rel="stylesheet" href="permission_editor.css?v=1">
     <title>Облік палива та конструктор документів А4</title>
     <meta name="description" content="Система обліку палива, транспортних засобів, агрегатів та конструктор документів А4 зі збереженням шаблонів фрагментів." />
     <meta property="og:title" content="Облік палива та конструктор документів А4" />
@@ -90,7 +91,7 @@
     <link rel="stylesheet" href="style.css?v=20261110-daily-formula-spacing">
     <style>
         html:not(.registry-developer) #base-view .registry-developer-only { display: none !important; }
-        html:not(.registry-admin-columns) #base-view .registry-admin-only { display: none !important; }
+        html:not(.registry-admin-columns) #base-view .registry-admin-only:not([data-editor-allowed]) { display: none !important; }
         table thead tr, 
         .compact-base-table thead tr, 
         .data-table thead tr {
@@ -730,6 +731,7 @@
                     <button type="button" id="btn-dev-ten-day-calculation" aria-pressed="true" onclick="setDailyRouteCalculation(false)">Підрахунок 10 днів</button>
                     <button type="button" id="btn-dev-daily-calculation" aria-pressed="false" onclick="setDailyRouteCalculation(true)">Щоденний підрахунок</button>
                 </div>
+                <button type="button" id="permission-editor-toggle" class="action-btn" aria-pressed="false">Права</button>
                 <div id="dev-panel-header-actions" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                     <button class="action-btn" onclick="refreshDevPanelData()" style="background-color: #2980b9; font-weight: bold;">🔄 Оновити дані</button>
                     <button class="action-btn" onclick="exportFullDatabaseBackup()" style="background-color: #27ae60; font-weight: bold;">📥 Скачати Бекап Бази</button>
@@ -780,6 +782,7 @@
     <script src="automatic_backup.js"></script>
     <script src="document_sync.js"></script>
     <script src="sync_conflicts.js?v=20261108-registry-additions"></script>
-    <script src="Shared_sync.js?v=20261108-report-storage"></script>
+    <script src="Shared_sync.js?v=20261112-maintenance"></script>
+    <script src="permission_editor.js?v=1"></script>
 </body>
 </html>
