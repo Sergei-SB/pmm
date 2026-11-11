@@ -38,7 +38,7 @@ function saveAggCalcState() {
             oilCalcExpr: document.getElementById('oil-calc-input')?.value || '',
             isVerification: !!window._isVerificationMode,
             isIntegerHours: !!window._isIntegerHours,
-            roundFuelSummary: window._roundFuelSummary !== false,
+            integerFuelSummary: !!window._integerFuelSummary,
             manualMotoHours: window._manualMotoHours || {},
             periodRandomSeeds: window._periodRandomSeeds || {},
             rows: rows
@@ -139,7 +139,7 @@ function renderAggregatesCalcView() {
     if (!container) return;
 
     const savedState = loadAggCalcState();
-    window._roundFuelSummary = savedState?.roundFuelSummary !== false;
+    window._integerFuelSummary = !!savedState?.integerFuelSummary;
 
     if (savedState) {
         window._selectedAggIndex = savedState.selectedAggIndex !== undefined ? savedState.selectedAggIndex : 'custom';
@@ -263,7 +263,7 @@ function renderAggregatesCalcView() {
 
                     <!-- ПІДСУМОК ТАБЛИЦІ ЗЛІВА -->
                     <div id="variant-b-summary-box" style="display: grid; grid-template-columns: auto 42px repeat(4, minmax(0, 1fr)); gap: 2px; text-align: center; font-size: 10px;">
-                        <button type="button" id="round-b-summary" class="action-btn" aria-pressed="${window._roundFuelSummary}" onclick="toggleVariantBSummaryRounding()" style="padding: 3px 6px; font-size: 10px; white-space: nowrap;">До 0,1 ${window._roundFuelSummary ? '✓' : '○'}</button>
+                        <button type="button" id="round-b-summary" class="action-btn" aria-label="Округлити підсумок до цілих" aria-pressed="${window._integerFuelSummary}" onclick="toggleVariantBSummaryRounding()" style="padding: 3px 6px; font-size: 10px; white-space: nowrap;">${window._integerFuelSummary ? 'Цілі (0)' : 'Десяткові (0,0)'}</button>
                         <div style="background: white; padding: 4px 2px; border-radius: 3px; border: 1px solid #bdc3c7;">
                             <div id="sum-b-days" style="font-weight: bold; color: #2c3e50; font-size: 11px;">0</div>
                         </div>
@@ -474,10 +474,10 @@ function calculateVariantBRow(rowIdx, skipPropagate) {
 }
 
 function toggleVariantBSummaryRounding() {
-    window._roundFuelSummary = window._roundFuelSummary === false;
+    window._integerFuelSummary = !window._integerFuelSummary;
     const button = document.getElementById('round-b-summary');
-    button.setAttribute('aria-pressed', String(window._roundFuelSummary));
-    button.textContent = 'До 0,1 ' + (window._roundFuelSummary ? '✓' : '○');
+    button.setAttribute('aria-pressed', String(window._integerFuelSummary));
+    button.textContent = window._integerFuelSummary ? 'Цілі (0)' : 'Десяткові (0,0)';
     updateVariantBSummary();
     saveAggCalcState();
 }
@@ -491,9 +491,7 @@ function updateVariantBSummary() {
     let totalSpent = 0;
 
     let foundFirstStart = false;
-    const formatFuel = value => window._roundFuelSummary === false
-        ? String(Number(value.toPrecision(15)))
-        : value.toFixed(1);
+    const formatFuel = value => window._integerFuelSummary ? value.toFixed(0) : value.toFixed(1);
 
     for (let i = 1; i <= 10; i++) {
         const daysIn = document.getElementById(`b-days-${i}`);
