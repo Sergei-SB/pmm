@@ -629,8 +629,11 @@ function isRegistryDeveloper() {
 }
 
 function syncRegistryDeveloperVisibility() {
-    const isDev = isRegistryDeveloper();
+    const role = typeof window.getCurrentAppRole === 'function' ? window.getCurrentAppRole()
+        : (typeof currentRole !== 'undefined' ? currentRole : (window.currentRole || 'user'));
+    const isDev = role === 'developer';
     document.documentElement.classList.toggle('registry-developer', isDev);
+    document.documentElement.classList.toggle('registry-admin-columns', isDev || role === 'admin');
     // A hidden category filter must never leave other roles with an incomplete fleet.
     if (!isDev && currentCategoryFilter !== 'all') filterCarsByCategory('all');
 }
@@ -803,7 +806,7 @@ function renderCarsTable(filterQuery = '') {
             <td>${car.consumption || 0} л</td>
             <td>${car.fuelType || '—'}</td>
             <td><input type="text" class="table-cell-input" value="${car.note || ''}" oninput="updateCarProp(${car.id}, 'note', this.value)"></td>
-            <td>${car.vin || ''}</td>
+            <td class="registry-admin-only">${car.vin || ''}</td>
             <td>${car.year || ''}</td>
             <td>${car.transmission || ''}</td>
             <td>${car.tankCapacity || 0} л</td>
@@ -813,7 +816,7 @@ function renderCarsTable(filterQuery = '') {
             <td>${car.gears || ''}</td>
             <td>${car.engineVolume || 0} см³</td>
             <td>${car.kw || 0}</td>
-            <td>${car.engineNo || ''}</td>
+            <td class="registry-admin-only">${car.engineNo || ''}</td>
             <td><input type="text" class="table-cell-input" value="${car.driver || ''}" oninput="updateCarProp(${car.id}, 'driver', this.value)"></td>
             <td class="cars-passport-col"></td>
             <td class="cars-report-col" style="text-align: center; ${isAdminOrDev ? '' : 'display: none;'}"><button class="action-btn" style="padding: 2px 8px; font-size: 11px;" onclick="openCarDetails(${car.id})">Звіт</button></td>

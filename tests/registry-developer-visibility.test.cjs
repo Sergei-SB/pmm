@@ -23,6 +23,7 @@ test('Only developer sees registry category controls and can change vehicle type
     for(const role of ['user','moderator','admin','developer']){
         const {c,classes,saves}=fixture(role);c.syncRegistryDeveloperVisibility();
         assert.equal(classes.has('registry-developer'),role==='developer');
+        assert.equal(classes.has('registry-admin-columns'),role==='developer'||role==='admin');
         c.updateCarVehicleType(1,'вантажний');
         assert.equal(c.carsData[0].vehicleType,role==='developer'?'вантажний':'легковий');assert.equal(saves(),role==='developer'?1:0);
     }

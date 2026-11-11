@@ -90,6 +90,7 @@
     <link rel="stylesheet" href="style.css?v=20261110-daily-formula-spacing">
     <style>
         html:not(.registry-developer) #base-view .registry-developer-only { display: none !important; }
+        html:not(.registry-admin-columns) #base-view .registry-admin-only { display: none !important; }
         table thead tr, 
         .compact-base-table thead tr, 
         .data-table thead tr {
@@ -267,7 +268,7 @@
                             <th>Витрата</th>
                             <th>Паливо</th>
                             <th>Примітка</th>
-                            <th>Він код</th>
+                            <th class="registry-admin-only">Він код</th>
                             <th>Рік</th>
                             <th>КПП</th>
                             <th>Бак</th>
@@ -277,7 +278,7 @@
                             <th>Передачі</th>
                             <th>Об'єм</th>
                             <th>кВт</th>
-                            <th>№ двигуна</th>
+                            <th class="registry-admin-only">№ двигуна</th>
                             <th>Водій</th>
                             <th class="cars-passport-col">Паспорт №</th>
                             <th id="cars-report-col-th" class="cars-report-col" style="display: none;">Звіт</th>
@@ -769,7 +770,7 @@
     <script src="driver_routes.js?v=20261110-daily-routes"></script>
     <script src="route_trailer.js?v=20261110-daily-routes"></script>
     <script src="daily_routes.js?v=20261110-daily-formula-spacing"></script>
-    <script src="app.js?v=20261110-daily-routes"></script>
+    <script src="app.js?v=20261111-registry-column-roles"></script>
     <script src="app2.js?v=20261110-daily-starter-row"></script>
     <script src="aggregates_calc.js?v=20261111-summary-integers"></script>
     <script src="destroyed_equipment.js?v=20261024-pumps"></script>
