@@ -25,6 +25,7 @@ import { createServer as createViteServer } from 'vite';
 import { archiveSnapshot, writeSnapshotWithBackup, registryChangeBlocked } from './storage_backups.ts';
 import { configuredGitHubStorage } from './github_storage.ts';
 import { protectRouteRows } from './route_locks.ts';
+import { installRolePasswordRoute } from './role_passwords.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -180,6 +181,8 @@ const LOCAL_ONLY_KEYS = [
   'last_active_car_period',
   'last_active_report_period',
   'dev_role_time_stats',
+  'dev_system_passwords',
+  'dev_security_logs',
 ];
 const LOCAL_ONLY_PREFIXES = ['lastreadbroadcastid_', '__sync_'];
 const VERSION_MARKER_SUFFIX = '_data_version';
@@ -196,6 +199,20 @@ function isSyncableKey(key: unknown): boolean {
   // через них один ПК міг перезаписати список бензопил/вебасто дефолтом.
   if (k.length >= VERSION_MARKER_SUFFIX.length && k.slice(-VERSION_MARKER_SUFFIX.length) === VERSION_MARKER_SUFFIX) return false;
   return true;
+}
+
+function stripManagedPasswords(key: string, value: string): string {
+  if (key.toLowerCase() !== 'dev_managed_users') return value;
+  try {
+    const users = JSON.parse(value);
+    if (Array.isArray(users)) {
+      return JSON.stringify(users.map(user => {
+        const {pin: _pin, ...profile} = asObject(user);
+        return profile;
+      }));
+    }
+  } catch {}
+  return '[]';
 }
 
 // --- Безпечне читання довільних даних із тіла запиту ---------------------
@@ -262,11 +279,12 @@ function normalizeStore(parsed: JsonObject): Store {
 
   const rawKeys = asObject(parsed.keys);
   for (const key of Object.keys(rawKeys)) {
+    if (['dev_system_passwords', 'dev_security_logs'].includes(key.toLowerCase())) continue;
     const rec = asObject(rawKeys[key]);
     const value = rec.value;
     if (typeof value !== 'string') continue;
     store.keys[key] = {
-      value,
+      value: stripManagedPasswords(key, value),
       rev: asNumber(rec.rev),
       updatedAt: asNumber(rec.updatedAt) || Date.now(),
       updatedByRole: asString(rec.updatedByRole, 'system'),
@@ -450,6 +468,8 @@ function applyChanges(body: unknown, options: { seedAllowed: boolean }): ApplyRe
     if (!isSyncableKey(key)) continue;
     const entry = normalizeChange(changes[key]);
     if (!entry) continue;
+    const submitted = entry.value;
+    entry.value = stripManagedPasswords(key, submitted);
     const authorRole = entry.role === undefined ? role : activityRole(entry.role);
 
     const existing = store.keys[key];
@@ -460,6 +480,7 @@ function applyChanges(body: unknown, options: { seedAllowed: boolean }): ApplyRe
     }
     if (existing && !seedAllowed) {
       if (!existing.deleted && existing.value === entry.value) {
+        if (entry.value !== submitted) canonical[key] = entry.value;
         applied[key] = existing.rev;
         continue;
       }
@@ -482,7 +503,7 @@ function applyChanges(body: unknown, options: { seedAllowed: boolean }): ApplyRe
       continue;
     }
     const value = protectedRoute?.value ?? entry.value;
-    if (value !== entry.value) canonical[key] = value;
+    if (value !== submitted) canonical[key] = value;
     if (existing && !existing.deleted && existing.value === value && !seedAllowed) {
       applied[key] = existing.rev;
       continue;
@@ -560,6 +581,12 @@ async function startServer(): Promise<void> {
   });
 
   app.use(express.json({ limit: MAX_BODY }));
+  installRolePasswordRoute(app, (id, role) => {
+    const record = store.keys.dev_managed_users;
+    if (!record || record.deleted) return false;
+    const users = JSON.parse(record.value) as JsonObject[];
+    return users.some(user => String(user.id) === id && user.role === role && user.status !== 'banned');
+  });
 
   // 2) Перевірка живості
   app.get('/api/health', (_req, res) => {
