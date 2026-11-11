@@ -38,6 +38,7 @@ function saveAggCalcState() {
             oilCalcExpr: document.getElementById('oil-calc-input')?.value || '',
             isVerification: !!window._isVerificationMode,
             isIntegerHours: !!window._isIntegerHours,
+            roundFuelSummary: window._roundFuelSummary !== false,
             manualMotoHours: window._manualMotoHours || {},
             periodRandomSeeds: window._periodRandomSeeds || {},
             rows: rows
@@ -138,6 +139,7 @@ function renderAggregatesCalcView() {
     if (!container) return;
 
     const savedState = loadAggCalcState();
+    window._roundFuelSummary = savedState?.roundFuelSummary !== false;
 
     if (savedState) {
         window._selectedAggIndex = savedState.selectedAggIndex !== undefined ? savedState.selectedAggIndex : 'custom';
@@ -260,7 +262,8 @@ function renderAggregatesCalcView() {
                     </div>
 
                     <!-- ПІДСУМОК ТАБЛИЦІ ЗЛІВА -->
-                    <div id="variant-b-summary-box" style="display: grid; grid-template-columns: 18% 20.5% 20.5% 20.5% 20.5%; gap: 2px; text-align: center; font-size: 10px;">
+                    <div id="variant-b-summary-box" style="display: grid; grid-template-columns: auto 42px repeat(4, minmax(0, 1fr)); gap: 2px; text-align: center; font-size: 10px;">
+                        <button type="button" id="round-b-summary" class="action-btn" aria-pressed="${window._roundFuelSummary}" onclick="toggleVariantBSummaryRounding()" style="padding: 3px 6px; font-size: 10px; white-space: nowrap;">До 0,1 ${window._roundFuelSummary ? '✓' : '○'}</button>
                         <div style="background: white; padding: 4px 2px; border-radius: 3px; border: 1px solid #bdc3c7;">
                             <div id="sum-b-days" style="font-weight: bold; color: #2c3e50; font-size: 11px;">0</div>
                         </div>
@@ -449,11 +452,9 @@ function calculateVariantBRow(rowIdx, skipPropagate) {
     let recVal = parseFloat(recInput.value) || 0;
     let endVal = parseFloat(endInput.value);
 
-    let isIntegerHours = !!window._isIntegerHours;
-
     if (!isNaN(startVal) && !isNaN(endVal)) {
         let spent = startVal + recVal - endVal;
-        spentInput.value = spent >= 0 ? (isIntegerHours ? Math.round(spent) : spent.toFixed(1)) : (isIntegerHours ? '0' : '0.0');
+        spentInput.value = Math.max(0, spent).toFixed(1);
     } else {
         spentInput.value = '';
     }
@@ -461,7 +462,7 @@ function calculateVariantBRow(rowIdx, skipPropagate) {
     if (!skipPropagate && rowIdx < 10 && !isNaN(endVal)) {
         let nextStartInput = document.getElementById(`b-start-${rowIdx + 1}`);
         if (nextStartInput && (!nextStartInput.value || nextStartInput.dataset.auto === 'true')) {
-            nextStartInput.value = isIntegerHours ? Math.round(endVal) : endVal.toFixed(1);
+            nextStartInput.value = endVal.toFixed(1);
             nextStartInput.dataset.auto = 'true';
             calculateVariantBRow(rowIdx + 1, false);
         }
@@ -470,6 +471,15 @@ function calculateVariantBRow(rowIdx, skipPropagate) {
     updateVariantBSummary();
     saveAggCalcState();
     triggerRecalc();
+}
+
+function toggleVariantBSummaryRounding() {
+    window._roundFuelSummary = window._roundFuelSummary === false;
+    const button = document.getElementById('round-b-summary');
+    button.setAttribute('aria-pressed', String(window._roundFuelSummary));
+    button.textContent = 'До 0,1 ' + (window._roundFuelSummary ? '✓' : '○');
+    updateVariantBSummary();
+    saveAggCalcState();
 }
 
 // Підсумок таблиці залишків
@@ -481,7 +491,9 @@ function updateVariantBSummary() {
     let totalSpent = 0;
 
     let foundFirstStart = false;
-    let isIntegerHours = !!window._isIntegerHours;
+    const formatFuel = value => window._roundFuelSummary === false
+        ? String(Number(value.toPrecision(15)))
+        : value.toFixed(1);
 
     for (let i = 1; i <= 10; i++) {
         const daysIn = document.getElementById(`b-days-${i}`);
@@ -527,10 +539,10 @@ function updateVariantBSummary() {
     const spEl = document.getElementById('sum-b-spent');
 
     if (dEl) dEl.textContent = totalDays;
-    if (sEl) sEl.textContent = isIntegerHours ? Math.round(firstStart) : firstStart.toFixed(1);
-    if (rEl) rEl.textContent = isIntegerHours ? Math.round(totalRec) : totalRec.toFixed(1);
-    if (eEl) eEl.textContent = isIntegerHours ? Math.round(lastEnd) : lastEnd.toFixed(1);
-    if (spEl) spEl.textContent = isIntegerHours ? Math.round(totalSpent) : totalSpent.toFixed(1);
+    if (sEl) sEl.textContent = formatFuel(firstStart);
+    if (rEl) rEl.textContent = formatFuel(totalRec);
+    if (eEl) eEl.textContent = formatFuel(lastEnd);
+    if (spEl) spEl.textContent = formatFuel(totalSpent);
 }
 
 // Випадаючий список агрегатів
@@ -768,9 +780,6 @@ function setAggHoursMode(isInteger) {
         });
     }
 
-    for (let i = 1; i <= 10; i++) {
-        calculateVariantBRow(i, true);
-    }
     saveAggCalcState();
     triggerRecalc();
 }
