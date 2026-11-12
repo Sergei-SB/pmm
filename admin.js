@@ -20,23 +20,6 @@ window.currentRole = currentRole;
 let isDeveloperLoggedIn = (currentRole === "developer");
 
 // --- ДОПОМІЖНІ ФУНКЦІЇ ЗВ'ЯЗКУ З ПАНЕЛЛЮ РОЗРОБНИКА ---
-function getSystemPasswords() {
-    const defaultPasswords = {
-        moderator: "2121",
-        admin: "4343",
-        developer: "02031985"
-    };
-    try {
-        const saved = JSON.parse(localStorage.getItem('dev_system_passwords') || '{}');
-        return {
-            moderator: saved.moderator || defaultPasswords.moderator,
-            admin: saved.admin || defaultPasswords.admin,
-            developer: saved.developer || defaultPasswords.developer
-        };
-    } catch (e) {
-        return defaultPasswords;
-    }
-}
 
 function getRoleSecurityConfig() {
     const defaultCfg = {
@@ -55,7 +38,7 @@ function getRoleSecurityConfig() {
 
 function addSecurityLog(type, title, details) {
     try {
-        const logs = JSON.parse(localStorage.getItem('dev_security_logs') || '[]');
+        const logs = JSON.parse(localStorage.getItem('dev_security_logs_v2') || '[]');
         logs.unshift({
             id: Date.now() + Math.random(),
             time: new Date().toLocaleString('uk-UA'),
@@ -64,7 +47,7 @@ function addSecurityLog(type, title, details) {
             details: details || ''
         });
         if (logs.length > 150) logs.length = 150;
-        localStorage.setItem('dev_security_logs', JSON.stringify(logs));
+        localStorage.setItem('dev_security_logs_v2', JSON.stringify(logs));
     } catch (e) {}
 }
 
@@ -79,128 +62,7 @@ setInterval(() => {
 
 // --- ПЕРЕМИКАННЯ РОЛЕЙ ---
 function selectRole(role) {
-    if (typeof window.developerPanelSelectRole === 'function') {
-        window.developerPanelSelectRole(role);
-        return;
-    }
-    if (role === currentRole) return;
-
-    const secCfg = getRoleSecurityConfig();
-    const passwords = getSystemPasswords();
-
-    // Якщо Розробник вже авторизований у цій сесії — пускаємо у будь-який кабінет без пароля
-    if (isDeveloperLoggedIn) {
-        window.currentRole = role;
-        currentRole = role;
-        try {
-            localStorage.setItem('app_current_role', role);
-            localStorage.setItem('currentRole', role);
-        } catch(e) {}
-        addSecurityLog('info', `Швидкий перехід Розробника`, `Перехід у кабінет: ${getRoleDisplayName(role)}`);
-        updateRoleUI();
-        return;
-    }
-
-    // Перевірка, чи не заблокована роль Розробником
-    if (role === "user" && secCfg.lockUser) {
-        alert("⛔ Доступ до режиму «Юзер» тимчасово призупинено Розробником.");
-        return;
-    }
-    if (role === "moderator" && secCfg.lockModerator) {
-        alert("⛔ Доступ до кабінету «Модератор» тимчасово заблоковано Розробником!");
-        addSecurityLog('warning', 'Спроба входу в заблоковану роль', 'Кабінет Модератора заблокований');
-        return;
-    }
-    if (role === "admin" && secCfg.lockAdmin) {
-        alert("⛔ Доступ до кабінету «Адмін» тимчасово заблоковано Розробником!");
-        addSecurityLog('warning', 'Спроба входу в заблоковану роль', 'Кабінет Адміна заблокований');
-        return;
-    }
-
-    if (role === "user") {
-        window.currentRole = "user";
-        currentRole = "user";
-        try {
-            localStorage.setItem('app_current_role', 'user');
-            localStorage.setItem('currentRole', 'user');
-        } catch(e) {}
-        updateRoleUI();
-        return;
-    }
-
-    if (role === "moderator") {
-        showCustomPasswordModal("Введіть пароль Модератора:", (pwd) => {
-            if (pwd === null) return;
-            // Перевіряємо або загальний пароль Модератора, або індивідуальний пароль користувача з роллю moderator
-            if (pwd === passwords.moderator || checkCustomUserPassword('moderator', pwd)) {
-                window.currentRole = "moderator";
-                currentRole = "moderator";
-                try {
-                    localStorage.setItem('app_current_role', 'moderator');
-                    localStorage.setItem('currentRole', 'moderator');
-                } catch(e) {}
-                addSecurityLog('success', 'Успішний вхід: Модератор', 'Авторизація пройдена');
-                updateRoleUI();
-            } else {
-                addSecurityLog('danger', 'Невірний пароль Модератора', `Введено: "${pwd}"`);
-                alert("❌ Невірний пароль Модератора!");
-            }
-        });
-    } else if (role === "admin") {
-        showCustomPasswordModal("Введіть пароль Адміна:", (pwd) => {
-            if (pwd === null) return;
-            if (pwd === passwords.admin || checkCustomUserPassword('admin', pwd)) {
-                window.currentRole = "admin";
-                currentRole = "admin";
-                try {
-                    localStorage.setItem('app_current_role', 'admin');
-                    localStorage.setItem('currentRole', 'admin');
-                } catch(e) {}
-                addSecurityLog('success', 'Успішний вхід: Адмін', 'Авторизація пройдена');
-                updateRoleUI();
-            } else {
-                addSecurityLog('danger', 'Невірний пароль Адміна', `Введено: "${pwd}"`);
-                alert("❌ Невірний пароль Адміна!");
-            }
-        });
-    } else if (role === "developer") {
-        showCustomPasswordModal("Введіть пароль Розробника:", (pwd) => {
-            if (pwd === null) return;
-            if (pwd === passwords.developer) {
-                window.currentRole = "developer";
-                currentRole = "developer";
-                isDeveloperLoggedIn = true;
-                try {
-                    localStorage.setItem('app_current_role', 'developer');
-                    localStorage.setItem('currentRole', 'developer');
-                    localStorage.setItem('isDeveloperLoggedIn', 'true');
-                } catch(e) {}
-                addSecurityLog('success', 'Успішний вхід: Розробник (Супер-доступ)', 'Активовано вільний перехід між кабінетами');
-                updateRoleUI();
-            } else {
-                addSecurityLog('danger', 'Спроба злому кабінету Розробника!', `Введено невірний пароль: "${pwd}"`);
-                alert("❌ Невірний пароль Розробника!");
-            }
-        });
-    }
-}
-
-function checkCustomUserPassword(targetRole, inputPwd) {
-    if (!inputPwd) return false;
-    try {
-        const users = JSON.parse(localStorage.getItem('dev_managed_users') || '[]');
-        const matched = users.find(u => u.role === targetRole && u.pin && String(u.pin) === String(inputPwd));
-        if (matched) {
-            if (matched.status === 'banned') {
-                alert(`🚫 Ваш обліковий запис (${matched.name}) ЗАБЛОКОВАНО!\nПричина: ${matched.banReason || 'Порушення правил'}`);
-                addSecurityLog('danger', `Спроба входу забаненого користувача`, `Користувач: ${matched.name} (${targetRole})`);
-                return false;
-            }
-            addSecurityLog('success', `Персональний вхід: ${matched.name}`, `Роль: ${targetRole}, Підрозділ: ${matched.subdivision || '-'}`);
-            return true;
-        }
-    } catch (e) {}
-    return false;
+    window.developerPanelSelectRole?.(role);
 }
 
 function getRoleDisplayName(role) {

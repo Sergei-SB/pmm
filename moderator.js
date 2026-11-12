@@ -2,21 +2,7 @@
 // МОДУЛЬ МОДЕРАТОРА (moderator.js)
 // ==========================================
 
-const MODERATOR_PASSWORD = "2121";
 
-function checkModeratorPassword(callback) {
-    // Передаємо "•", щоб у модератора при введенні пароля були кружечки
-    showCustomPasswordModal((pass) => {
-        if (pass === MODERATOR_PASSWORD) {
-            callback(true);
-        } else if (pass !== null) {
-            alert("Неправильний пароль Модератора!");
-            callback(false);
-        } else {
-            callback(false);
-        }
-    }, "•");
-}
 
 // Блокування полів звіту для модератора, залишаючи активним лише фільтр "Підр." та перемикання періодів
 function applyModeratorReportLock() {

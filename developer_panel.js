@@ -20,37 +20,6 @@ window.togglePasswordVisibility = function(inputId, btnEl) {
     }
 };
 
-window.toggleTablePinVisibility = function(spanId, realPin, btnEl) {
-    const span = document.getElementById(spanId);
-    if (!span) return;
-    if (span.dataset.visible === '1') {
-        span.textContent = '••••••';
-        span.dataset.visible = '0';
-        if (btnEl) btnEl.innerHTML = '👁️';
-    } else {
-        span.textContent = realPin;
-        span.dataset.visible = '1';
-        if (btnEl) btnEl.innerHTML = '🙈';
-    }
-};
-
-function getSystemPasswords() {
-    const defaultPasswords = {
-        moderator: "2121",
-        admin: "4343",
-        developer: "02031985"
-    };
-    try {
-        const saved = JSON.parse(localStorage.getItem('dev_system_passwords') || '{}');
-        return {
-            moderator: saved.moderator || defaultPasswords.moderator,
-            admin: saved.admin || defaultPasswords.admin,
-            developer: saved.developer || defaultPasswords.developer
-        };
-    } catch (e) {
-        return defaultPasswords;
-    }
-}
 
 function getRoleSecurityConfig() {
     const defaultCfg = {
@@ -332,7 +301,7 @@ window.getModuleNameUkrainian = function(moduleKey) {
 
 function addSecurityLog(type, title, details) {
     try {
-        const logs = JSON.parse(localStorage.getItem('dev_security_logs') || '[]');
+        const logs = JSON.parse(localStorage.getItem('dev_security_logs_v2') || '[]');
         logs.unshift({
             id: Date.now() + Math.random(),
             time: new Date().toLocaleString('uk-UA'),
@@ -341,7 +310,7 @@ function addSecurityLog(type, title, details) {
             details: details || ''
         });
         if (logs.length > 150) logs.length = 150;
-        localStorage.setItem('dev_security_logs', JSON.stringify(logs));
+        localStorage.setItem('dev_security_logs_v2', JSON.stringify(logs));
     } catch (e) {}
 }
 
@@ -352,23 +321,6 @@ function getRoleDisplayName(role) {
     return 'Юзер';
 }
 
-function checkCustomUserPassword(targetRole, inputPwd) {
-    if (!inputPwd) return false;
-    try {
-        const users = getManagedUsers();
-        const matched = users.find(u => u.role === targetRole && u.pin && String(u.pin) === String(inputPwd));
-        if (matched) {
-            if (matched.status === 'banned') {
-                alert(`🚫 Ваш обліковий запис (${matched.name}) ЗАБЛОКОВАНО!\nПричина: ${matched.banReason || 'Порушення правил'}`);
-                addSecurityLog('danger', `Спроба входу забаненого користувача`, `Користувач: ${matched.name} (${targetRole})`);
-                return false;
-            }
-            addSecurityLog('success', `Персональний вхід: ${matched.name}`, `Роль: ${targetRole}, Підрозділ: ${matched.subdivision || '-'}`);
-            return true;
-        }
-    } catch (e) {}
-    return false;
-}
 
 window.selectRole = function(role) {
     if (typeof currentRole !== 'undefined' && role === currentRole && role !== 'developer') {
@@ -377,7 +329,7 @@ window.selectRole = function(role) {
     }
 
     const secCfg = getRoleSecurityConfig();
-    const passwords = getSystemPasswords();
+
 
     if (window.isDeveloperLoggedIn) {
         window.currentRole = role;
@@ -414,9 +366,11 @@ window.selectRole = function(role) {
     }
 
     if (role === "moderator") {
-        showCustomPasswordModal("Введіть пароль Модератора:", (pwd) => {
+        showCustomPasswordModal("Введіть пароль Модератора:", async (pwd) => {
             if (pwd === null) return;
-            if (pwd === passwords.moderator || checkCustomUserPassword('moderator', pwd)) {
+            const verified = await verifyRolePassword('moderator', pwd);
+            if (verified === null) return;
+            if (verified) {
                 window.currentRole = "moderator";
                 currentRole = "moderator";
                 try {
@@ -426,14 +380,16 @@ window.selectRole = function(role) {
                 addSecurityLog('success', 'Успішний вхід: Модератор', 'Авторизація пройдена');
                 updateRoleUI();
             } else {
-                addSecurityLog('danger', 'Невірний пароль Модератора', `Введено: "${pwd}"`);
+                addSecurityLog('danger', 'Пароль відхилено сервером');
                 alert("❌ Невірний пароль Модератора!");
             }
         });
     } else if (role === "admin") {
-        showCustomPasswordModal("Введіть пароль Адміна:", (pwd) => {
+        showCustomPasswordModal("Введіть пароль Адміна:", async (pwd) => {
             if (pwd === null) return;
-            if (pwd === passwords.admin || checkCustomUserPassword('admin', pwd)) {
+            const verified = await verifyRolePassword('admin', pwd);
+            if (verified === null) return;
+            if (verified) {
                 window.currentRole = "admin";
                 currentRole = "admin";
                 try {
@@ -443,14 +399,16 @@ window.selectRole = function(role) {
                 addSecurityLog('success', 'Успішний вхід: Адмін', 'Авторизація пройдена');
                 updateRoleUI();
             } else {
-                addSecurityLog('danger', 'Невірний пароль Адміна', `Введено: "${pwd}"`);
+                addSecurityLog('danger', 'Пароль відхилено сервером');
                 alert("❌ Невірний пароль Адміна!");
             }
         });
     } else if (role === "developer") {
-        showCustomPasswordModal("Введіть пароль Розробника:", (pwd) => {
+        showCustomPasswordModal("Введіть пароль Розробника:", async (pwd) => {
             if (pwd === null) return;
-            if (pwd === passwords.developer) {
+            const verified = await verifyRolePassword('developer', pwd);
+            if (verified === null) return;
+            if (verified) {
                 window.currentRole = "developer";
                 currentRole = "developer";
                 window.isDeveloperLoggedIn = true;
@@ -462,7 +420,7 @@ window.selectRole = function(role) {
                 addSecurityLog('success', 'Успішний вхід: Розробник (Супер-доступ)', 'Активовано вільний перехід між кабінетами');
                 updateRoleUI();
             } else {
-                addSecurityLog('danger', 'Спроба злому кабінету Розробника!', `Введено: "${pwd}"`);
+                addSecurityLog('danger', 'Пароль відхилено сервером');
                 alert("❌ Невірний пароль Розробника!");
             }
         });
@@ -1025,8 +983,9 @@ window.exportFullDatabaseBackup = async function() {
         const allStorage = {};
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
-            if (!key) continue;
-            const rawVal = localStorage.getItem(key);
+            if (!key || window.isLegacyPasswordStorageKey?.(key)) continue;
+            const raw = localStorage.getItem(key);
+            const rawVal = window.sanitizeRoleStorage?.(key, raw) ?? raw;
             try {
                 allStorage[key] = JSON.parse(rawVal);
             } catch (e) {
@@ -1129,12 +1088,12 @@ window.exportFullDatabaseBackup = async function() {
                     marginsMmTemplates: allStorage['doc_margins_mm_templates_v1'] || []
                 },
                 systemSettingsAndMail: {
-                    passwords: allStorage['dev_system_passwords'] || {},
+
                     roleSecurityConfig: allStorage['dev_role_security_config'] || {},
                     permissionsMatrix: allStorage['dev_page_permissions_matrix_v1'] || {},
                     granularPermissions: allStorage['dev_granular_permissions_v1'] || {},
                     managedUsers: allStorage['dev_managed_users'] || [],
-                    securityLogs: allStorage['dev_security_logs'] || [],
+                    securityLogs: allStorage['dev_security_logs_v2'] || [],
                     roleTimeStats: allStorage['dev_role_time_stats'] || {},
                     broadcastMail: allStorage['broadcastStorageList_v2'] || []
                 }
@@ -1251,6 +1210,7 @@ async function applyParsedJsonToStorage(parsed) {
     // Відновлення sessionStorage (якщо є)
     if (parsed.sessionStorageData && typeof parsed.sessionStorageData === 'object') {
         Object.keys(parsed.sessionStorageData).forEach(k => {
+            if (window.isLegacyPasswordStorageKey?.(k)) return;
             try {
                 const v = parsed.sessionStorageData[k];
                 if (v !== undefined && v !== null) {
@@ -1337,11 +1297,12 @@ async function applyParsedJsonToStorage(parsed) {
 
     if (storageMap && typeof storageMap === 'object' && !Array.isArray(storageMap)) {
         Object.keys(storageMap).forEach(key => {
+            if (window.isLegacyPasswordStorageKey?.(key)) return;
             const val = storageMap[key];
             if (val === undefined || val === null) return;
             const serialized = (typeof val === 'string') ? val : JSON.stringify(val);
             try {
-                localStorage.setItem(key, serialized);
+                localStorage.setItem(key, window.sanitizeRoleStorage?.(key, serialized) ?? serialized);
                 importedKeysCount++;
             } catch (err) {
                 if (key.startsWith('car_folder_') && val && Array.isArray(val.files) && Array.isArray(parsed.carIndexedDBFiles)) {
@@ -1399,12 +1360,12 @@ async function applyParsedJsonToStorage(parsed) {
     // 5. Якщо це прямий дамп ключів localStorage
     const metaSkipKeys = new Set(['app', 'version', 'exportDate', 'exportDateLocale', 'summary', 'fullSiteSnapshot', 'indexedDBFiles', 'sessionStorageData']);
     Object.keys(parsed).forEach(key => {
-        if (metaSkipKeys.has(key)) return;
+        if (metaSkipKeys.has(key) || window.isLegacyPasswordStorageKey?.(key)) return;
         const val = parsed[key];
         if (val === undefined || val === null) return;
         const serialized = (typeof val === 'string') ? val : JSON.stringify(val);
         try {
-            localStorage.setItem(key, serialized);
+            localStorage.setItem(key, window.sanitizeRoleStorage?.(key, serialized) ?? serialized);
             importedKeysCount++;
         } catch (e) {}
     });
@@ -1544,10 +1505,10 @@ function showDevNotification(msg, bgColor = '#27ae60') {
 
 function getManagedUsers() {
     const defaultUsers = [
-        { id: 1, name: "Головний Розробник", subdivision: "Штаб / ІТ", role: "developer", pin: "02031985", ip: "192.168.1.10", status: "active", banReason: "", lastSeen: "Онлайн" },
-        { id: 2, name: "Черговий Адмін ПММ", subdivision: "Служба ПММ", role: "admin", pin: "4343", ip: "192.168.1.25", status: "active", banReason: "", lastSeen: "Сьогодні" },
-        { id: 3, name: "Модератор Звітів", subdivision: "1БрОП", role: "moderator", pin: "2121", ip: "192.168.1.42", status: "active", banReason: "", lastSeen: "Сьогодні" },
-        { id: 4, name: "Оператор обліку (Юзер)", subdivision: "БТрО", role: "user", pin: "", ip: "192.168.1.88", status: "active", banReason: "", lastSeen: "Вчора" }
+        { id: 1, name: "Головний Розробник", subdivision: "Штаб / ІТ", role: "developer", ip: "192.168.1.10", status: "active", banReason: "", lastSeen: "Онлайн" },
+        { id: 2, name: "Черговий Адмін ПММ", subdivision: "Служба ПММ", role: "admin", ip: "192.168.1.25", status: "active", banReason: "", lastSeen: "Сьогодні" },
+        { id: 3, name: "Модератор Звітів", subdivision: "1БрОП", role: "moderator", ip: "192.168.1.42", status: "active", banReason: "", lastSeen: "Сьогодні" },
+        { id: 4, name: "Оператор обліку (Юзер)", subdivision: "БТрО", role: "user", ip: "192.168.1.88", status: "active", banReason: "", lastSeen: "Вчора" }
     ];
     try {
         const stored = localStorage.getItem('dev_managed_users');
@@ -1556,7 +1517,7 @@ function getManagedUsers() {
             return defaultUsers;
         }
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed.map(({pin, ...user}) => user);
         return defaultUsers;
     } catch (e) {
         return defaultUsers;
@@ -1781,21 +1742,6 @@ window.resetRoleTimeStats = function() {
     renderDeveloperPanel();
 };
 
-window.saveDevSystemPasswords = function() {
-    const modPwd = document.getElementById('dev-inp-pwd-mod')?.value.trim() || '2121';
-    const admPwd = document.getElementById('dev-inp-pwd-admin')?.value.trim() || '4343';
-    const devPwd = document.getElementById('dev-inp-pwd-dev')?.value.trim() || '02031985';
-
-    localStorage.setItem('dev_system_passwords', JSON.stringify({
-        moderator: modPwd,
-        admin: admPwd,
-        developer: devPwd
-    }));
-
-    addSecurityLog('warning', 'Змінено системні паролі ролей', `Модератор / Адмін / Розробник оновлено`);
-    showDevNotification('✅ Системні паролі успішно збережено!', '#27ae60');
-    renderDeveloperPanel();
-};
 
 window.toggleDevSecurityFlag = function(flagName, checked) {
     const cfg = getRoleSecurityConfig();
@@ -1809,7 +1755,6 @@ window.addNewManagedUser = function() {
     const name = document.getElementById('dev-new-user-name')?.value.trim();
     const sub = document.getElementById('dev-new-user-sub')?.value.trim();
     const role = document.getElementById('dev-new-user-role')?.value || 'user';
-    const pin = document.getElementById('dev-new-user-pin')?.value.trim() || '';
 
     if (!name) {
         showDevNotification('⚠️ Введіть ПІБ або позивний користувача!', '#e67e22');
@@ -1823,7 +1768,6 @@ window.addNewManagedUser = function() {
         name: name,
         subdivision: sub || 'РМТЗ',
         role: role,
-        pin: pin,
         ip: `192.168.1.${Math.floor(20 + Math.random() * 200)}`,
         status: 'active',
         banReason: '',
@@ -2038,7 +1982,7 @@ window.deleteManagedUser = function(userId) {
 };
 
 window.clearAllSecurityLogs = function() {
-    localStorage.setItem('dev_security_logs', '[]');
+    localStorage.setItem('dev_security_logs_v2', '[]');
     renderDeveloperPanel();
 };
 
@@ -2054,7 +1998,6 @@ window.renderDeveloperPanel = function() {
         const container = getDevPanelContainer();
         if (!container) return;
 
-        const passwords = getSystemPasswords();
         const secCfg = getRoleSecurityConfig();
         const permMatrix = getPagePermissionsMatrix();
         const granularPerms = getGranularPermissions();
@@ -2069,7 +2012,7 @@ window.renderDeveloperPanel = function() {
 
         let logs = [];
         try {
-            const rawLogs = localStorage.getItem('dev_security_logs');
+            const rawLogs = localStorage.getItem('dev_security_logs_v2');
             if (rawLogs && rawLogs !== 'undefined' && rawLogs !== 'null') {
                 const parsedLogs = JSON.parse(rawLogs);
                 if (Array.isArray(parsedLogs)) logs = parsedLogs;
@@ -2428,30 +2371,7 @@ window.renderDeveloperPanel = function() {
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
                 <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px;">
                     <h3 style="margin: 0 0 14px 0; color: #2c3e50; font-size: 16px;">🔑 Системні паролі кабінетів</h3>
-                    <div style="display: flex; flex-direction: column; gap: 12px;">
-                        <div>
-                            <label style="font-size: 12px; font-weight: bold; color: #34495e; display: block; margin-bottom: 4px;">Пароль Модератора:</label>
-                            <div style="display: flex; gap: 6px;">
-                                <input type="password" id="dev-inp-pwd-mod" value="${passwords.moderator}" style="flex: 1; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
-                                <button type="button" onclick="togglePasswordVisibility('dev-inp-pwd-mod', this)" style="padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; background: #f8fafc; cursor: pointer;">👁️</button>
-                            </div>
-                        </div>
-                        <div>
-                            <label style="font-size: 12px; font-weight: bold; color: #34495e; display: block; margin-bottom: 4px;">Пароль Адміна:</label>
-                            <div style="display: flex; gap: 6px;">
-                                <input type="password" id="dev-inp-pwd-admin" value="${passwords.admin}" style="flex: 1; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
-                                <button type="button" onclick="togglePasswordVisibility('dev-inp-pwd-admin', this)" style="padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; background: #f8fafc; cursor: pointer;">👁️</button>
-                            </div>
-                        </div>
-                        <div>
-                            <label style="font-size: 12px; font-weight: bold; color: #34495e; display: block; margin-bottom: 4px;">Пароль Розробника:</label>
-                            <div style="display: flex; gap: 6px;">
-                                <input type="password" id="dev-inp-pwd-dev" value="${passwords.developer}" style="flex: 1; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
-                                <button type="button" onclick="togglePasswordVisibility('dev-inp-pwd-dev', this)" style="padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; background: #f8fafc; cursor: pointer;">👁️</button>
-                            </div>
-                        </div>
-                        <button type="button" onclick="saveDevSystemPasswords()" style="background: #27ae60; color: #fff; border: none; padding: 10px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 6px;">💾 Зберегти паролі</button>
-                    </div>
+                    <p>Паролі ролей і персональні PIN налаштовуються на сервері Render.</p>
                 </div>
 
                 <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px;">
@@ -2525,7 +2445,6 @@ window.renderDeveloperPanel = function() {
                         <option value="moderator">Модератор</option>
                         <option value="admin">Адмін</option>
                     </select>
-                    <input type="text" id="dev-new-user-pin" placeholder="Персональний пароль..." style="width: 170px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
                     <button type="button" onclick="addNewManagedUser()" style="background: #27ae60; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer;">+ Додати</button>
                 </div>
 
@@ -2550,8 +2469,7 @@ window.renderDeveloperPanel = function() {
                                     <td style="padding: 8px 10px; border: 1px solid #cbd5e1; text-align: center;">${u.subdivision || '—'}</td>
                                     <td style="padding: 8px 10px; border: 1px solid #cbd5e1; text-align: center;">${getRoleDisplayName(u.role)}</td>
                                     <td style="padding: 8px 10px; border: 1px solid #cbd5e1; text-align: center;">
-                                        <span id="pin-span-${u.id}" data-visible="0">••••••</span>
-                                        <button type="button" onclick="toggleTablePinVisibility('pin-span-${u.id}', '${u.pin || '—'}', this)" style="margin-left: 6px; border: none; background: transparent; cursor: pointer;">👁️</button>
+                                        На сервері
                                     </td>
                                     <td style="padding: 8px 10px; border: 1px solid #cbd5e1; text-align: center;">
                                         <span style="padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; background: ${u.status === 'banned' ? '#fee2e2' : '#dcfce7'}; color: ${u.status === 'banned' ? '#b91c1c' : '#15803d'};">

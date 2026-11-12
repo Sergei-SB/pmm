@@ -1,1 +1,4 @@
 /data/backups/
+/.env
+/.env.local
+/Doc/full_site_backup_*.json

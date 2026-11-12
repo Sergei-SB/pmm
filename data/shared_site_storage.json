@@ -91,16 +91,8 @@
       "deviceId": "legacy-file",
       "deleted": false
     },
-    "dev_security_logs": {
-      "value": "[{\"id\":1791901065220.9375,\"time\":\"13.10.2026, 17:17:45\",\"type\":\"success\",\"title\":\"Успішний вхід: Розробник (Супер-доступ)\",\"details\":\"Активовано вільний перехід між кабінетами\"}]",
-      "rev": 663,
-      "updatedAt": 1791907083947,
-      "updatedByRole": "user",
-      "deviceId": "legacy-file",
-      "deleted": false
-    },
     "dev_managed_users": {
-      "value": "[{\"id\":1,\"name\":\"Головний Розробник\",\"subdivision\":\"Штаб / ІТ\",\"role\":\"developer\",\"pin\":\"02031985\",\"ip\":\"192.168.1.10\",\"status\":\"active\",\"banReason\":\"\",\"lastSeen\":\"Онлайн\"},{\"id\":2,\"name\":\"Черговий Адмін ПММ\",\"subdivision\":\"Служба ПММ\",\"role\":\"admin\",\"pin\":\"4343\",\"ip\":\"192.168.1.25\",\"status\":\"active\",\"banReason\":\"\",\"lastSeen\":\"Сьогодні\"},{\"id\":3,\"name\":\"Модератор Звітів\",\"subdivision\":\"1БрОП\",\"role\":\"moderator\",\"pin\":\"2121\",\"ip\":\"192.168.1.42\",\"status\":\"active\",\"banReason\":\"\",\"lastSeen\":\"Сьогодні\"},{\"id\":4,\"name\":\"Оператор обліку (Юзер)\",\"subdivision\":\"БТрО\",\"role\":\"user\",\"pin\":\"\",\"ip\":\"192.168.1.88\",\"status\":\"active\",\"banReason\":\"\",\"lastSeen\":\"Вчора\"}]",
+      "value": "[{\"id\":1,\"name\":\"Головний Розробник\",\"subdivision\":\"Штаб / ІТ\",\"role\":\"developer\",\"ip\":\"192.168.1.10\",\"status\":\"active\",\"banReason\":\"\",\"lastSeen\":\"Онлайн\"},{\"id\":2,\"name\":\"Черговий Адмін ПММ\",\"subdivision\":\"Служба ПММ\",\"role\":\"admin\",\"ip\":\"192.168.1.25\",\"status\":\"active\",\"banReason\":\"\",\"lastSeen\":\"Сьогодні\"},{\"id\":3,\"name\":\"Модератор Звітів\",\"subdivision\":\"1БрОП\",\"role\":\"moderator\",\"ip\":\"192.168.1.42\",\"status\":\"active\",\"banReason\":\"\",\"lastSeen\":\"Сьогодні\"},{\"id\":4,\"name\":\"Оператор обліку (Юзер)\",\"subdivision\":\"БТрО\",\"role\":\"user\",\"ip\":\"192.168.1.88\",\"status\":\"active\",\"banReason\":\"\",\"lastSeen\":\"Вчора\"}]",
       "rev": 664,
       "updatedAt": 1791907083947,
       "updatedByRole": "user",

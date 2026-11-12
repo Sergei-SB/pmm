@@ -49,7 +49,7 @@
     var LOCAL_ONLY_KEYS = [
         'currentrole', 'app_current_role', 'userrole', 'role', 'isdeveloperloggedin',
         'last_active_car_id', 'last_active_car_period', 'last_active_report_period',
-        'dev_role_time_stats'
+        'dev_role_time_stats', 'dev_system_passwords', 'dev_security_logs'
     ];
     var LOCAL_ONLY_PREFIXES = ['lastreadbroadcastid_', '__sync_'];
     var VERSION_MARKER_SUFFIX = '_data_version';
@@ -114,6 +114,13 @@
     if (typeof meta.lastRev !== 'number') meta.lastRev = 0;
 
     var pending = readJSON(PENDING_KEY, null) || {};
+    var removedLegacyCredentials = false;
+    ['dev_system_passwords', 'dev_security_logs'].forEach(function (key) {
+        if (!Object.hasOwn(pending, key)) return;
+        delete pending[key];
+        removedLegacyCredentials = true;
+    });
+    if (removedLegacyCredentials) writeJSON(PENDING_KEY, pending);
     if (!meta.carBases) meta.carBases = {};
 
     function isCarKey(key) {
