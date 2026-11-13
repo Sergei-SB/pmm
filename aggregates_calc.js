@@ -561,36 +561,35 @@ function toggleAggDropdown(event) {
 }
 
 function renderAggDropdownItems(items) {
-    const listContainer = document.getElementById('agg-items-list');
-    if (!listContainer) return;
-
-    let html = `<div onclick="selectCustomAggOption()" style="padding: 9px 12px; cursor: pointer; border-bottom: 1px solid #e0e0e0; color: #2e7d32; font-weight: bold; background: #f4f6f7;" onmouseover="this.style.background='#eaf2f8'" onmouseout="this.style.background='#f4f6f7'">➕ Свій агрегат</div>`;
-
-    items.forEach((eq, idx) => {
-        const title = `${eq.category}: ${eq.model || 'Без назви'} (${eq.locationSubdivision || eq.subdivision || 'РМТЗ'})`;
-        html += `<div onclick="selectAggItem(${idx}, '${title.replace(/'/g, "\\'")}')" style="padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #f2f2f2; font-size: 12px;" onmouseover="this.style.background='#eaf2f8'" onmouseout="this.style.background='#fff'">${title}</div>`;
-    });
-
-    listContainer.innerHTML = html;
+    filterAggDropdown('', items);
 }
 
-function filterAggDropdown(query) {
+function filterAggDropdown(query, all = window._allCalculatedEquipment || []) {
     const q = (query || '').toLowerCase().trim();
-    const all = window._allCalculatedEquipment || [];
     
     let html = `<div onclick="selectCustomAggOption()" style="padding: 9px 12px; cursor: pointer; border-bottom: 1px solid #e0e0e0; color: #2e7d32; font-weight: bold; background: #f4f6f7;" onmouseover="this.style.background='#eaf2f8'" onmouseout="this.style.background='#f4f6f7'">➕ Свій агрегат</div>`;
 
-    const filtered = all.filter(eq => {
-        const title = `${eq.category}: ${eq.model || ''} (${eq.locationSubdivision || eq.subdivision || 'РМТЗ'})`.toLowerCase();
-        return title.includes(q);
+    const groups = new Map();
+    all.forEach((eq, index) => {
+        const title = `${eq.category}: ${eq.model?.trim() || 'Без назви'} (${(eq.locationSubdivision || eq.subdivision || 'РМТЗ').trim()})`;
+        const label = title.toLowerCase().replace(/\s+/g, ' ');
+        if (!label.includes(q)) return;
+        const fuel = aggregateInventoryNumber(eq.consumption);
+        const oil = aggregateInventoryNumber(eq.oilNorm10Days);
+        const rateKey = JSON.stringify([fuel, oil]);
+        if (!groups.has(label)) groups.set(label, new Map());
+        const rates = groups.get(label);
+        if (!rates.has(rateKey) || index === window._selectedAggIndex) rates.set(rateKey, {title, index, fuel, oil});
     });
+    const filtered = [...groups.values()].flatMap(rates => [...rates.values()].map(option => ({
+        index: option.index,
+        title: rates.size === 1 ? option.title : `${option.title} · ${option.fuel ?? '—'} л/год · мастило ${option.oil ?? '—'} л`
+    })));
 
     if (filtered.length === 0 && q) {
         html += `<div onclick="selectCustomAggText('${query.replace(/'/g, "\\'")}')" style="padding: 10px 12px; cursor: pointer; color: #2980b9; font-weight: bold; font-size: 12px;" onmouseover="this.style.background='#eaf2f8'" onmouseout="this.style.background='#fff'">➕ Використати власне: "${query}"</div>`;
     } else {
-        filtered.forEach((eq) => {
-            const originalIdx = all.indexOf(eq);
-            const title = `${eq.category}: ${eq.model || 'Без назви'} (${eq.locationSubdivision || eq.subdivision || 'РМТЗ'})`;
+        filtered.forEach(({index: originalIdx, title}) => {
             html += `<div onclick="selectAggItem(${originalIdx}, '${title.replace(/'/g, "\\'")}')" style="padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #f2f2f2; font-size: 12px;" onmouseover="this.style.background='#eaf2f8'" onmouseout="this.style.background='#fff'">${title}</div>`;
         });
     }
