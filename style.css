@@ -571,7 +571,7 @@ th {
 }
 
 .doc-green-btn:active,
-body:has(#pdf-links-dialog[open]) #doc-pdf-btn,
+
 body:has(#all-fragment-templates-modal) #doc-template-bank-btn,
 #documents-main-section:has(#a4-paper-sheet):has(#doc-editor-workspace:not([style*="display: none"])) #btn-new-doc-a4 {
     background: #14532d;
@@ -583,9 +583,9 @@ body:has(#all-fragment-templates-modal) #doc-template-bank-btn,
     font-size: 12px;
 }
 
-#pdf-links-dialog {
-    width: min(680px, calc(100vw - 24px));
-    max-height: 90vh;
+#pdf-links-page {
+    max-width: 920px;
+    margin: 0 auto;
     box-sizing: border-box;
     color: #173526;
     background: #fff;
@@ -595,11 +595,7 @@ body:has(#all-fragment-templates-modal) #doc-template-bank-btn,
     box-shadow: 0 16px 48px #10291c38;
 }
 
-#pdf-links-dialog::backdrop {
-    background: #10291c59;
-}
-
-#pdf-links-dialog > header {
+#pdf-links-page > header {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -637,13 +633,13 @@ body:has(#all-fragment-templates-modal) #doc-template-bank-btn,
     border-radius: 6px;
 }
 
-#pdf-links-dialog > ul {
+#pdf-links-page > ul {
     margin: 12px 0 0;
     padding: 0;
     list-style: none;
 }
 
-#pdf-links-dialog li {
+#pdf-links-page li {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
@@ -652,7 +648,7 @@ body:has(#all-fragment-templates-modal) #doc-template-bank-btn,
     border-bottom: 1px solid #d6e7dc;
 }
 
-#pdf-links-dialog li a {
+#pdf-links-page li a {
     flex: 1 1 180px;
     min-width: 0;
     color: #166534;

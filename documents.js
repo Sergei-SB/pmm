@@ -2462,7 +2462,7 @@ function renderDocumentsMainView() {
                     <button type="button" id="btn-new-doc-a4" class="doc-green-btn" onclick="createNewBlankDocument()">
                         📝 Створити новий документ А4
                     </button>
-                    <button type="button" id="doc-pdf-btn" class="doc-green-btn" aria-haspopup="dialog" onclick="event.preventDefault(); event.stopPropagation(); window.openPdfLinks()">📄 PDF</button>
+                    <button type="button" class="doc-green-btn" onclick="window.openPdfLinks()">📄 PDF</button>
                 </div>
             </div>
 

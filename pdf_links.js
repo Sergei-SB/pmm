@@ -1,5 +1,6 @@
 (() => {
     const prefix = 'pmm_pdf_link_';
+    let refresh;
 
     function allowed(edit = false) {
         const role = getCurrentUserRoleForDocs();
@@ -16,14 +17,14 @@
     }
 
     window.openPdfLinks = function () {
-        if (!allowed() || document.getElementById('pdf-links-dialog')) return;
-        const dialog = document.createElement('dialog');
-        dialog.id = 'pdf-links-dialog';
-        dialog.setAttribute('aria-labelledby', 'pdf-links-title');
-        dialog.innerHTML = `
+        if (!allowed()) return;
+        const page = document.getElementById('pdf-links-view');
+        if (!page) return;
+        clearInterval(refresh);
+        page.innerHTML = `<div id="pdf-links-page">
             <header>
-                <h2 id="pdf-links-title">Додати або відкрити PDF</h2>
-                <form method="dialog"><button class="doc-green-btn doc-green-btn-small" type="submit">Закрити</button></form>
+                <h2 id="pdf-links-title" tabindex="-1">Документи PDF</h2>
+                <button class="doc-green-btn doc-green-btn-small" type="button" onclick="switchView('documents')">← До документів</button>
             </header>
             <form id="pdf-links-form">
                 <label>Посилання на PDF
@@ -35,16 +36,16 @@
                 <button type="submit" class="doc-green-btn">Додати PDF</button>
             </form>
             <p role="status"></p>
-            <ul></ul>
+            <ul></ul></div>
         `;
-        const form = dialog.querySelector('#pdf-links-form');
-        const status = dialog.querySelector('[role="status"]');
-        const list = dialog.querySelector('ul');
+        const form = page.querySelector('#pdf-links-form');
+        const status = page.querySelector('[role="status"]');
+        const list = page.querySelector('ul');
         form.hidden = !allowed(true);
 
         function render() {
             if (!allowed()) {
-                dialog.close();
+                switchView('base');
                 return;
             }
             form.hidden = !allowed(true);
@@ -127,14 +128,15 @@
                 status.textContent = 'Не вдалося зберегти посилання.';
             }
         });
-        document.body.append(dialog);
-        dialog.addEventListener('close', () => {
-            clearInterval(refresh);
-            dialog.remove();
-        }, {once: true});
-        dialog.showModal();
-        let snapshot;
-        const refresh = setInterval(() => {
+        switchView('pdf-links');
+        page.querySelector('h2').focus();
+        let snapshot = state();
+        refresh = setInterval(() => {
+            if (!page.classList.contains('active')) {
+                clearInterval(refresh);
+                page.replaceChildren();
+                return;
+            }
             const current = state();
             if (current !== snapshot) {
                 snapshot = current;
@@ -149,7 +151,6 @@
                 return null;
             }
         }
-        snapshot = state();
         render();
     };
 })();
