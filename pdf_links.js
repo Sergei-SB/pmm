@@ -4,7 +4,6 @@
     function allowed(edit = false) {
         const role = getCurrentUserRoleForDocs();
         return window.canRoleAccess?.(role, 'documents') &&
-            window.canRoleView?.(role, 'documents') &&
             (!edit || window.canRoleEdit?.(role, 'documents'));
     }
 
@@ -23,7 +22,7 @@
         dialog.setAttribute('aria-labelledby', 'pdf-links-title');
         dialog.innerHTML = `
             <header>
-                <h2 id="pdf-links-title">Посилання на PDF</h2>
+                <h2 id="pdf-links-title">Додати або відкрити PDF</h2>
                 <form method="dialog"><button class="doc-green-btn doc-green-btn-small" type="submit">Закрити</button></form>
             </header>
             <form id="pdf-links-form">
@@ -64,7 +63,7 @@
                     link.href = url;
                     link.target = '_blank';
                     link.rel = 'noopener noreferrer';
-                    link.textContent = record.description;
+                    link.textContent = 'Відкрити PDF — ' + record.description;
                     link.addEventListener('click', event => {
                         if (!allowed()) event.preventDefault();
                     });
