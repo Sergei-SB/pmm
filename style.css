@@ -571,7 +571,7 @@ th {
 }
 
 .doc-green-btn:active,
-
+#pdf-add-btn[aria-expanded="true"],
 body:has(#all-fragment-templates-modal) #doc-template-bank-btn,
 #documents-main-section:has(#a4-paper-sheet):has(#doc-editor-workspace:not([style*="display: none"])) #btn-new-doc-a4 {
     background: #14532d;
@@ -584,31 +584,37 @@ body:has(#all-fragment-templates-modal) #doc-template-bank-btn,
 }
 
 #pdf-links-page {
-    max-width: 920px;
+    max-width: 1450px;
     margin: 0 auto;
     box-sizing: border-box;
     color: #173526;
     background: #fff;
-    border: 1px solid #bbd5c4;
-    border-radius: 14px;
-    padding: 0 18px 18px;
-    box-shadow: 0 16px 48px #10291c38;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 10px;
+    box-shadow: 0 4px 20px #00000014;
 }
 
 #pdf-links-page > header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin: 0 -18px 14px;
-    padding: 14px 18px;
-    background: #ecf7ef;
-    border-bottom: 1px solid #d6e7dc;
+    margin-bottom: 20px;
+    padding-bottom: 14px;
+    border-bottom: 2px solid #e2e8f0;
 }
 
 #pdf-links-title {
-    margin: 0;
-    font-size: 20px;
+    margin: 0 0 10px;
+    color: #0f172a;
+    font-size: 22px;
+}
+
+.pdf-links-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+#pdf-add-btn[hidden] {
+    display: none;
 }
 
 #pdf-links-form {
@@ -633,26 +639,50 @@ body:has(#all-fragment-templates-modal) #doc-template-bank-btn,
     border-radius: 6px;
 }
 
-#pdf-links-page > ul {
-    margin: 12px 0 0;
-    padding: 0;
-    list-style: none;
+.pdf-links-table {
+    overflow-x: auto;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
 }
 
-#pdf-links-page li {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 6px;
-    padding: 8px 0;
-    border-bottom: 1px solid #d6e7dc;
+.pdf-links-table table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
 }
 
-#pdf-links-page li a {
-    flex: 1 1 180px;
-    min-width: 0;
+.pdf-links-table th {
+    padding: 12px;
+    background: #2e7d32;
+    color: #fff;
+}
+
+.pdf-links-table td {
+    padding: 10px 14px;
+    text-align: center;
+}
+
+.pdf-links-table tbody tr:nth-child(odd) {
+    background: #f5f7fa;
+}
+
+.pdf-links-table td:nth-child(2) {
+    text-align: left;
+    width: 50%;
+}
+
+.pdf-links-table td a {
     color: #166534;
     overflow-wrap: anywhere;
+}
+
+.pdf-links-table td .doc-green-btn {
+    margin: 2px;
+}
+
+.pdf-links-table .pdf-links-empty {
+    padding: 28px 14px;
+    color: #526680;
 }
 
 .delete-row-btn {

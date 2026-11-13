@@ -23,32 +23,48 @@
         clearInterval(refresh);
         page.innerHTML = `<div id="pdf-links-page">
             <header>
-                <h2 id="pdf-links-title" tabindex="-1">Документи PDF</h2>
-                <button class="doc-green-btn doc-green-btn-small" type="button" onclick="switchView('documents')">← До документів</button>
+                <h2 id="pdf-links-title" tabindex="-1">📄 Документи PDF</h2>
+                <div class="pdf-links-actions">
+                    <button class="doc-green-btn" id="pdf-add-btn" type="button" aria-expanded="false" aria-controls="pdf-links-form">＋ Додати PDF</button>
+                    <button class="doc-green-btn" type="button" onclick="switchView('documents')">← До документів</button>
+                </div>
             </header>
-            <form id="pdf-links-form">
+            <form id="pdf-links-form" hidden>
                 <label>Посилання на PDF
                     <input name="url" type="url" required maxlength="2048" placeholder="https://…">
                 </label>
                 <label>Опис
                     <input name="description" required maxlength="300">
                 </label>
-                <button type="submit" class="doc-green-btn">Додати PDF</button>
+                <button type="submit" class="doc-green-btn">Зберегти</button>
             </form>
             <p role="status"></p>
-            <ul></ul></div>
+            <div class="pdf-links-table"><table>
+                <thead><tr><th scope="col">№</th><th scope="col">Назва документа / опис</th><th scope="col">Формат / Тип</th><th scope="col">Дії</th></tr></thead>
+                <tbody></tbody>
+            </table></div></div>
         `;
         const form = page.querySelector('#pdf-links-form');
         const status = page.querySelector('[role="status"]');
-        const list = page.querySelector('ul');
-        form.hidden = !allowed(true);
+        const list = page.querySelector('tbody');
+        const add = page.querySelector('#pdf-add-btn');
+        add.addEventListener('click', () => {
+            if (!allowed(true)) return;
+            form.hidden = !form.hidden;
+            add.setAttribute('aria-expanded', String(!form.hidden));
+            if (!form.hidden) form.elements.url.focus();
+        });
 
         function render() {
             if (!allowed()) {
                 switchView('base');
                 return;
             }
-            form.hidden = !allowed(true);
+            add.hidden = !allowed(true);
+            if (add.hidden) {
+                form.hidden = true;
+                add.setAttribute('aria-expanded', 'false');
+            }
             list.replaceChildren();
             try {
                 for (const key of Object.keys(localStorage).filter(key => key.startsWith(prefix))) {
@@ -59,12 +75,17 @@
                     } catch (_) { continue; }
                     if (typeof record.description !== 'string') continue;
 
-                    const item = document.createElement('li');
+                    const item = list.insertRow();
+                    item.insertCell().textContent = String(list.rows.length);
+                    const title = item.insertCell();
+                    item.insertCell().textContent = 'PDF';
+                    const actions = item.insertCell();
                     const link = document.createElement('a');
                     link.href = url;
                     link.target = '_blank';
                     link.rel = 'noopener noreferrer';
-                    link.textContent = 'Відкрити PDF — ' + record.description;
+                    link.textContent = record.description;
+                    title.append(link);
                     link.addEventListener('click', event => {
                         if (!allowed()) event.preventDefault();
                     });
@@ -81,7 +102,7 @@
                             status.textContent = 'Не вдалося скопіювати. Скористайтеся меню посилання.';
                         }
                     });
-                    item.append(link, ' ', copy);
+                    actions.append(copy);
                     if (allowed(true)) {
                         const remove = document.createElement('button');
                         remove.type = 'button';
@@ -97,11 +118,15 @@
                                 status.textContent = 'Не вдалося видалити посилання.';
                             }
                         });
-                        item.append(' ', remove);
+                        actions.append(remove);
                     }
-                    list.append(item);
                 }
-                if (!list.childElementCount) list.textContent = 'Збережених посилань ще немає.';
+                if (!list.rows.length) {
+                    const empty = list.insertRow().insertCell();
+                    empty.colSpan = 4;
+                    empty.className = 'pdf-links-empty';
+                    empty.textContent = 'Збережених PDF ще немає.';
+                }
             } catch (_) {
                 status.textContent = 'Не вдалося прочитати збережені посилання.';
             }
