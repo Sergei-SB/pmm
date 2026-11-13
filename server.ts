@@ -183,6 +183,7 @@ const LOCAL_ONLY_KEYS = [
   'dev_role_time_stats',
   'dev_system_passwords',
   'dev_security_logs',
+  'aggregates_calc_saved_state',
 ];
 const LOCAL_ONLY_PREFIXES = ['lastreadbroadcastid_', '__sync_'];
 const VERSION_MARKER_SUFFIX = '_data_version';
@@ -279,7 +280,7 @@ function normalizeStore(parsed: JsonObject): Store {
 
   const rawKeys = asObject(parsed.keys);
   for (const key of Object.keys(rawKeys)) {
-    if (['dev_system_passwords', 'dev_security_logs'].includes(key.toLowerCase())) continue;
+    if (['dev_system_passwords', 'dev_security_logs', 'aggregates_calc_saved_state'].includes(key.toLowerCase())) continue;
     const rec = asObject(rawKeys[key]);
     const value = rec.value;
     if (typeof value !== 'string') continue;
