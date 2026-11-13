@@ -199,26 +199,10 @@
                     copy.textContent = url ? 'Копіювати посилання' : 'Копіювати';
                     copy.addEventListener('click', async () => {
                         if (!allowed()) return;
-                        if (!url) {
-                            if (!window.ClipboardItem?.supports?.('application/pdf')) {
-                                status.textContent = 'Цей браузер не підтримує копіювання PDF-файлів.';
-                                return;
-                            }
-                            const pdf = (async () => {
-                                const binary = await getDocBinaryFromIDB(key);
-                                if (!binary?.fileDataUrl || !allowed()) throw new Error('PDF unavailable');
-                                return (await fetch(binary.fileDataUrl)).blob();
-                            })();
-                            try {
-                                await navigator.clipboard.write([new ClipboardItem({'application/pdf': pdf})]);
-                                status.textContent = 'PDF скопійовано. Вставте його в месенджері.';
-                            } catch (_) {
-                                status.textContent = 'Браузер не зміг скопіювати PDF. Для копіювання адреси додайте PDF за вебпосиланням.';
-                            }
-                            return;
-                        }
+                        const fileName = String(record.fileName || '').split(/[\\/]/).pop();
+                        const address = url || 'F:\\ПОЛК\\PDF\\' + fileName;
                         try {
-                            await navigator.clipboard.writeText(url);
+                            await navigator.clipboard.writeText(address);
                             status.textContent = 'Посилання скопійовано.';
                         } catch (_) {
                             status.textContent = 'Не вдалося скопіювати. Скористайтеся меню посилання.';
