@@ -38,7 +38,8 @@
             document.querySelector('main').before(notice);
             let opening = false;
             let attempts = 0;
-            async function openRequestedPdf() {
+            let refreshed = false;
+            async function openRequestedPdf(force = false) {
                 if (opening) return;
                 if (!allowed()) {
                     message.textContent = 'Щоб відкрити PDF за посиланням, увійдіть під роллю з доступом до «Документів та шаблонів».';
@@ -49,13 +50,19 @@
                     ? 'Шукаємо PDF у спільній базі…'
                     : 'PDF поки недоступний. Перевірте, чи файл синхронізовано на комп’ютері, з якого його додали.';
                 try {
-                    const record = JSON.parse(localStorage.getItem(requestedPdf));
-                    if (!record?.fileName || typeof record.fileName !== 'string') return;
-                    const binary = await getDocBinaryFromIDB(requestedPdf);
+                    let binary = await getDocBinaryFromIDB(requestedPdf);
+                    if (!binary?.fileDataUrl && (!refreshed || force) && allowed() &&
+                        typeof window.refreshPmmSharedDocuments === 'function') {
+                        refreshed = true;
+                        await window.refreshPmmSharedDocuments();
+                        binary = await getDocBinaryFromIDB(requestedPdf);
+                    }
                     if (!binary?.fileDataUrl || !allowed()) return;
+                    const record = JSON.parse(localStorage.getItem(requestedPdf));
+                    const name = record?.fileName || binary.originalFileName || 'Документ.pdf';
                     window.openPdfLinks();
                     await openUniversalFilePreviewModal({
-                        name: record.fileName, ext: 'pdf', dataUrl: binary.fileDataUrl,
+                        name, ext: 'pdf', dataUrl: binary.fileDataUrl,
                         shareUrl: shareAddress(requestedPdf)
                     });
                     clearInterval(timer);
@@ -66,7 +73,7 @@
                     opening = false;
                 }
             }
-            retry.addEventListener('click', openRequestedPdf);
+            retry.addEventListener('click', () => openRequestedPdf(true));
             const timer = setInterval(openRequestedPdf, 2000);
             openRequestedPdf();
         });

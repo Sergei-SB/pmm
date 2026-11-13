@@ -1116,6 +1116,10 @@
         }).finally(function () { docPushPromise = null; });
         return docPushPromise;
     }
+    window.refreshPmmSharedDocuments = function () {
+        return pullDocsIfNewer(0, true);
+    };
+
     function pullDocsIfNewer(serverVersion, force) {
         if (typeof window.restoreAllDocsToIndexedDB !== 'function' || filesInFlight || docPushPromise) return Promise.resolve();
         var initialInfo = readJSON(IDB_META_KEY, {}) || {};
