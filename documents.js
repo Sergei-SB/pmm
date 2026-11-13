@@ -2463,6 +2463,7 @@ function renderDocumentsMainView() {
                     <button id="btn-new-doc-a4" onclick="createNewBlankDocument()" style="background:#16a34a; color:#fff; border:none; padding:10px 18px; border-radius:8px; cursor:pointer; font-weight:700; font-size:14px; display:inline-flex; align-items:center; gap:8px; box-shadow:0 2px 8px rgba(22,163,74,0.25);">
                         📝 Створити новий документ А4
                     </button>
+                    <button type="button" class="action-btn" style="padding:10px 18px;background:#b91c1c" onclick="openPdfLinks()">PDF</button>
                 </div>
             </div>
 
