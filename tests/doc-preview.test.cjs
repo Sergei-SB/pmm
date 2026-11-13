@@ -98,6 +98,16 @@ test('DOC preview escapes literal HTML and retains paragraphs', async () => {
     assert.ok(html.includes('BMW &lt;test&gt;<br>Акт технічного стану'));
     assert.ok(html.includes('white-space:pre-wrap'));
 });
+test('RTF preview accepts a versioned header and renders escaped Unicode text', async () => {
+    const rtf = String.raw`{\rtf1\ansi{\fonttbl{\f0 Hidden;}}<RTF>\par \u1040?\u1082?\u1090?}`;
+    await context.openUniversalFilePreviewModal({
+        name: 'test.rtf',
+        dataUrl: 'data:application/rtf;base64,' + Buffer.from(rtf, 'utf8').toString('base64')
+    });
+    const html = modals.at(-1).innerHTML;
+    assert.ok(html.includes('&lt;RTF&gt;<br>Акт'));
+    assert.ok(!html.includes('Hidden;'));
+});
 test('DOCX rich preview keeps its existing conversion path', async () => {
     context.mammoth = { async convertToHtml() { return { value: '<p>DOCX текст</p>' }; } };
     await context.openUniversalFilePreviewModal({ name: 'test.docx', dataUrl: 'data:application/octet-stream;base64,UEs=' });

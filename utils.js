@@ -642,7 +642,7 @@ window.openUniversalFilePreviewModal = async function(fileInfo) {
             if (dataUrl) {
                 try { source = atob(dataUrl.split(',')[1]); } catch (_) {}
             }
-            extractedPlain = /^\s*\{\\rtf\b/.test(source) ? extractRtfPreviewText(source) : '';
+            extractedPlain = /^\s*\{\\rtf\d+(?![a-z0-9])/i.test(source) ? extractRtfPreviewText(source) : '';
         }
 
         // Якщо маємо dataUrl, пробуємо витягнути максимальний HTML
