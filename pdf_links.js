@@ -196,9 +196,38 @@
                     const copy = document.createElement('button');
                     copy.type = 'button';
                     copy.className = 'doc-green-btn doc-green-btn-small';
-                    copy.textContent = 'Копіювати посилання';
+                    copy.textContent = url ? 'Копіювати посилання' : 'Копіювати';
                     copy.addEventListener('click', async () => {
                         if (!allowed()) return;
+                        if (!url) {
+                            const pdf = (async () => {
+                                const binary = await getDocBinaryFromIDB(key);
+                                if (!binary?.fileDataUrl || !allowed()) throw new Error('PDF unavailable');
+                                return (await fetch(binary.fileDataUrl)).blob();
+                            })();
+                            try {
+                                if (!window.ClipboardItem?.supports?.('application/pdf')) {
+                                    throw new Error('PDF clipboard unavailable');
+                                }
+                                await navigator.clipboard.write([new ClipboardItem({'application/pdf': pdf})]);
+                                status.textContent = 'PDF скопійовано. Вставте його в месенджері.';
+                            } catch (_) {
+                                try {
+                                    const blob = await pdf;
+                                    if (!allowed()) return;
+                                    const download = document.createElement('a');
+                                    const objectUrl = URL.createObjectURL(blob);
+                                    download.href = objectUrl;
+                                    download.download = record.fileName;
+                                    download.click();
+                                    setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+                                    status.textContent = 'PDF завантажено. Прикріпіть його в месенджері.';
+                                } catch (_) {
+                                    status.textContent = 'PDF ще недоступний. Спробуйте після синхронізації.';
+                                }
+                            }
+                            return;
+                        }
                         try {
                             await navigator.clipboard.writeText(url);
                             status.textContent = 'Посилання скопійовано.';
@@ -206,7 +235,7 @@
                             status.textContent = 'Не вдалося скопіювати. Скористайтеся меню посилання.';
                         }
                     });
-                    if (url) actions.append(copy);
+                    actions.append(copy);
                     if (allowed(true)) {
                         const remove = document.createElement('button');
                         remove.type = 'button';
