@@ -983,7 +983,7 @@ window.exportFullDatabaseBackup = async function() {
         const allStorage = {};
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
-            if (!key || window.isLegacyPasswordStorageKey?.(key)) continue;
+            if (!key || key === '__sync_local_developer_notes' || window.isLegacyPasswordStorageKey?.(key)) continue;
             const raw = localStorage.getItem(key);
             const rawVal = window.sanitizeRoleStorage?.(key, raw) ?? raw;
             try {
@@ -2513,6 +2513,8 @@ window.renderDeveloperPanel = function() {
                 </div>
             </div>
         `;
+    } else if (currentDevSubTab === 'notes') {
+        subTabContentHtml = '<div id="dev-notes-content"></div>';
     } else if (currentDevSubTab === 'transfer') {
         subTabContentHtml = `
             <section style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:20px;">
@@ -2570,10 +2572,14 @@ window.renderDeveloperPanel = function() {
             <button type="button" data-active="${currentDevSubTab==='transfer'}" onclick="switchDevSubTab('transfer')" style="${subTabBtnStyle('transfer')}">
                 📈 Передача даних
             </button>
+            <button type="button" data-active="${currentDevSubTab==='notes'}" onclick="switchDevSubTab('notes')" style="${subTabBtnStyle('notes')}">
+                Нотатки
+            </button>
         </nav><div class="dev-admin-content">
         ${subTabContentHtml}</div></div>
     `;
     if (currentDevSubTab === 'logs') window.renderPmmSharedActivity();
+    if (currentDevSubTab === 'notes') window.renderDeveloperNotes();
     if (currentDevSubTab === 'transfer') {
         window.renderDevTransferStats();
         if (!devTransferStats && !devTransferRequest) window.refreshDevTransferStats();

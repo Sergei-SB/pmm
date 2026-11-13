@@ -186,6 +186,12 @@
                 visibility: hidden;
             }
         }
+        #dev-notes-bell[hidden], html:not(.registry-developer) #dev-notes-bell { display: none !important; }
+        #dev-notes-bell[data-due] { background: #a01818; animation: dev-notes-alert 1.4s infinite alternate; }
+        @keyframes dev-notes-alert { to { background: #e03232; } }
+        @media (prefers-reduced-motion: reduce) {
+            #dev-notes-bell[data-due] { animation: none; }
+        }
     </style>
 </head>
 <body>
@@ -212,6 +218,7 @@
             </button>
 
             <input type="text" id="base-search-input" placeholder="Пошук по авто, номеру, водію..." oninput="filterBaseTable(this.value)" style="padding: 6px; width: 220px; border-radius: 4px; border: none;" autocomplete="off">
+            <button type="button" id="dev-notes-bell" class="nav-btn" hidden aria-label="Нотатки">🔔</button>
         </div>
     </header>
 
@@ -764,7 +771,8 @@
     <script src="admin.js?v=20261112-server-passwords"></script>
     <script src="moderator.js?v=20261112-server-passwords"></script>
     <script src="developer_mail.js"></script>
-    <script src="developer_panel.js?v=20261112-server-passwords"></script>
+    <script src="developer_notes.js?v=20261113"></script>
+    <script src="developer_panel.js?v=20261113-notes"></script>
     <script src="admin_layout.js?v=20261026-dual-admin"></script>
     <script src="permissions_registry.js"></script>
     <script src="broadcast_mail.js"></script>
@@ -772,7 +780,7 @@
     <script src="driver_routes.js?v=20261110-daily-routes"></script>
     <script src="route_trailer.js?v=20261110-daily-routes"></script>
     <script src="daily_routes.js?v=20261110-daily-formula-spacing"></script>
-    <script src="app.js?v=20261111-registry-column-roles"></script>
+    <script src="app.js?v=20261113-notes"></script>
     <script src="app2.js?v=20261110-daily-starter-row"></script>
     <script src="aggregates_calc.js?v=20261113-unique-options"></script>
     <script src="destroyed_equipment.js?v=20261024-pumps"></script>

@@ -633,6 +633,7 @@ function syncRegistryDeveloperVisibility() {
         : (typeof currentRole !== 'undefined' ? currentRole : (window.currentRole || 'user'));
     const isDev = role === 'developer';
     document.documentElement.classList.toggle('registry-developer', isDev);
+    window.refreshDeveloperNotesBell?.();
     document.documentElement.classList.toggle('registry-admin-columns', isDev || role === 'admin');
     // A hidden category filter must never leave other roles with an incomplete fleet.
     if (!isDev && currentCategoryFilter !== 'all') filterCarsByCategory('all');
