@@ -2,8 +2,7 @@
     const prefix = 'pmm_pdf_link_';
 
     function allowed(edit = false) {
-        const role = window.getCurrentAppRole?.() ||
-            (typeof currentRole !== 'undefined' ? currentRole : window.currentRole) || 'user';
+        const role = getCurrentUserRoleForDocs();
         return window.canRoleAccess?.(role, 'documents') &&
             window.canRoleView?.(role, 'documents') &&
             (!edit || window.canRoleEdit?.(role, 'documents'));
@@ -22,23 +21,22 @@
         const dialog = document.createElement('dialog');
         dialog.id = 'pdf-links-dialog';
         dialog.setAttribute('aria-labelledby', 'pdf-links-title');
-        dialog.style.cssText = 'width:min(620px,90vw);box-sizing:border-box;border:1px solid #cbd5e1;border-radius:10px;padding:20px';
         dialog.innerHTML = `
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <header>
                 <h2 id="pdf-links-title">Посилання на PDF</h2>
-                <form method="dialog"><button type="submit">Закрити</button></form>
-            </div>
-            <form id="pdf-links-form" style="margin:12px 0">
-                <label style="display:block;margin-bottom:8px">Посилання на PDF
-                    <input name="url" type="url" required maxlength="2048" placeholder="https://…" style="display:block;width:100%;box-sizing:border-box">
+                <form method="dialog"><button class="doc-green-btn doc-green-btn-small" type="submit">Закрити</button></form>
+            </header>
+            <form id="pdf-links-form">
+                <label>Посилання на PDF
+                    <input name="url" type="url" required maxlength="2048" placeholder="https://…">
                 </label>
-                <label style="display:block;margin-bottom:8px">Опис
-                    <input name="description" required maxlength="300" style="display:block;width:100%;box-sizing:border-box">
+                <label>Опис
+                    <input name="description" required maxlength="300">
                 </label>
-                <button type="submit" class="action-btn">Зберегти</button>
+                <button type="submit" class="doc-green-btn">Додати PDF</button>
             </form>
             <p role="status"></p>
-            <ul style="padding-left:20px"></ul>
+            <ul></ul>
         `;
         const form = dialog.querySelector('#pdf-links-form');
         const status = dialog.querySelector('[role="status"]');
@@ -62,7 +60,6 @@
                     if (typeof record.description !== 'string') continue;
 
                     const item = document.createElement('li');
-                    item.style.cssText = 'margin:8px 0;overflow-wrap:anywhere';
                     const link = document.createElement('a');
                     link.href = url;
                     link.target = '_blank';
@@ -73,6 +70,7 @@
                     });
                     const copy = document.createElement('button');
                     copy.type = 'button';
+                    copy.className = 'doc-green-btn doc-green-btn-small';
                     copy.textContent = 'Копіювати посилання';
                     copy.addEventListener('click', async () => {
                         if (!allowed()) return;
@@ -87,6 +85,7 @@
                     if (allowed(true)) {
                         const remove = document.createElement('button');
                         remove.type = 'button';
+                        remove.className = 'doc-green-btn doc-green-btn-small';
                         remove.textContent = 'Видалити';
                         remove.addEventListener('click', () => {
                             if (!allowed(true) || !confirm('Видалити це посилання?')) return;

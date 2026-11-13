@@ -2452,18 +2452,17 @@ function renderDocumentsMainView() {
                     </p>
                 </div>
                 <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                    <button type="button" onclick="openAllFragmentTemplatesModal()"
-                        style="background:#7c3aed; color:#fff; border:none; padding:10px 16px; border-radius:8px; cursor:pointer; font-weight:700; font-size:14px; display:inline-flex; align-items:center; gap:8px; box-shadow:0 2px 8px rgba(124,58,237,0.25);">
+                    <button type="button" id="doc-template-bank-btn" class="doc-green-btn" onclick="openAllFragmentTemplatesModal()">
                         📚 Банк шаблонів фрагментів (${totalTemplatesCount})
                     </button>
-                    <label for="doc-upload-input" style="background:#2563eb; color:#fff; padding:10px 18px; border-radius:8px; cursor:pointer; font-weight:700; font-size:14px; display:inline-flex; align-items:center; gap:8px; box-shadow:0 2px 8px rgba(37,99,235,0.25); margin:0;">
+                    <label for="doc-upload-input" class="doc-green-btn">
                         ➕ Додати документи (З файлу)
                     </label>
                     <input type="file" id="doc-upload-input" multiple accept=".txt,.doc,.docx,.pdf,.rtf,.html,.xlsx,.xls,.csv,.tsv,.png,.jpg,.jpeg,.webp,.jfif,.svg,*/*" style="display:none;" onchange="handleUploadDocumentFile(event)">
-                    <button id="btn-new-doc-a4" onclick="createNewBlankDocument()" style="background:#16a34a; color:#fff; border:none; padding:10px 18px; border-radius:8px; cursor:pointer; font-weight:700; font-size:14px; display:inline-flex; align-items:center; gap:8px; box-shadow:0 2px 8px rgba(22,163,74,0.25);">
+                    <button type="button" id="btn-new-doc-a4" class="doc-green-btn" onclick="createNewBlankDocument()">
                         📝 Створити новий документ А4
                     </button>
-                    <button type="button" class="action-btn" style="padding:10px 18px;background:#b91c1c" onclick="openPdfLinks()">PDF</button>
+                    <button type="button" id="doc-pdf-btn" class="doc-green-btn" aria-haspopup="dialog" onclick="openPdfLinks()">📄 PDF</button>
                 </div>
             </div>
 
