@@ -1,3 +1,10 @@
+function subdivisionFuelLabel(value, fallback = 'ДП') {
+    const fuel = String(value ?? '').trim();
+    if (/^(АБ|бензин)(?:$|[s/])/i.test(fuel)) return 'АБ';
+    if (/^ДП(?:$|[s/])/i.test(fuel)) return 'ДП';
+    return fallback;
+}
+
 // ==========================================
 // ЛОГІКА ДЕСЯТИДЕННОГО ЗВІТУ ТА ЗВІТУ ПО ПІДРОЗДІЛАХ (report.js)
 // (ПЕРЕМИКАЧІ ПЕРІОДУ ТА МІСЯЦЯ ПРЯМО В ТАБЛИЦІ ПІДРОЗДІЛІВ)
@@ -1228,8 +1235,8 @@ function showSubdivisionDetails(subName) {
     let stats30 = calculateSubStatsDetailed(subName, monthPeriods);
     let statsAll = calculateSubStatsDetailed(subName, periods);
 
-    let carsListHtml = subCars.length > 0 ? subCars.map(c => '<li style="margin-bottom: 4px;"><strong>' + c.plate + '</strong> — ' + c.model + ' (<span style="color: #27ae60; font-weight: bold;">паливо: ' + (c.fuelType || 'ДП') + '</span>)</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає автомобілів</li>';
-    let eqListHtml = eqItems.length > 0 ? eqItems.map(i => '<li style="margin-bottom: 4px;"><span style="background: #e8f8f5; padding: 1px 4px; border-radius: 3px; font-size: 11px; color: #16a085; font-weight: bold;">' + i.category + '</span> <strong>' + i.model + '</strong> (<span style="color: #27ae60; font-weight: bold;">паливо: ' + (i.fuelType || (i.category === 'Бензопила' ? 'АБ' : 'ДП')) + '</span>)</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає обладнання</li>';
+    let carsListHtml = subCars.length > 0 ? subCars.map(c => '<li style="margin-bottom: 4px;"><strong>' + c.plate + '</strong> — ' + c.model + ' (<span style="color: #27ae60; font-weight: bold;">' + subdivisionFuelLabel(c.fuelType) + '</span>)</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає автомобілів</li>';
+    let eqListHtml = eqItems.length > 0 ? eqItems.map(i => '<li style="margin-bottom: 4px;"><span style="background: #e8f8f5; padding: 1px 4px; border-radius: 3px; font-size: 11px; color: #16a085; font-weight: bold;">' + i.category + '</span> <strong>' + i.model + '</strong> (<span style="color: #27ae60; font-weight: bold;">' + subdivisionFuelLabel(i.fuelType, i.category === 'Бензопила' ? 'АБ' : 'ДП') + '</span>)</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає обладнання</li>';
     let periodsOptionsHtml = periods.map(p => '<option value="' + p + '" ' + (p === currentCustomPeriod ? 'selected' : '') + '>' + p + '</option>').join('');
 
     let html = `
@@ -1387,8 +1394,8 @@ function showNoSubdivisionDetails() {
     let stats30 = calculateNoSubStatsDetailed(monthPeriods);
     let statsAll = calculateNoSubStatsDetailed(periods);
 
-    let carsListHtml = subCars.length > 0 ? subCars.map(c => '<li style="margin-bottom: 4px;"><strong>' + c.plate + '</strong> — ' + c.model + ' (<span style="color: #27ae60; font-weight: bold;">паливо: ' + (c.fuelType || 'ДП') + '</span>)</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає не задіяних автомобілів</li>';
-    let eqListHtml = eqItems.length > 0 ? eqItems.map(i => '<li style="margin-bottom: 4px;"><span style="background: #e8f8f5; padding: 1px 4px; border-radius: 3px; font-size: 11px; color: #16a085; font-weight: bold;">' + i.category + '</span> <strong>' + i.model + '</strong> (<span style="color: #27ae60; font-weight: bold;">паливо: ' + (i.fuelType || (i.category === 'Бензопила' ? 'АБ' : 'ДП')) + '</span>)</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає не задіяного обладнання</li>';
+    let carsListHtml = subCars.length > 0 ? subCars.map(c => '<li style="margin-bottom: 4px;"><strong>' + c.plate + '</strong> — ' + c.model + ' (<span style="color: #27ae60; font-weight: bold;">' + subdivisionFuelLabel(c.fuelType) + '</span>)</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає не задіяних автомобілів</li>';
+    let eqListHtml = eqItems.length > 0 ? eqItems.map(i => '<li style="margin-bottom: 4px;"><span style="background: #e8f8f5; padding: 1px 4px; border-radius: 3px; font-size: 11px; color: #16a085; font-weight: bold;">' + i.category + '</span> <strong>' + i.model + '</strong> (<span style="color: #27ae60; font-weight: bold;">' + subdivisionFuelLabel(i.fuelType, i.category === 'Бензопила' ? 'АБ' : 'ДП') + '</span>)</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає не задіяного обладнання</li>';
     let periodsOptionsHtml = periods.map(p => '<option value="' + p + '" ' + (p === currentCustomPeriod ? 'selected' : '') + '>' + p + '</option>').join('');
 
     let html = `
@@ -1545,8 +1552,8 @@ function showPolkDetails() {
     let stats30 = calculatePolkStatsDetailed(monthPeriods);
     let statsAll = calculatePolkStatsDetailed(periods);
 
-    let polkCarsHtml = activePolkCars.length > 0 ? activePolkCars.map(c => '<li style="margin-bottom: 4px;"><strong>' + c.plate + '</strong> — ' + c.model + ' (<span style="color: #2980b9; font-weight: bold;">' + (c.subdivision || 'Без підрозділу') + '</span>, <span style="color: #27ae60; font-weight: bold;">паливо: ' + (c.fuelType || 'ДП') + '</span>)</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає техніки</li>';
-    let polkEqHtml = allEqItems.length > 0 ? allEqItems.map(i => '<li style="margin-bottom: 4px;"><span style="background: #e8f8f5; padding: 1px 4px; border-radius: 3px; font-size: 11px; color: #16a085; font-weight: bold;">' + i.category + '</span> <strong>' + i.model + '</strong> (<span style="color: #2980b9; font-weight: bold;">' + (i.subdivision || 'Без підрозділу') + '</span>, <span style="color: #27ae60; font-weight: bold;">паливо: ' + (i.fuelType || (i.category === 'Бензопила' ? 'АБ' : 'ДП')) + '</span>)</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає обладнання</li>';
+    let polkCarsHtml = activePolkCars.length > 0 ? activePolkCars.map(c => '<li style="margin-bottom: 4px;"><strong>' + c.plate + '</strong> — ' + c.model + ' (<span style="color: #2980b9; font-weight: bold;">' + (c.subdivision || 'Без підрозділу') + '</span>, <span style="color: #27ae60; font-weight: bold;">' + subdivisionFuelLabel(c.fuelType) + '</span>)</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає техніки</li>';
+    let polkEqHtml = allEqItems.length > 0 ? allEqItems.map(i => '<li style="margin-bottom: 4px;"><span style="background: #e8f8f5; padding: 1px 4px; border-radius: 3px; font-size: 11px; color: #16a085; font-weight: bold;">' + i.category + '</span> <strong>' + i.model + '</strong> (<span style="color: #2980b9; font-weight: bold;">' + (i.subdivision || 'Без підрозділу') + '</span>, <span style="color: #27ae60; font-weight: bold;">' + subdivisionFuelLabel(i.fuelType, i.category === 'Бензопила' ? 'АБ' : 'ДП') + '</span>)</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає обладнання</li>';
     let periodsOptionsHtml = periods.map(p => '<option value="' + p + '" ' + (p === currentCustomPeriod ? 'selected' : '') + '>' + p + '</option>').join('');
 
     let html = `
