@@ -200,31 +200,20 @@
                     copy.addEventListener('click', async () => {
                         if (!allowed()) return;
                         if (!url) {
+                            if (!window.ClipboardItem?.supports?.('application/pdf')) {
+                                status.textContent = 'Цей браузер не підтримує копіювання PDF-файлів.';
+                                return;
+                            }
                             const pdf = (async () => {
                                 const binary = await getDocBinaryFromIDB(key);
                                 if (!binary?.fileDataUrl || !allowed()) throw new Error('PDF unavailable');
                                 return (await fetch(binary.fileDataUrl)).blob();
                             })();
                             try {
-                                if (!window.ClipboardItem?.supports?.('application/pdf')) {
-                                    throw new Error('PDF clipboard unavailable');
-                                }
                                 await navigator.clipboard.write([new ClipboardItem({'application/pdf': pdf})]);
                                 status.textContent = 'PDF скопійовано. Вставте його в месенджері.';
                             } catch (_) {
-                                try {
-                                    const blob = await pdf;
-                                    if (!allowed()) return;
-                                    const download = document.createElement('a');
-                                    const objectUrl = URL.createObjectURL(blob);
-                                    download.href = objectUrl;
-                                    download.download = record.fileName;
-                                    download.click();
-                                    setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
-                                    status.textContent = 'PDF завантажено. Прикріпіть його в месенджері.';
-                                } catch (_) {
-                                    status.textContent = 'PDF ще недоступний. Спробуйте після синхронізації.';
-                                }
+                                status.textContent = 'Браузер не зміг скопіювати PDF. Для копіювання адреси додайте PDF за вебпосиланням.';
                             }
                             return;
                         }
