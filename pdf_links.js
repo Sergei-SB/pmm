@@ -25,27 +25,50 @@
     const requestedPdf = new URLSearchParams(location.search).get('pdf');
     if (requestedPdf && /^pmm_pdf_link_[a-z0-9-]+$/i.test(requestedPdf)) {
         document.addEventListener('DOMContentLoaded', () => {
+            const notice = document.createElement('aside');
+            notice.className = 'pdf-share-notice';
+            notice.style.cssText = 'padding:12px 18px;background:#eef8ef;color:#14532d;border-bottom:1px solid #bbd5c4';
+            const message = document.createElement('span');
+            message.setAttribute('role', 'status');
+            const retry = document.createElement('button');
+            retry.type = 'button';
+            retry.className = 'doc-green-btn doc-green-btn-small';
+            retry.textContent = 'Відкрити PDF';
+            notice.append(message, ' ', retry);
+            document.querySelector('main').before(notice);
             let opening = false;
-            const timer = setInterval(async () => {
-                if (opening || !allowed()) return;
+            let attempts = 0;
+            async function openRequestedPdf() {
+                if (opening) return;
+                if (!allowed()) {
+                    message.textContent = 'Щоб відкрити PDF за посиланням, увійдіть під роллю з доступом до «Документів та шаблонів».';
+                    return;
+                }
                 opening = true;
+                message.textContent = ++attempts < 8
+                    ? 'Шукаємо PDF у спільній базі…'
+                    : 'PDF поки недоступний. Перевірте, чи файл синхронізовано на комп’ютері, з якого його додали.';
                 try {
                     const record = JSON.parse(localStorage.getItem(requestedPdf));
                     if (!record?.fileName || typeof record.fileName !== 'string') return;
                     const binary = await getDocBinaryFromIDB(requestedPdf);
                     if (!binary?.fileDataUrl || !allowed()) return;
-                    clearInterval(timer);
                     window.openPdfLinks();
                     await openUniversalFilePreviewModal({
                         name: record.fileName, ext: 'pdf', dataUrl: binary.fileDataUrl,
                         shareUrl: shareAddress(requestedPdf)
                     });
+                    clearInterval(timer);
+                    notice.remove();
                 } catch (_) {
                     // A shared file can arrive after its list entry.
                 } finally {
                     opening = false;
                 }
-            }, 1000);
+            }
+            retry.addEventListener('click', openRequestedPdf);
+            const timer = setInterval(openRequestedPdf, 2000);
+            openRequestedPdf();
         });
     }
 
