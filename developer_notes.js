@@ -58,7 +58,7 @@
                 <label>Дата нагадування<br><input name="date" type="text" required maxlength="10" placeholder="15,11 або 15.11.2026"></label>
                 <button class="action-btn" type="submit">Додати нагадування</button>
             </form>
-            <p role="status">Без року використовується найближча дата за київським часом. Нотатки зберігаються в цьому браузері.</p>
+            <p role="status"></p>
             <ul></ul>
         `;
         const form = target.querySelector('form');
