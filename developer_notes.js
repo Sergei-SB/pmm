@@ -54,7 +54,7 @@
         if (!isDeveloper()) return;
         target.innerHTML = `
             <form style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
-                <label>Що потрібно зробити<br><input name="task" type="text" required maxlength="500"></label>
+                <label style="width:870px;max-width:100%;">Що потрібно зробити<br><input name="task" type="text" required maxlength="500" style="width:100%;box-sizing:border-box;"></label>
                 <label>Дата нагадування<br><input name="date" type="text" required maxlength="10" placeholder="15,11 або 15.11.2026"></label>
                 <button class="action-btn" type="submit">Додати нагадування</button>
             </form>
