@@ -41,7 +41,7 @@ function getEquipmentReportItems(period, includeExcluded = false) {
     const data = readEquipmentReportData(period);
     const items = getAllEquipmentItemsUnified().map(item => ({...item, ...data[item.uniqueId]?._equipment,
         uniqueId: item.uniqueId,
-        subdivision: data[item.uniqueId]?.subdivision ?? data[item.uniqueId]?._equipment?.subdivision ?? item.subdivision ?? '',
+        subdivision: item.inventoryLocation ?? data[item.uniqueId]?.subdivision ?? data[item.uniqueId]?._equipment?.subdivision ?? item.subdivision ?? '',
         serialNumber: data[item.uniqueId]?.serialNumber ?? item.serialNumber ?? item.rawItem?.serialNumber ?? ''}));
     for (const [id, row] of Object.entries(data)) {
         if (['Генератор','Webasto','Теплова пушка','Бензопила','Помпа'].includes(row?._equipment?.category) && !items.some(item => item.uniqueId === id)) {
@@ -612,24 +612,18 @@ function getAllEquipmentItemsUnified() {
                 const noteStr = String(item.note || "").toLowerCase();
                 if (noteStr.includes('знищ')) return; // Пропускаємо знищені позиції
 
-                const actualSub = item.locationSubdivision || item.subdivision || item.sub || 'РМТЗ';
+                const actualSub = String(item.locationSubdivision ?? item.subdivision ?? item.sub ?? '').trim();
                 allItems.push({
                     uniqueId: `${src.type}_${item.id || index}`,
                     category: src.type,
                     subdivision: actualSub,
+                    inventoryLocation: actualSub,
                     model: item.model || item.name || `Пристрій #${index + 1}`,
                     fuelType: item.fuelType || item.fuel || 'Бензин', serialNumber: item.serialNumber || ''
                 });
             });
         }
     });
-
-    if (allItems.length === 0) {
-        allItems = [
-            { uniqueId: 'Gen_1', category: 'Генератор', subdivision: 'РМТЗ', model: 'Honda EU22i', fuelType: 'Бензин' },
-            { uniqueId: 'Web_1', category: 'Webasto', subdivision: 'ВТО', model: 'Air Top 2000', fuelType: 'ДП' }
-        ];
-    }
 
     return allItems;
 }
@@ -731,7 +725,10 @@ function renderEquipmentReportView() {
     const periodStr = periodInput ? periodInput.value.trim() : (activeEquipmentReportPeriod || "01.10-10.10");
     updateEquipmentReportHeaders();
 
-    const items = getEquipmentReportItems(periodStr);
+    const items = getEquipmentReportItems(periodStr).filter(item => {
+        const unit = String(item.subdivision ?? '').trim();
+        return unit !== '' && !/^[-–—]+$/.test(unit);
+    });
 
     const subFilterEl = document.getElementById('equipment-subdivision-filter');
     const currentSubVal = subFilterEl ? subFilterEl.value : 'all';
@@ -740,12 +737,11 @@ function renderEquipmentReportView() {
         const subs = new Set();
         items.forEach(i => { if (i.subdivision) subs.add(i.subdivision.trim()); });
         let opts = '<option value="all">Усі</option>';
-        if (items.some(item => !String(item.subdivision || '').trim())) opts += '<option value="__unassigned__">Без підрозділу</option>';
         subs.forEach(sub => {
             opts += `<option value="${equipmentReportEscape(sub)}">${equipmentReportEscape(sub)}</option>`;
         });
         subFilterEl.innerHTML = opts;
-        if (subs.has(currentSubVal) || currentSubVal === 'all' || (currentSubVal === '__unassigned__' && items.some(item => !String(item.subdivision || '').trim()))) {
+        if (subs.has(currentSubVal) || currentSubVal === 'all') {
             subFilterEl.value = currentSubVal;
         }
     }
@@ -818,7 +814,7 @@ function renderEquipmentReportView() {
         tr.innerHTML = `
             <td style="text-align: center;">${idx + 1}</td>
             <td><span style="background: #e8f8f5; padding: 2px 6px; border-radius: 4px; font-size: 11px; color: #16a085; font-weight: bold;">${equipmentReportEscape(item.category)}</span></td>
-            <td style="text-align: center;"><input type="text" class="eq-rep-input" data-id="${equipmentReportEscape(item.uniqueId)}" data-field="subdivision" list="eq-report-subdivision-options" aria-label="Підрозділ ${equipmentReportEscape(item.model)}" value="${equipmentReportEscape(item.subdivision)}" onchange="changeEquipmentReportFilter('row-subdivision',this.value)" style="width:100%;box-sizing:border-box;padding:4px;border:1px solid #ccc;text-align:center" ${eqLock}></td>
+            <td style="text-align: center;"><input type="text" class="eq-rep-input" data-id="${equipmentReportEscape(item.uniqueId)}" data-field="subdivision" list="eq-report-subdivision-options" aria-label="Підрозділ ${equipmentReportEscape(item.model)}" value="${equipmentReportEscape(item.subdivision)}" ${item.inventoryLocation !== undefined ? 'readonly title="Змінюється в обліку обладнання"' : ''} onchange="changeEquipmentReportFilter('row-subdivision',this.value)" style="width:100%;box-sizing:border-box;padding:4px;border:1px solid #ccc;text-align:center" ${eqLock}></td>
             <td><strong>${equipmentReportEscape(item.model)}</strong></td>
             <td><input type="text" class="eq-rep-input" data-id="${equipmentReportEscape(item.uniqueId)}" data-field="serialNumber" aria-label="Серійний номер ${equipmentReportEscape(item.model)}" value="${equipmentReportEscape(itemData.serialNumber ?? item.serialNumber ?? '')}" style="width:100%;box-sizing:border-box;padding:4px;border:1px solid #ccc" ${eqLock}></td>
             <td style="text-align: center;" class="eq-row-fuel-type">${equipmentReportEscape(item.fuelType)}</td>
