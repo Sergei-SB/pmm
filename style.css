@@ -1022,8 +1022,34 @@ input[type=number] {
 
     #aggregates-calc-container div[style*="grid-template-columns: 1fr 1fr"],
     #aggregates-calc-container div[style*="grid-template-columns: 1.8fr 0.9fr"] {
-        grid-template-columns: 1fr !important;
+        grid-template-columns: minmax(0, 1fr) !important;
         gap: 12px !important;
+    }
+
+    #aggregates-calc-container div:has(> table) {
+        overflow-x: auto;
+    }
+
+    #aggregates-calc-container table {
+        min-width: 340px;
+    }
+
+    #aggregates-calc-container input:not([type="checkbox"]) {
+        font-size: 16px !important;
+        min-height: 32px;
+    }
+
+    #aggregates-calc-container button {
+        min-height: 36px;
+    }
+
+    #variant-b-summary-box {
+        grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    }
+
+    #round-b-summary {
+        grid-column: 1 / -1;
+        justify-self: start;
     }
 
     #eq-rates-info-box {
