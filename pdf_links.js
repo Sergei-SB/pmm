@@ -16,6 +16,39 @@
         return url.href;
     }
 
+    function shareAddress(key) {
+        const address = new URL(location.pathname, location.origin);
+        address.searchParams.set('pdf', key);
+        return address.href;
+    }
+
+    const requestedPdf = new URLSearchParams(location.search).get('pdf');
+    if (requestedPdf && /^pmm_pdf_link_[a-z0-9-]+$/i.test(requestedPdf)) {
+        document.addEventListener('DOMContentLoaded', () => {
+            let opening = false;
+            const timer = setInterval(async () => {
+                if (opening || !allowed()) return;
+                opening = true;
+                try {
+                    const record = JSON.parse(localStorage.getItem(requestedPdf));
+                    if (!record?.fileName || typeof record.fileName !== 'string') return;
+                    const binary = await getDocBinaryFromIDB(requestedPdf);
+                    if (!binary?.fileDataUrl || !allowed()) return;
+                    clearInterval(timer);
+                    window.openPdfLinks();
+                    await openUniversalFilePreviewModal({
+                        name: record.fileName, ext: 'pdf', dataUrl: binary.fileDataUrl,
+                        shareUrl: shareAddress(requestedPdf)
+                    });
+                } catch (_) {
+                    // A shared file can arrive after its list entry.
+                } finally {
+                    opening = false;
+                }
+            }, 1000);
+        });
+    }
+
     window.openPdfLinks = function () {
         if (!allowed()) return;
         const page = document.getElementById('pdf-links-view');
@@ -187,28 +220,12 @@
                             const binary = await getDocBinaryFromIDB(key);
                             if (!binary?.fileDataUrl) throw new Error('Missing PDF');
                             if (allowed()) await openUniversalFilePreviewModal({
-                                name: record.fileName, ext: 'pdf', dataUrl: binary.fileDataUrl
+                                name: record.fileName, ext: 'pdf', dataUrl: binary.fileDataUrl, shareUrl: shareAddress(key)
                             });
                         } catch (_) {
                             status.textContent = 'Файл ще недоступний. Спробуйте після синхронізації.';
                         }
                     });
-                    const copy = document.createElement('button');
-                    copy.type = 'button';
-                    copy.className = 'doc-green-btn doc-green-btn-small';
-                    copy.textContent = url ? 'Копіювати посилання' : 'Копіювати';
-                    copy.addEventListener('click', async () => {
-                        if (!allowed()) return;
-                        const fileName = String(record.fileName || '').split(/[\\/]/).pop();
-                        const address = url || 'F:\\ПОЛК\\PDF\\' + fileName;
-                        try {
-                            await navigator.clipboard.writeText(address);
-                            status.textContent = 'Посилання скопійовано.';
-                        } catch (_) {
-                            status.textContent = 'Не вдалося скопіювати. Скористайтеся меню посилання.';
-                        }
-                    });
-                    actions.append(copy);
                     if (allowed(true)) {
                         const remove = document.createElement('button');
                         remove.type = 'button';

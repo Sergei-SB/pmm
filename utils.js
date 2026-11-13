@@ -834,6 +834,7 @@ window.openUniversalFilePreviewModal = async function(fileInfo) {
                             📥 Скачати
                         </button>
                     ` : ''}
+                    ${isPdf && fileInfo.shareUrl ? '<button type="button" class="doc-green-btn doc-green-btn-small" data-copy-pdf-link>Копіювати посилання</button><span role="status" data-pdf-copy-status></span>' : ''}
                     <button onclick="printUniversalFilePreview()" 
                         style="background:#334155; color:white; border:none; padding:7px 14px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:5px;">
                         🖨️ Друк
@@ -853,6 +854,18 @@ window.openUniversalFilePreviewModal = async function(fileInfo) {
     `;
 
     document.body.appendChild(modal);
+    if (isPdf && fileInfo.shareUrl) {
+        const button = modal.querySelector('[data-copy-pdf-link]');
+        const status = modal.querySelector('[data-pdf-copy-status]');
+        button.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(fileInfo.shareUrl);
+                status.textContent = 'Скопійовано';
+            } catch (_) {
+                status.textContent = 'Не вдалося скопіювати';
+            }
+        });
+    }
 
     const escListener = function(e) {
         if (e.key === 'Escape') {
