@@ -518,6 +518,37 @@ function dataURIToArrayBuffer(dataURI) {
     }
 }
 
+function extractRtfPreviewText(source) {
+    const stack = [];
+    let state = {hidden: false, fallback: 1, codepage: 'windows-1252'};
+    let skip = 0;
+    const output = [];
+    const destinations = new Set(['fonttbl', 'colortbl', 'stylesheet', 'info', 'pict', 'object', 'filetbl', 'generator', 'fldinst']);
+    for (const match of source.matchAll(/\\([a-z]+)(-?\d+)? ?|\\'([0-9a-f]{2})|\\([^a-z])|[{}]|[^\\{}]+/gi)) {
+        const [token, word, argument, hex, symbol] = match;
+        if (token === '{') { stack.push(state); state = {...state}; continue; }
+        if (token === '}') { state = stack.pop() || state; continue; }
+        if (symbol === '*' || destinations.has(word)) state.hidden = true;
+        if (state.hidden) continue;
+        if (word === 'ansicpg') {
+            try { state.codepage = new TextDecoder('windows-' + argument).encoding; } catch (_) {}
+        } else if (word === 'uc') {
+            state.fallback = Math.max(0, Number(argument) || 0);
+        } else if (word === 'u') {
+            output.push(String.fromCharCode(Number(argument)));
+            skip = state.fallback;
+        } else {
+            const value = hex ? new TextDecoder(state.codepage).decode(Uint8Array.of(parseInt(hex, 16)))
+                : symbol ? ({'~': '\u00a0', '-': '\u00ad', '_': '\u2011', '\\': '\\', '{': '{', '}': '}'})[symbol] || ''
+                : word ? ({par: '\n', line: '\n', row: '\n', tab: '\t', cell: '\t', emdash: '—', endash: '–', bullet: '•'})[word] || ''
+                : token.replace(/[\r\n]/g, '');
+            output.push(value.slice(skip));
+            skip = Math.max(0, skip - value.length);
+        }
+    }
+    return output.join('').trim();
+}
+
 window.openUniversalFilePreviewModal = async function(fileInfo) {
     if (!fileInfo) return;
 
@@ -604,6 +635,15 @@ window.openUniversalFilePreviewModal = async function(fileInfo) {
     else if (isWord) {
         let richHtml = fileInfo.bodyHtml || '';
         let extractedPlain = fileInfo.content || '';
+
+        if (ext === 'rtf') {
+            richHtml = '';
+            let source = extractedPlain;
+            if (dataUrl) {
+                try { source = atob(dataUrl.split(',')[1]); } catch (_) {}
+            }
+            extractedPlain = /^\s*\{\\rtf\b/.test(source) ? extractRtfPreviewText(source) : '';
+        }
 
         // Якщо маємо dataUrl, пробуємо витягнути максимальний HTML
         if (!richHtml && dataUrl) {
