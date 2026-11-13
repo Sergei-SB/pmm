@@ -647,7 +647,7 @@ body:has(#all-fragment-templates-modal) #doc-template-bank-btn,
     overflow-wrap: anywhere;
 }
 
-#pdf-drop-zone input[hidden] {
+#pdf-drop-zone [hidden] {
     display: none;
 }
 

@@ -38,6 +38,7 @@
                     <button type="button" class="doc-green-btn doc-green-btn-small" id="pdf-pick-file">Вибрати файл</button>
                     <input type="file" name="pdfFile" accept=".pdf,application/pdf" hidden>
                     <span id="pdf-selected-file"></span>
+                    <a id="pdf-open-selected" class="doc-green-btn doc-green-btn-small" target="_blank" rel="noopener noreferrer" hidden>Відкрити файл</a>
                 </div>
                 <label>Опис
                     <input name="description" required maxlength="300">
@@ -58,6 +59,14 @@
         const fileInput = form.elements.pdfFile;
         const dropZone = page.querySelector('#pdf-drop-zone');
         const selectedFile = page.querySelector('#pdf-selected-file');
+        const preview = page.querySelector('#pdf-open-selected');
+        let previewUrl;
+        function clearPreview() {
+            if (previewUrl) URL.revokeObjectURL(previewUrl);
+            previewUrl = undefined;
+            preview.hidden = true;
+            preview.removeAttribute('href');
+        }
         let file;
         let saving = false;
         let selectionVersion = 0;
@@ -66,14 +75,17 @@
             if (!allowed(true) || saving || !candidate) return;
             const version = ++selectionVersion;
             try {
-                const valid = candidate.size <= 20 * 1024 * 1024 &&
-                    (await candidate.slice(0, 1024).text()).includes('%PDF-');
+                const valid = (await candidate.slice(0, 1024).text()).includes('%PDF-');
                 if (version !== selectionVersion || saving || !allowed(true)) return;
                 if (!valid) {
-                    status.textContent = 'Виберіть PDF-файл розміром до 20 МБ.';
+                    status.textContent = 'Виберіть дійсний PDF-файл.';
                     return;
                 }
                 file = candidate;
+                clearPreview();
+                previewUrl = URL.createObjectURL(new Blob([candidate], {type: 'application/pdf'}));
+                preview.href = previewUrl;
+                preview.hidden = false;
                 urlInput.value = '';
                 selectedFile.textContent = candidate.name;
                 if (!form.elements.description.value.trim()) {
@@ -92,6 +104,7 @@
         urlInput.addEventListener('input', () => {
             selectionVersion++;
             file = undefined;
+            clearPreview();
             selectedFile.textContent = '';
         });
         urlInput.addEventListener('paste', event => {
@@ -255,12 +268,13 @@
                 localStorage.setItem(key, JSON.stringify({url, description, fileName: selected?.name}));
                 form.reset();
                 file = undefined;
+                clearPreview();
                 selectedFile.textContent = '';
                 status.textContent = 'PDF додано.';
                 render();
             } catch (_) {
                 if (binarySaved) await deleteDocBinaryFromIDB(key).catch(() => {});
-                status.textContent = 'Не вдалося зберегти PDF.';
+                status.textContent = 'Не вдалося зберегти PDF. Файл можна відкрити напряму або додати посилання на нього.';
             } finally {
                 saving = submit.disabled = false;
             }
@@ -271,6 +285,7 @@
         refresh = setInterval(() => {
             if (!page.classList.contains('active')) {
                 clearInterval(refresh);
+                clearPreview();
                 page.replaceChildren();
                 return;
             }
