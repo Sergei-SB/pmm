@@ -31,8 +31,14 @@
             </header>
             <form id="pdf-links-form" hidden>
                 <label>Посилання на PDF
-                    <input name="url" type="url" required maxlength="2048" placeholder="https://…">
+                    <input name="url" type="url" maxlength="2048" placeholder="Введіть, вставте або перетягніть посилання">
                 </label>
+                <div id="pdf-drop-zone">
+                    Перетягніть PDF сюди або
+                    <button type="button" class="doc-green-btn doc-green-btn-small" id="pdf-pick-file">Вибрати файл</button>
+                    <input type="file" name="pdfFile" accept=".pdf,application/pdf" hidden>
+                    <span id="pdf-selected-file"></span>
+                </div>
                 <label>Опис
                     <input name="description" required maxlength="300">
                 </label>
@@ -48,6 +54,73 @@
         const status = page.querySelector('[role="status"]');
         const list = page.querySelector('tbody');
         const add = page.querySelector('#pdf-add-btn');
+        const urlInput = form.elements.url;
+        const fileInput = form.elements.pdfFile;
+        const dropZone = page.querySelector('#pdf-drop-zone');
+        const selectedFile = page.querySelector('#pdf-selected-file');
+        let file;
+        let saving = false;
+        let selectionVersion = 0;
+
+        async function selectFile(candidate) {
+            if (!allowed(true) || saving || !candidate) return;
+            const version = ++selectionVersion;
+            try {
+                const valid = candidate.size <= 20 * 1024 * 1024 &&
+                    (await candidate.slice(0, 1024).text()).includes('%PDF-');
+                if (version !== selectionVersion || saving || !allowed(true)) return;
+                if (!valid) {
+                    status.textContent = 'Виберіть PDF-файл розміром до 20 МБ.';
+                    return;
+                }
+                file = candidate;
+                urlInput.value = '';
+                selectedFile.textContent = candidate.name;
+                if (!form.elements.description.value.trim()) {
+                    form.elements.description.value = candidate.name.replace(/\.pdf$/i, '').slice(0, 300);
+                }
+                status.textContent = '';
+            } catch (_) {
+                status.textContent = 'Не вдалося прочитати файл.';
+            }
+        }
+        page.querySelector('#pdf-pick-file').addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', () => {
+            selectFile(fileInput.files[0]);
+            fileInput.value = '';
+        });
+        urlInput.addEventListener('input', () => {
+            selectionVersion++;
+            file = undefined;
+            selectedFile.textContent = '';
+        });
+        urlInput.addEventListener('paste', event => {
+            const pastedFile = event.clipboardData?.files[0];
+            if (!pastedFile) return;
+            event.preventDefault();
+            selectFile(pastedFile);
+        });
+        for (const target of [urlInput, dropZone]) {
+            target.addEventListener('dragover', event => event.preventDefault());
+            target.addEventListener('drop', event => {
+                event.preventDefault();
+                if (!allowed(true) || saving) return;
+                const data = event.dataTransfer;
+                if (data.files.length) {
+                    selectFile(data.files[0]);
+                    return;
+                }
+                const value = (data.getData('text/uri-list') || data.getData('text/plain'))
+                    .split(/\r?\n/).find(line => line.trim() && !line.startsWith('#'));
+                try {
+                    urlInput.value = pdfUrl(value?.trim());
+                    urlInput.dispatchEvent(new Event('input'));
+                    status.textContent = '';
+                } catch (_) {
+                    status.textContent = 'Перетягніть PDF-файл або посилання HTTP чи HTTPS.';
+                }
+            });
+        }
         add.addEventListener('click', () => {
             if (!allowed(true)) return;
             form.hidden = !form.hidden;
@@ -71,7 +144,7 @@
                     let record, url;
                     try {
                         record = JSON.parse(localStorage.getItem(key));
-                        url = pdfUrl(record.url);
+                        if (!record.fileName) url = pdfUrl(record.url);
                     } catch (_) { continue; }
                     if (typeof record.description !== 'string') continue;
 
@@ -80,14 +153,32 @@
                     const title = item.insertCell();
                     item.insertCell().textContent = 'PDF';
                     const actions = item.insertCell();
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.target = '_blank';
-                    link.rel = 'noopener noreferrer';
+                    const link = document.createElement(url ? 'a' : 'button');
+                    if (url) {
+                        link.href = url;
+                        link.target = '_blank';
+                        link.rel = 'noopener noreferrer';
+                    } else {
+                        link.type = 'button';
+                        link.className = 'doc-green-btn doc-green-btn-small';
+                    }
                     link.textContent = record.description;
                     title.append(link);
-                    link.addEventListener('click', event => {
-                        if (!allowed()) event.preventDefault();
+                    link.addEventListener('click', async event => {
+                        if (!allowed()) {
+                            event.preventDefault();
+                            return;
+                        }
+                        if (url) return;
+                        try {
+                            const binary = await getDocBinaryFromIDB(key);
+                            if (!binary?.fileDataUrl) throw new Error('Missing PDF');
+                            if (allowed()) await openUniversalFilePreviewModal({
+                                name: record.fileName, ext: 'pdf', dataUrl: binary.fileDataUrl
+                            });
+                        } catch (_) {
+                            status.textContent = 'Файл ще недоступний. Спробуйте після синхронізації.';
+                        }
                     });
                     const copy = document.createElement('button');
                     copy.type = 'button';
@@ -102,20 +193,23 @@
                             status.textContent = 'Не вдалося скопіювати. Скористайтеся меню посилання.';
                         }
                     });
-                    actions.append(copy);
+                    if (url) actions.append(copy);
                     if (allowed(true)) {
                         const remove = document.createElement('button');
                         remove.type = 'button';
                         remove.className = 'doc-green-btn doc-green-btn-small';
                         remove.textContent = 'Видалити';
-                        remove.addEventListener('click', () => {
-                            if (!allowed(true) || !confirm('Видалити це посилання?')) return;
+                        remove.addEventListener('click', async () => {
+                            if (!allowed(true) || !confirm('Видалити цей запис PDF?')) return;
+                            remove.disabled = true;
                             try {
+                                if (!url) await deleteDocBinaryFromIDB(key);
                                 localStorage.removeItem(key);
-                                status.textContent = 'Посилання видалено.';
+                                status.textContent = 'Запис видалено.';
                                 render();
                             } catch (_) {
-                                status.textContent = 'Не вдалося видалити посилання.';
+                                status.textContent = 'Не вдалося видалити запис.';
+                                remove.disabled = false;
                             }
                         });
                         actions.append(remove);
@@ -132,25 +226,43 @@
             }
         }
 
-        form.addEventListener('submit', event => {
+        form.addEventListener('submit', async event => {
             event.preventDefault();
-            if (!allowed(true)) return;
+            if (!allowed(true) || saving) return;
             const description = form.elements.description.value.trim();
+            const selected = file;
             let url;
             try {
-                url = pdfUrl(form.elements.url.value.trim());
+                if (!selected) url = pdfUrl(urlInput.value.trim());
                 if (!description) throw new Error('Empty description');
             } catch (_) {
-                status.textContent = 'Введіть опис і посилання, що починається з https:// або http://.';
+                status.textContent = 'Введіть опис і додайте PDF-файл або посилання HTTP чи HTTPS.';
                 return;
             }
+            const key = prefix + crypto.randomUUID();
+            const submit = form.querySelector('[type="submit"]');
+            saving = submit.disabled = true;
+            let binarySaved = false;
             try {
-                localStorage.setItem(prefix + crypto.randomUUID(), JSON.stringify({url, description}));
+                if (selected) {
+                    const fileDataUrl = await readFileAsDataURLAsync(new Blob([selected], {type: 'application/pdf'}));
+                    if (!allowed(true)) return;
+                    binarySaved = await saveDocBinaryToIDB(key, {
+                        fileDataUrl, originalFileName: selected.name, mimeType: 'application/pdf', ext: 'pdf'
+                    });
+                    if (!binarySaved) throw new Error('File save failed');
+                }
+                localStorage.setItem(key, JSON.stringify({url, description, fileName: selected?.name}));
                 form.reset();
-                status.textContent = 'Посилання додано.';
+                file = undefined;
+                selectedFile.textContent = '';
+                status.textContent = 'PDF додано.';
                 render();
             } catch (_) {
-                status.textContent = 'Не вдалося зберегти посилання.';
+                if (binarySaved) await deleteDocBinaryFromIDB(key).catch(() => {});
+                status.textContent = 'Не вдалося зберегти PDF.';
+            } finally {
+                saving = submit.disabled = false;
             }
         });
         switchView('pdf-links');
