@@ -125,6 +125,26 @@ th {
     background: white;
 }
 
+#equipment-report-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+#equipment-report-table thead th {
+    position: static;
+    padding: 3px 5px;
+}
+
+#equipment-report-table .eq-refuel-date {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 105px;
+    padding: 3px;
+    border: 1px solid #ccc;
+    font: inherit;
+}
+
 /* ==========================================
    БАЗА АВТОМОБІЛІВ (РЕЄСТР)
    ========================================== */

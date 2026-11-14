@@ -822,10 +822,13 @@ function renderEquipmentReportView() {
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="prevOil" value="${itemData.prevOil || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p1Fuel" value="${itemData.p1Fuel || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p1Oil" value="${itemData.p1Oil || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
+            <td><input type="date" class="eq-rep-input eq-refuel-date" data-id="${equipmentReportEscape(item.uniqueId)}" data-field="p1Date" aria-label="Дата заправки за 1-й період" value="${equipmentReportEscape(itemData.p1Date)}" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p2Fuel" value="${itemData.p2Fuel || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p2Oil" value="${itemData.p2Oil || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
+            <td><input type="date" class="eq-rep-input eq-refuel-date" data-id="${equipmentReportEscape(item.uniqueId)}" data-field="p2Date" aria-label="Дата заправки за 2-й період" value="${equipmentReportEscape(itemData.p2Date)}" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p3Fuel" value="${itemData.p3Fuel || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p3Oil" value="${itemData.p3Oil || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
+            <td><input type="date" class="eq-rep-input eq-refuel-date" data-id="${equipmentReportEscape(item.uniqueId)}" data-field="p3Date" aria-label="Дата заправки за 3-й період" value="${equipmentReportEscape(itemData.p3Date)}" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="nextFuel" value="${itemData.nextFuel || ''}" style="width: 100%; text-align: center; border: 1px solid #27ae60; background: #f0fdf4; padding: 4px; font-weight: bold; color: #166534;" placeholder="0.0" ${eqLock}></td>
             <td class="eq-report-action"><button type="button" data-remove-eq-id="${equipmentReportEscape(item.uniqueId)}" ${canEditEq?'':'disabled'} style="background:#c0392b;color:white;border:0;border-radius:4px;padding:6px;cursor:pointer">Видалити зі звіту</button></td>
         `;
@@ -921,10 +924,13 @@ function updateEquipmentReportTotals() {
             <td rowspan="2" style="text-align: center; vertical-align: middle; border-left: 1px solid #dcdcdc; border-right: 1px solid #dcdcdc; font-size: 11px;">${formatFluidBreakdown(sumPrevOilMap)}</td>
             <td style="text-align: center; color: #27ae60; border-bottom: 1px solid #dcdcdc;">${dpP1Fuel !== 0 ? dpP1Fuel.toFixed(1) + ' л' : '0 л'}</td>
             <td rowspan="2" style="text-align: center; vertical-align: middle; border-left: 1px solid #dcdcdc; border-right: 1px solid #dcdcdc; font-size: 11px;">${formatFluidBreakdown(sumP1OilMap)}</td>
+            <td rowspan="2"></td>
             <td style="text-align: center; color: #27ae60; border-bottom: 1px solid #dcdcdc;">${dpP2Fuel !== 0 ? dpP2Fuel.toFixed(1) + ' л' : '0 л'}</td>
             <td rowspan="2" style="text-align: center; vertical-align: middle; border-left: 1px solid #dcdcdc; border-right: 1px solid #dcdcdc; font-size: 11px;">${formatFluidBreakdown(sumP2OilMap)}</td>
+            <td rowspan="2"></td>
             <td style="text-align: center; color: #27ae60; border-bottom: 1px solid #dcdcdc;">${dpP3Fuel !== 0 ? dpP3Fuel.toFixed(1) + ' л' : '0 л'}</td>
             <td rowspan="2" style="text-align: center; vertical-align: middle; border-left: 1px solid #dcdcdc; border-right: 1px solid #dcdcdc; font-size: 11px;">${formatFluidBreakdown(sumP3OilMap)}</td>
+            <td rowspan="2"></td>
             <td style="text-align: center; color: #27ae60; border-bottom: 1px solid #dcdcdc; font-weight: bold;">${dpNextFuel !== 0 ? dpNextFuel.toFixed(1) + ' л' : '0 л'}</td>
             <td class="eq-report-action" rowspan="2"></td>
         </tr>
@@ -939,7 +945,7 @@ function updateEquipmentReportTotals() {
         <tr style="background-color: #d5f5e3; font-weight: bold; border-top: 2px solid #27ae60; border-bottom: 2px solid #27ae60;">
             <td colspan="6" style="text-align: right; padding-right: 10px; color: #145a32;">ВСЬОГО ЗА ПЕРІУД:</td>
             <td colspan="2" style="text-align: center; color: #27ae60;">Початковий: ДП ${dpPrevFuel.toFixed(1)} л | АБ ${abPrevFuel.toFixed(1)} л</td>
-            <td colspan="6" style="text-align: left; padding-left: 15px; color: #2c3e50;">Заправка: ДП <strong style="color: #27ae60;">${totalDpPeriod.toFixed(1)} л</strong> | АБ <strong style="color: #2980b9;">${totalAbPeriod.toFixed(1)} л</strong> | Мастило <strong style="color: #8e44ad;">${formatFluidBreakdown(totalOilPeriodMap)}</strong></td>
+            <td colspan="9" style="text-align: left; padding-left: 15px; color: #2c3e50;">Заправка: ДП <strong style="color: #27ae60;">${totalDpPeriod.toFixed(1)} л</strong> | АБ <strong style="color: #2980b9;">${totalAbPeriod.toFixed(1)} л</strong> | Мастило <strong style="color: #8e44ad;">${formatFluidBreakdown(totalOilPeriodMap)}</strong></td>
             <td style="text-align: center; color: #145a32; font-weight: bold;">${(dpNextFuel + abNextFuel) > 0 ? (dpNextFuel + abNextFuel).toFixed(1) + ' л' : '0 л'}</td>
             <td class="eq-report-action"></td>
         </tr>

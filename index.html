@@ -88,7 +88,7 @@
             reader.readAsDataURL(file);
         }
     </script>
-    <link rel="stylesheet" href="style.css?v=20261113-pdf-preview">
+    <link rel="stylesheet" href="style.css?v=20261114-grouped">
     <style>
         html:not(.registry-developer) #base-view .registry-developer-only { display: none !important; }
         html:not(.registry-admin-columns) #base-view .registry-admin-only:not([data-editor-allowed]) { display: none !important; }
@@ -568,22 +568,24 @@
                 <table id="equipment-report-table" class="compact-report-table" style="width: 100%; border-collapse: collapse; background: white; font-size: 12px;">
                     <thead>
                         <tr style="background-color: #2e7d32; color: white;">
-                            <th style="padding: 6px 4px; width: 35px;">№</th>
-                            <th style="padding: 6px 4px; width: 95px;">Категорія</th>
-                            <th style="padding: 6px 4px; width: 100px;">Підрозділ<select class="eq-report-search" id="eq-report-subdivision-search" aria-label="Пошук за підрозділом" onchange="changeEquipmentReportFilter('subdivision',this.value)" style="display:block;width:100%;margin-top:5px;padding:4px;box-sizing:border-box"><option value="all">Усі</option></select></th>
-                            <th style="padding: 6px 4px; min-width: 180px;">Модель обладнання<input class="eq-report-search" id="eq-report-model-search" type="search" list="eq-report-model-options" aria-label="Пошук за моделлю обладнання" placeholder="Назва або вибір зі списку…" autocomplete="off" oninput="changeEquipmentReportFilter('model',this.value)" style="display:block;width:100%;margin-top:5px;padding:4px;box-sizing:border-box"><datalist id="eq-report-model-options"></datalist></th>
-                            <th style="padding: 6px 4px; min-width: 140px;">Серійний номер<input class="eq-report-search" id="eq-report-serial-search" type="search" aria-label="Пошук за серійним номером" placeholder="Введіть цифри або букви…" autocomplete="off" oninput="changeEquipmentReportFilter('serial',this.value)" style="display:block;width:100%;margin-top:5px;padding:4px;box-sizing:border-box"></th>
-                            <th style="padding: 6px 4px; width: 75px;">Тип пал.</th>
-                            <th style="padding: 6px 4px; width: 85px;">Залишок палива<br>на <span class="eq-rep-start">01.10</span></th>
-                            <th style="padding: 6px 4px; width: 85px;">Залишок мастила<br>на <span class="eq-rep-start">01.10</span></th>
-                            <th style="padding: 6px 4px; width: 85px;">Заправка <span class="eq-rep-p1-label">1-10.10</span><br>(паливо)</th>
-                            <th style="padding: 6px 4px; width: 85px;">Заправка <span class="eq-rep-p1-label">1-10.10</span><br>(мастило)</th>
-                            <th style="padding: 6px 4px; width: 85px;">Заправка <span class="eq-rep-p2-label">11-20.10</span><br>(паливо)</th>
-                            <th style="padding: 6px 4px; width: 85px;">Заправка <span class="eq-rep-p2-label">11-20.10</span><br>(мастило)</th>
-                            <th style="padding: 6px 4px; width: 85px;">Заправка <span class="eq-rep-p3-label">21-31.10</span><br>(паливо)</th>
-                            <th style="padding: 6px 4px; width: 85px;">Заправка <span class="eq-rep-p3-label">21-31.10</span><br>(мастило)</th>
-                            <th style="padding: 6px 4px; width: 95px;">Залишок палива на початок<br>наст. періоду (<span class="eq-rep-next-start">11.10</span>)</th>
-                            <th class="eq-report-action" style="padding:6px 4px;min-width:110px">Дія</th>
+                            <th rowspan="2" style="padding: 6px 4px; width: 35px;">№</th>
+                            <th rowspan="2" style="padding: 6px 4px; width: 95px;">Категорія</th>
+                            <th rowspan="2" style="padding: 6px 4px; width: 100px;">Підрозділ<select class="eq-report-search" id="eq-report-subdivision-search" aria-label="Пошук за підрозділом" onchange="changeEquipmentReportFilter('subdivision',this.value)" style="display:block;width:100%;margin-top:5px;padding:4px;box-sizing:border-box"><option value="all">Усі</option></select></th>
+                            <th rowspan="2" style="padding: 6px 4px; min-width: 180px;">Модель обладнання<input class="eq-report-search" id="eq-report-model-search" type="search" list="eq-report-model-options" aria-label="Пошук за моделлю обладнання" placeholder="Назва або вибір зі списку…" autocomplete="off" oninput="changeEquipmentReportFilter('model',this.value)" style="display:block;width:100%;margin-top:5px;padding:4px;box-sizing:border-box"><datalist id="eq-report-model-options"></datalist></th>
+                            <th rowspan="2" style="padding: 6px 4px; min-width: 140px;">Серійний номер<input class="eq-report-search" id="eq-report-serial-search" type="search" aria-label="Пошук за серійним номером" placeholder="Введіть цифри або букви…" autocomplete="off" oninput="changeEquipmentReportFilter('serial',this.value)" style="display:block;width:100%;margin-top:5px;padding:4px;box-sizing:border-box"></th>
+                            <th rowspan="2" style="padding: 6px 4px; width: 75px;">Тип пал.</th>
+                            <th colspan="2">Залишки на <span class="eq-rep-start">01.10</span></th>
+                            <th colspan="3">Заправка <span class="eq-rep-p1-label">1-10.10</span></th>
+                            <th colspan="3">Заправка <span class="eq-rep-p2-label">11-20.10</span></th>
+                            <th colspan="3">Заправка <span class="eq-rep-p3-label">21-31.10</span></th>
+                            <th rowspan="2">Залишок палива<br>на кінець періоду</th>
+                            <th rowspan="2" class="eq-report-action" style="min-width:110px">Дія</th>
+                        </tr>
+                        <tr>
+                            <th>Паливо</th><th>Мастило</th>
+                            <th>Паливо</th><th>Мастило</th><th>Число</th>
+                            <th>Паливо</th><th>Мастило</th><th>Число</th>
+                            <th>Паливо</th><th>Мастило</th><th>Число</th>
                         </tr>
                     </thead>
                     <tbody id="equipment-report-tbody"></tbody>
@@ -778,7 +780,7 @@
     <script src="admin_layout.js?v=20261026-dual-admin"></script>
     <script src="permissions_registry.js"></script>
     <script src="broadcast_mail.js"></script>
-    <script src="equipment_report.js?v=20261113-inventory-location"></script>
+    <script src="equipment_report.js?v=20261114-grouped"></script>
     <script src="driver_routes.js?v=20261110-daily-routes"></script>
     <script src="route_trailer.js?v=20261110-daily-routes"></script>
     <script src="daily_routes.js?v=20261110-daily-formula-spacing"></script>
