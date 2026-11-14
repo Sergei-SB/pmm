@@ -422,7 +422,7 @@ function updateEquipmentReportHeaders() {
         }
     }
 
-    document.querySelectorAll('.eq-rep-start').forEach(el => el.textContent = startDate);
+    document.querySelectorAll('.eq-rep-start').forEach(el => el.textContent = `01.${mm}`);
     document.querySelectorAll('.eq-rep-end').forEach(el => el.textContent = endDate);
     document.querySelectorAll('.eq-rep-next-start').forEach(el => el.textContent = nextStartDate);
     document.querySelectorAll('.eq-rep-p1-label').forEach(el => el.textContent = p1Label);
