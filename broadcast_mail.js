@@ -370,7 +370,7 @@ function openBroadcastMailModal(tab) {
             <select id="broadcast-target" style="width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 13px; background: white; color: #1e293b; font-weight: 500;">
                 <option value="admin">🛡️ Тільки Адмінам (побачить виключно Адміністратор)</option>
                 <option value="moderator">👮 Тільки Модераторам (побачить виключно Модератор)</option>
-                <option value="developer">💻 Тільки Розробникам (побачить виключно Розробник)</option>
+                <option value="developer" selected>💻 Тільки Розробникам (побачить виключно Розробник)</option>
                 <option value="user">👤 Тільки Юзерам (побачить виключно звичайний Юзер)</option>
                 <option value="admin_moderator">🛡️👮 Тільки Адмінам і Модераторам</option>
                 <option value="dev_admin">💻🛡️ Тільки Розробникам і Адмінам</option>
