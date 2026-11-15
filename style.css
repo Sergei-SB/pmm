@@ -125,6 +125,33 @@ th {
     background: white;
 }
 
+#equipment-report-table {
+    table-layout: fixed;
+    min-width: 1280px;
+}
+
+#equipment-report-table th:nth-child(1)[rowspan] { width: 28px !important; }
+#equipment-report-table th:nth-child(2)[rowspan] { width: 68px !important; }
+#equipment-report-table th:nth-child(3)[rowspan] { width: 76px !important; }
+#equipment-report-table th:nth-child(4)[rowspan],
+#equipment-report-table th:nth-child(5)[rowspan] { min-width: 0 !important; }
+#equipment-report-table th.eq-report-action { width: 104px; }
+#equipment-report-table .eq-report-fuel-type-col { width: 42px; }
+#equipment-report-table .eq-report-amount-col { width: 52px; }
+#equipment-report-table .eq-report-dates-col { width: 66px; }
+#equipment-report-table .eq-report-ending-col { width: 105px; }
+
+#equipment-report-table tbody td {
+    padding-inline: 3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#equipment-report-table .eq-rep-input {
+    box-sizing: border-box;
+    min-width: 0;
+}
+
 #equipment-report-table thead {
     position: sticky;
     top: 0;
@@ -139,7 +166,6 @@ th {
 #equipment-report-table .eq-refuel-date {
     box-sizing: border-box;
     width: 100%;
-    min-width: 105px;
     padding: 3px;
     border: 1px solid #ccc;
     font: inherit;
