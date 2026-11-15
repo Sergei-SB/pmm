@@ -88,7 +88,7 @@
             reader.readAsDataURL(file);
         }
     </script>
-    <link rel="stylesheet" href="style.css?v=20261116-responsive-equipment-report">
+    <link rel="stylesheet" href="style.css?v=20261116-balanced-equipment-report">
     <style>
         html:not(.registry-developer) #base-view .registry-developer-only { display: none !important; }
         html:not(.registry-admin-columns) #base-view .registry-admin-only:not([data-editor-allowed]) { display: none !important; }
@@ -567,14 +567,17 @@
                 <datalist id="eq-report-subdivision-options"></datalist>
                 <table id="equipment-report-table" class="compact-report-table" style="width: 100%; border-collapse: collapse; background: white; font-size: 12px;">
                     <colgroup>
-                        <col span="5">
+                        <col class="eq-report-index-col">
+                        <col span="2" class="eq-report-category-col">
+                        <col class="eq-report-model-col">
+                        <col class="eq-report-serial-col">
                         <col class="eq-report-fuel-type-col">
                         <col span="2" class="eq-report-amount-col">
                         <col span="2" class="eq-report-amount-col"><col class="eq-report-dates-col">
                         <col span="2" class="eq-report-amount-col"><col class="eq-report-dates-col">
                         <col span="2" class="eq-report-amount-col"><col class="eq-report-dates-col">
                         <col class="eq-report-ending-col">
-                        <col>
+                        <col class="eq-report-action-col">
                     </colgroup>
                     <thead>
                         <tr style="background-color: #2e7d32; color: white;">

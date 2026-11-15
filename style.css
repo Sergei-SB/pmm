@@ -130,17 +130,15 @@ th {
     min-width: 1200px;
 }
 
-#equipment-report-table th:nth-child(1)[rowspan] { width: 28px !important; }
-#equipment-report-table th:nth-child(2)[rowspan] { width: 68px !important; }
-#equipment-report-table th:nth-child(3)[rowspan] { width: 76px !important; }
-#equipment-report-table th:nth-child(4)[rowspan],
-#equipment-report-table th:nth-child(5)[rowspan] { min-width: 0 !important; }
-#equipment-report-table th:nth-child(5)[rowspan] { width: clamp(94px, 8vw, 125px); }
-#equipment-report-table th.eq-report-action { width: 104px; }
-#equipment-report-table .eq-report-fuel-type-col { width: 42px; }
-#equipment-report-table .eq-report-amount-col { width: 52px; }
-#equipment-report-table .eq-report-dates-col { width: 66px; }
-#equipment-report-table .eq-report-ending-col { width: 105px; }
+#equipment-report-table .eq-report-index-col { width: 2.3%; }
+#equipment-report-table .eq-report-category-col { width: 8%; }
+#equipment-report-table .eq-report-model-col { width: 10.5%; }
+#equipment-report-table .eq-report-serial-col { width: 9%; }
+#equipment-report-table .eq-report-fuel-type-col { width: 3.4%; }
+#equipment-report-table .eq-report-amount-col { width: 4.15%; }
+#equipment-report-table .eq-report-dates-col { width: 4.7%; }
+#equipment-report-table .eq-report-ending-col { width: 4.5%; }
+#equipment-report-table .eq-report-action-col { width: 7%; }
 
 #equipment-report-table tbody td {
     padding-inline: 3px;
@@ -153,6 +151,13 @@ th {
     min-width: 0;
 }
 
+#equipment-report-table tbody td:nth-child(2),
+#equipment-report-table tbody td:nth-child(4),
+#equipment-report-table tfoot td {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
 #equipment-report-table thead {
     position: sticky;
     top: 0;
@@ -160,6 +165,7 @@ th {
 }
 
 #equipment-report-table thead th {
+    min-width: 0 !important;
     position: static;
     padding: 3px 2px;
     white-space: normal;
