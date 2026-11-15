@@ -390,6 +390,10 @@ th {
     background: #fff;
 }
 
+.view-section table :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="hidden"]), select, textarea) {
+    border-radius: 3px !important;
+}
+
 .report-controls {
     display: flex;
     align-items: center;
