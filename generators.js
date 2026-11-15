@@ -370,10 +370,14 @@ function updateGeneratorProp(id, prop, val) {
     if (item) {
         item[prop] = val;
         if (prop === 'locationSubdivision') item.subdivision = val;
-        if (prop === 'model' && val.trim()) {
-            const model = val.trim().toLowerCase();
-            const matches = list.filter(other => other !== item && String(other.model ?? '').trim().toLowerCase() === model);
-            for (const field of ['kw', 'fuelType', 'consumption', 'oilNorm10Days']) {
+        const sharedFields = ['kw', 'fuelType', 'consumption', 'oilNorm10Days'];
+        const model = String(item.model ?? '').trim().toLowerCase();
+        const sharedEdit = sharedFields.includes(prop);
+        const matches = model && (prop === 'model' || sharedEdit)
+            ? list.filter(other => other !== item && String(other.model ?? '').trim().toLowerCase() === model)
+            : [];
+        if (prop === 'model') {
+            for (const field of sharedFields) {
                 if (String(item[field] ?? '').trim()) continue;
                 const values = new Set(matches.map(other => String(other[field] ?? '').trim()).filter(Boolean));
                 if (values.size === 1) item[field] = values.values().next().value;
@@ -382,6 +386,17 @@ function updateGeneratorProp(id, prop, val) {
         if (['consumption','motoHoursDay'].includes(prop) && typeof applyEquipmentFuelLimits === 'function') {
             applyEquipmentFuelLimits(item, 12, true);
             updateEquipmentFuelLimitCells(item, 'updateGeneratorProp');
+        }
+        if (sharedEdit) {
+            for (const duplicate of matches) {
+                duplicate[prop] = val;
+                if (prop === 'consumption' && typeof applyEquipmentFuelLimits === 'function') {
+                    applyEquipmentFuelLimits(duplicate, 12, true);
+                    updateEquipmentFuelLimitCells(duplicate, 'updateGeneratorProp');
+                }
+                const cell = document.querySelector?.(`#generators-tbody input[oninput="updateGeneratorProp(${Number(duplicate.id)}, '${prop}', this.value)"]`);
+                if (cell) cell.value = val;
+            }
         }
         saveGeneratorsList(list);
         if (prop === 'model') renderGeneratorsView();
