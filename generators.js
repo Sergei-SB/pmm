@@ -257,9 +257,9 @@ function renderGeneratorsView() {
                             ${efBtn('max30Days', 'Макс на 30 діб')}
                         </div>
                     </th>
-                    <th style="padding: 6px 4px; width: 54px;">
+                    <th style="padding: 6px 4px; width: 42px;">
                         <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
-                            <span>Норма<br>мотогодин</span>
+                            <span>Норма<br>м/год</span>
                             ${efBtn('motoHoursDay', 'Норма мотог.')}
                         </div>
                     </th>
