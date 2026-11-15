@@ -438,7 +438,7 @@
         Object.keys(bases).forEach(function (key) {
             // A confirmed snapshot identical to the local value is already
             // available as previousValue when the next edit is queued.
-            if (/^(report_data_|isolated_car_routes_)/.test(key) && !pending[key] &&
+            if (!pending[key] &&
                 typeof bases[key] === 'string' && getKeyRev(key) > 0 && localGet(key) === bases[key]) {
                 delete bases[key];
             }
@@ -615,7 +615,7 @@
                 try {
                     rawSetItem.call(this, key, value);
                 } catch (error) {
-                    if (!isLocal || error.name !== 'QuotaExceededError' || !/^(report_data_|isolated_car_routes_)/.test(key)) throw error;
+                    if (!isLocal || applyingRemote || error.name !== 'QuotaExceededError') throw error;
                     saveMeta();
                     rawSetItem.call(this, key, value);
                 }

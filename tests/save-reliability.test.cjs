@@ -587,7 +587,7 @@ test('Conflict button sends legacy duplicate plates using their stable IDs and r
 
 test('Card transfer recovers browser space and stores fuel and odometers in the selected report', () => {
     const key = 'report_data_01.11-10.11';
-    const routeKey = 'isolated_car_routes_9_01.11-10.11';
+    const routeKey = 'equipment_report_data_01.11-10.11';
     const previousReport = JSON.stringify({9: {note: 'Existing note'}, 10: {leftFuel: '25'}});
     const route = JSON.stringify({topFields: {}, rows: [], padding: 'x'.repeat(2500)});
     const dirtyKey = 'report_data_pending';
