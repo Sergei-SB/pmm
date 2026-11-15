@@ -263,7 +263,7 @@ function renderGeneratorsView() {
                             ${efBtn('motoHoursDay', 'Норма мотог.')}
                         </div>
                     </th>
-                    <th style="padding: 6px 4px; min-width: 90px;">
+                    <th style="padding: 6px 4px; width: 90px; min-width: 90px;">
                         <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
                             <span>Підрозділ</span>
                             ${efBtn('subdivision', 'Підрозділ')}
@@ -277,9 +277,9 @@ function renderGeneratorsView() {
                         </div>
                         <input type="text" id="filter-gen-resp" placeholder="Фільтр..." value="${generatorsFilters.responsiblePerson}" oninput="updateGenFilter('responsiblePerson', this.value)" style="width: 100%; font-size: 11px; padding: 2px; border-radius: 2px; border: 1px solid #1b5e20; box-sizing: border-box; margin-top: 2px;">
                     </th>
-                    <th style="padding: 6px 4px; min-width: 100px;">
+                    <th style="padding: 6px 4px; width: 90px; min-width: 90px;">
                         <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
-                            <span>Де знаходиться</span>
+                            <span style="white-space: normal;">Де знаходиться</span>
                             ${efBtn('locationSubdivision', 'Де знаходиться')}
                         </div>
                         <input type="text" id="filter-gen-loc" placeholder="Фільтр..." value="${generatorsFilters.locationSubdivision}" oninput="updateGenFilter('locationSubdivision', this.value)" style="width: 100%; font-size: 11px; padding: 2px; border-radius: 2px; border: 1px solid #1b5e20; box-sizing: border-box; margin-top: 2px;">
