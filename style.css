@@ -127,7 +127,7 @@ th {
 
 #equipment-report-table {
     table-layout: fixed;
-    min-width: 1280px;
+    min-width: 1200px;
 }
 
 #equipment-report-table th:nth-child(1)[rowspan] { width: 28px !important; }
@@ -135,6 +135,7 @@ th {
 #equipment-report-table th:nth-child(3)[rowspan] { width: 76px !important; }
 #equipment-report-table th:nth-child(4)[rowspan],
 #equipment-report-table th:nth-child(5)[rowspan] { min-width: 0 !important; }
+#equipment-report-table th:nth-child(5)[rowspan] { width: clamp(94px, 8vw, 125px); }
 #equipment-report-table th.eq-report-action { width: 104px; }
 #equipment-report-table .eq-report-fuel-type-col { width: 42px; }
 #equipment-report-table .eq-report-amount-col { width: 52px; }
@@ -160,7 +161,19 @@ th {
 
 #equipment-report-table thead th {
     position: static;
-    padding: 3px 5px;
+    padding: 3px 2px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.15;
+}
+
+#equipment-report-table thead tr:nth-child(2) th {
+    font-size: 10px;
+}
+
+#equipment-report-table td.eq-report-action button {
+    max-width: 100%;
+    white-space: normal;
 }
 
 #equipment-report-table .eq-refuel-date {
