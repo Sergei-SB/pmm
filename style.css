@@ -141,7 +141,7 @@ th {
 #equipment-report-table .eq-report-action-col { width: 7%; }
 
 #equipment-report-table tbody td {
-    padding-inline: 3px;
+    padding: 2px 3px;
     overflow: hidden;
     text-overflow: ellipsis;
 }
@@ -149,6 +149,17 @@ th {
 #equipment-report-table .eq-rep-input {
     box-sizing: border-box;
     min-width: 0;
+}
+
+#equipment-report-table tbody .eq-rep-input,
+#equipment-report-table tbody .eq-report-action button {
+    padding: 2px 4px !important;
+    font-size: 11px;
+}
+
+#equipment-report-table .eq-report-identifier {
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 #equipment-report-table tbody td:nth-child(2),
