@@ -262,7 +262,7 @@ function renderPumpsView() {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td style="text-align: center; padding: 3px 4px;">${index + 1}</td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" list="pumps-model-datalist" value="${escapePumpValue(item.model)}" placeholder="Нова помпа" oninput="updatePumpsProp(${item.id}, 'model', this.value, false)" onchange="updatePumpsProp(${item.id}, 'model', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" list="pumps-model-datalist" value="${escapePumpValue(item.model)}" oninput="updatePumpsProp(${item.id}, 'model', this.value, false)" onchange="updatePumpsProp(${item.id}, 'model', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${escapePumpValue(item.kw)}" oninput="updatePumpsProp(${item.id}, 'kw', this.value)"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${escapePumpValue(item.fuelType)}" oninput="updatePumpsProp(${item.id}, 'fuelType', this.value)"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; background-color: #fff9c4; width: 100%; box-sizing: border-box; padding: 3px;" value="${escapePumpValue(item.consumption)}" oninput="updatePumpsProp(${item.id}, 'consumption', this.value)"></td>
@@ -327,7 +327,7 @@ function addPumpsRow() {
     if (!canManagePumps('eq_add_item')) return;
     let list = getPumpsList();
     const newId = list.length > 0 ? Math.max(...list.map(i => i.id)) + 1 : 1;
-    list.push({ id: newId, model: "", kw: "", fuelType: "", consumption: "", max5Days: "", max10Days: "", max30Days: "", motoHoursDay: "", oilNorm10Days: "", subdivision: "РМТЗ", responsiblePerson: "", locationSubdivision: "РМТЗ", serialNumber: "", note: "" });
+    list.push({ id: newId, model: "", kw: "", fuelType: "", consumption: "", max5Days: "", max10Days: "", max30Days: "", motoHoursDay: "", oilNorm10Days: "", subdivision: "", responsiblePerson: "", locationSubdivision: "", serialNumber: "", note: "" });
     savePumpsList(list);
     renderPumpsView();
 }

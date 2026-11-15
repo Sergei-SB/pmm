@@ -334,7 +334,7 @@ function renderGeneratorsView() {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td style="text-align: center; padding: 3px 4px;">${index + 1}</td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" list="generators-model-datalist" value="${item.model || ''}" placeholder="Новий генератор" onchange="updateGeneratorProp(${item.id}, 'model', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" list="generators-model-datalist" value="${item.model || ''}" onchange="updateGeneratorProp(${item.id}, 'model', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.kw || ''}" oninput="updateGeneratorProp(${item.id}, 'kw', this.value)"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.fuelType || ''}" oninput="updateGeneratorProp(${item.id}, 'fuelType', this.value)"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; background-color: #fff9c4; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.consumption || ''}" oninput="updateGeneratorProp(${item.id}, 'consumption', this.value)"></td>
@@ -370,17 +370,13 @@ function updateGeneratorProp(id, prop, val) {
     if (item) {
         item[prop] = val;
         if (prop === 'locationSubdivision') item.subdivision = val;
-        if (prop === 'model') {
-            const foundRef = defaultGeneratorsData.find(ref => ref.model.toLowerCase().trim() === val.toLowerCase().trim());
-            if (foundRef) {
-                item.kw = foundRef.kw;
-                item.fuelType = foundRef.fuelType;
-                item.consumption = foundRef.consumption;
-                item.max5Days = foundRef.max5Days;
-                item.max10Days = foundRef.max10Days;
-                item.max30Days = foundRef.max30Days;
-                item.motoHoursDay = foundRef.motoHoursDay;
-                item.oilNorm10Days = foundRef.oilNorm10Days;
+        if (prop === 'model' && val.trim()) {
+            const model = val.trim().toLowerCase();
+            const matches = list.filter(other => other !== item && String(other.model ?? '').trim().toLowerCase() === model);
+            for (const field of ['kw', 'fuelType', 'consumption', 'oilNorm10Days']) {
+                if (String(item[field] ?? '').trim()) continue;
+                const values = new Set(matches.map(other => String(other[field] ?? '').trim()).filter(Boolean));
+                if (values.size === 1) item[field] = values.values().next().value;
             }
         }
         if (['consumption','motoHoursDay'].includes(prop) && typeof applyEquipmentFuelLimits === 'function') {
@@ -395,7 +391,7 @@ function updateGeneratorProp(id, prop, val) {
 function addGeneratorRow() {
     let list = getGeneratorsList();
     const newId = list.length > 0 ? Math.max(...list.map(i => i.id)) + 1 : 1;
-    list.push({ id: newId, model: "", kw: "", fuelType: "", consumption: "", max5Days: "", max10Days: "", max30Days: "", motoHoursDay: "", oilNorm10Days: "", subdivision: "РМТЗ", responsiblePerson: "Ковальов В.В.", locationSubdivision: "РМТЗ", serialNumber: "000000", note: "" });
+    list.push({ id: newId, model: "", kw: "", fuelType: "", consumption: "", max5Days: "", max10Days: "", max30Days: "", motoHoursDay: "", oilNorm10Days: "", subdivision: "", responsiblePerson: "", locationSubdivision: "", serialNumber: "", note: "" });
     saveGeneratorsList(list);
     renderGeneratorsView();
 }

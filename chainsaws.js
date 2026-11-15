@@ -257,7 +257,7 @@ function renderChainsawsView() {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td style="text-align: center; padding: 3px 4px;">${index + 1}</td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" list="chainsaws-model-datalist" value="${item.model || ''}" placeholder="Нова бензопила" onchange="updateChainsawsProp(${item.id}, 'model', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" list="chainsaws-model-datalist" value="${item.model || ''}" onchange="updateChainsawsProp(${item.id}, 'model', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.kw || ''}" oninput="updateChainsawsProp(${item.id}, 'kw', this.value)"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.fuelType || ''}" oninput="updateChainsawsProp(${item.id}, 'fuelType', this.value)"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; background-color: #fff9c4; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.consumption || ''}" oninput="updateChainsawsProp(${item.id}, 'consumption', this.value)"></td>
@@ -318,7 +318,7 @@ function updateChainsawsProp(id, prop, val) {
 function addChainsawsRow() {
     let list = getChainsawsList();
     const newId = list.length > 0 ? Math.max(...list.map(i => i.id)) + 1 : 1;
-    list.push({ id: newId, model: "", kw: "", fuelType: "", consumption: "", max5Days: "", max10Days: "", max30Days: "", motoHoursDay: "", oilNorm10Days: "", subdivision: "РМТЗ", responsiblePerson: "Ковальов В.В.", locationSubdivision: "РМТЗ", serialNumber: "000000", note: "" });
+    list.push({ id: newId, model: "", kw: "", fuelType: "", consumption: "", max5Days: "", max10Days: "", max30Days: "", motoHoursDay: "", oilNorm10Days: "", subdivision: "", responsiblePerson: "", locationSubdivision: "", serialNumber: "", note: "" });
     saveChainsawsList(list);
     renderChainsawsView();
 }
