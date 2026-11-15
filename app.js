@@ -749,6 +749,9 @@ function renderCarsTable(filterQuery = '') {
 
     const searchInput = document.getElementById('base-search-input');
     const query = filterQuery !== '' ? filterQuery : (searchInput ? searchInput.value : '');
+    const vinSearch = document.getElementById('base-vin-search');
+    const vinQuery = document.documentElement.classList.contains('registry-admin-columns')
+        ? (vinSearch?.value || '').trim().toUpperCase() : '';
     const upperVal = query.toUpperCase().trim();
     
     const filteredCars = safeCars.filter(car => {
@@ -764,6 +767,7 @@ function renderCarsTable(filterQuery = '') {
             return false;
         }
 
+        if (vinQuery && !String(car.vin ?? '').toUpperCase().includes(vinQuery)) return false;
         if (selectedPlate !== 'all' && (car.plate || '').trim() !== selectedPlate) {
             return false;
         }
