@@ -233,33 +233,33 @@ function renderGeneratorsView() {
                             ${efBtn('consumption', 'Розхід')}
                         </div>
                     </th>
-                    <th style="padding: 6px 4px; width: 65px;">
+                    <th style="padding: 6px 4px; width: 54px;">
                         <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
-                            <span>Норма мастил</span>
+                            <span>Норма<br>мастила</span>
                             ${efBtn('oilNorm10Days', 'Норма мастил')}
                         </div>
                     </th>
-                    <th style="padding: 6px 4px; width: 75px;">
+                    <th style="padding: 6px 4px; width: 54px;">
                         <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
-                            <span>Макс 5 діб</span>
+                            <span>5 днів</span>
                             ${efBtn('max5Days', 'Макс на 5 діб')}
                         </div>
                     </th>
-                    <th style="padding: 6px 4px; width: 75px;">
+                    <th style="padding: 6px 4px; width: 54px;">
                         <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
-                            <span>Макс 10 діб</span>
+                            <span>10 днів</span>
                             ${efBtn('max10Days', 'Макс на 10 діб')}
                         </div>
                     </th>
-                    <th style="padding: 6px 4px; width: 75px;">
+                    <th style="padding: 6px 4px; width: 54px;">
                         <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
-                            <span>Макс 30 діб</span>
+                            <span>30 днів</span>
                             ${efBtn('max30Days', 'Макс на 30 діб')}
                         </div>
                     </th>
-                    <th style="padding: 6px 4px; width: 65px;">
+                    <th style="padding: 6px 4px; width: 54px;">
                         <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
-                            <span>Норма мотог.</span>
+                            <span>Норма<br>мотогодин</span>
                             ${efBtn('motoHoursDay', 'Норма мотог.')}
                         </div>
                     </th>
