@@ -394,6 +394,15 @@ th {
     border-radius: 3px !important;
 }
 
+#card-view table :is(input[type="text"], input[type="number"], input[type="time"], input[type="date"]) {
+    border: 1px solid #bdc3c7;
+}
+
+#card-view table :is(input[type="text"], input[type="number"], input[type="time"], input[type="date"]):focus {
+    outline: 1px solid #2e7d32;
+    outline-offset: 0;
+}
+
 .report-controls {
     display: flex;
     align-items: center;
