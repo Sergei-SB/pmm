@@ -253,7 +253,7 @@ function renderAggregatesCalcView() {
                 <td style="padding: 2px; border: 1px solid #bdc3c7;"><input type="number" step="1" min="0" max="31" id="b-days-${i}" value="${rowData.days || ''}" oninput="onDaysInputChange(${i})" style="width: 100%; border: none; text-align: center; font-size: 11px; padding: 3px;" placeholder=""></td>
                 <td style="padding: 2px; border: 1px solid #bdc3c7;"><input type="number" step="0.1" id="b-start-${i}" data-auto="${rowData.autoStart === true}" value="${rowData.start || ''}" oninput="this.dataset.auto='false'; calculateVariantBRow(${i})" style="width: 100%; border: none; text-align: center; font-size: 11px; padding: 3px;" placeholder=""></td>
                 <td style="padding: 2px; border: 1px solid #bdc3c7;"><input type="number" step="0.1" id="b-rec-${i}" value="${rowData.rec || ''}" oninput="calculateVariantBRow(${i})" style="width: 100%; border: none; text-align: center; font-size: 11px; padding: 3px;" placeholder=""></td>
-                <td style="padding: 2px;"><input type="text" inputmode="numeric" maxlength="5" placeholder="дд.мм" id="b-receipt-date-${i}" aria-label="Дата отримання пального, рядок ${i}" value="${aggregateReceiptDayMonth(rowData.receiptDate)}" oninput="formatAggregateReceiptInput(this); onDaysInputChange(${i})" style="width:100%;box-sizing:border-box;font-size:11px;padding:2px;"></td>
+                <td style="padding:2px;"><div style="display:flex;align-items:center;position:relative;"><input type="text" inputmode="numeric" maxlength="5" placeholder="дд.мм" id="b-receipt-date-${i}" aria-label="Дата отримання пального, рядок ${i}" value="${aggregateReceiptDayMonth(rowData.receiptDate)}" oninput="formatAggregateReceiptInput(this); onDaysInputChange(${i})" style="width:100%;box-sizing:border-box;font-size:11px;padding:2px;"><input type="date" aria-label="Вибрати дату в календарі, рядок ${i}" onchange="pickAggregateReceiptDate(this,${i})" style="position:absolute;right:0;bottom:0;width:1px;height:1px;opacity:0;" tabindex="-1"><button type="button" aria-label="Відкрити календар" onclick="openAggregateReceiptPicker(this.previousElementSibling)" style="padding:0 3px;cursor:pointer;">📅</button></div></td>
                 <td style="padding: 2px; border: 1px solid #bdc3c7;"><input type="number" step="0.1" id="b-end-${i}" value="${rowData.end || ''}" oninput="calculateVariantBRow(${i})" style="width: 100%; border: none; text-align: center; font-size: 11px; padding: 3px;" placeholder=""></td>
                 <td style="padding: 2px; border: 1px solid #bdc3c7;"><input type="number" step="0.1" id="b-spent-${i}" value="${rowData.spent || ''}" readonly style="width: 100%; border: none; text-align: center; font-size: 11px; padding: 3px; font-weight: bold; color: #c0392b; background: #f9f9f9;" placeholder=""></td>
             </tr>
@@ -799,6 +799,19 @@ function formatAggregateReceiptInput(input) {
     const digits = input.value.replace(/\D/g, '').slice(0, 4);
     const formatted = digits.length > 2 ? digits.slice(0, 2) + '.' + digits.slice(2) : digits;
     if (input.value !== formatted) input.value = formatted;
+}
+
+function openAggregateReceiptPicker(picker) {
+    const dayMonth = picker.previousElementSibling.value;
+    const year = new Intl.DateTimeFormat('en', {year: 'numeric', timeZone: 'Europe/Kyiv'}).format(new Date());
+    picker.value = /^\d{2}\.\d{2}$/.test(dayMonth)
+        ? year + '-' + dayMonth.split('.').reverse().join('-') : '';
+    picker.showPicker();
+}
+
+function pickAggregateReceiptDate(picker, row) {
+    picker.previousElementSibling.value = aggregateReceiptDayMonth(picker.value);
+    onDaysInputChange(row);
 }
 
 function aggregateReceiptDate(row) {
