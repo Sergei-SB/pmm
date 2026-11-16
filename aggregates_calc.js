@@ -262,27 +262,17 @@ function renderAggregatesCalcView() {
 
     html += `
                             </tbody>
+                            <tfoot id="variant-b-summary-box" style="position:sticky;bottom:0;background:#e8f5e9;text-align:center;font-weight:bold;">
+                                <tr>
+                                    <td id="sum-b-days">0</td>
+                                    <td id="sum-b-start">0.0</td>
+                                    <td id="sum-b-rec" style="color:#2e7d32;">0.0</td>
+                                    <td><button type="button" id="round-b-summary" class="action-btn" aria-label="Округлити підсумок до цілих" aria-pressed="${window._integerFuelSummary}" onclick="toggleVariantBSummaryRounding()" style="padding: 3px 6px; font-size: 10px; white-space: nowrap;">${window._integerFuelSummary ? 'Цілі (0)' : 'Десяткові (0,0)'}</button></td>
+                                    <td id="sum-b-end" style="color:#2980b9;">0.0</td>
+                                    <td id="sum-b-spent" style="color:#c0392b;">0.0</td>
+                                </tr>
+                            </tfoot>
                         </table>
-                    </div>
-
-                    <!-- ПІДСУМОК ТАБЛИЦІ ЗЛІВА -->
-                    <div id="variant-b-summary-box" style="display: grid; grid-template-columns: auto 42px repeat(4, minmax(0, 1fr)); gap: 2px; text-align: center; font-size: 10px;">
-                        <button type="button" id="round-b-summary" class="action-btn" aria-label="Округлити підсумок до цілих" aria-pressed="${window._integerFuelSummary}" onclick="toggleVariantBSummaryRounding()" style="padding: 3px 6px; font-size: 10px; white-space: nowrap;">${window._integerFuelSummary ? 'Цілі (0)' : 'Десяткові (0,0)'}</button>
-                        <div style="background: white; padding: 4px 2px; border-radius: 3px; border: 1px solid #bdc3c7;">
-                            <div id="sum-b-days" style="font-weight: bold; color: #2c3e50; font-size: 11px;">0</div>
-                        </div>
-                        <div style="background: white; padding: 4px 2px; border-radius: 3px; border: 1px solid #bdc3c7;">
-                            <div id="sum-b-start" style="font-weight: bold; color: #2c3e50; font-size: 11px;">0.0</div>
-                        </div>
-                        <div style="background: white; padding: 4px 2px; border-radius: 3px; border: 1px solid #bdc3c7;">
-                            <div id="sum-b-rec" style="font-weight: bold; color: #2e7d32; font-size: 11px;">0.0</div>
-                        </div>
-                        <div style="background: white; padding: 4px 2px; border-radius: 3px; border: 1px solid #bdc3c7;">
-                            <div id="sum-b-end" style="font-weight: bold; color: #2980b9; font-size: 11px;">0.0</div>
-                        </div>
-                        <div style="background: white; padding: 4px 2px; border-radius: 3px; border: 1px solid #bdc3c7;">
-                            <div id="sum-b-spent" style="font-weight: bold; color: #c0392b; font-size: 11px;">0.0</div>
-                        </div>
                     </div>
                 </div>
 
@@ -1236,7 +1226,6 @@ function printAggregatesReport() {
     const headerText = document.getElementById('agg-header-text');
     const eqName = headerText ? headerText.textContent : 'Агрегат';
 
-    let summaryBoxHtml = document.getElementById('variant-b-summary-box')?.outerHTML || '';
     let printContent = box.innerHTML.replace(/max-height:\s*300px;\s*overflow-y:\s*auto;/g, 'max-height: none; overflow: visible;');
     
     // Приховуємо панель перемикачів і кнопки перемішування при друку
@@ -1278,7 +1267,6 @@ function printAggregatesReport() {
             <body>
                 <h2>Розрахунок витрати палива та мастил агрегатів</h2>
                 <div class="subtitle"><strong>Обладнання:</strong> ${eqName} | <strong>Розхід:</strong> ${eq.consumption} л/год</div>
-                ${summaryBoxHtml}
                 ${printContent}
                 <script>
                     window.onload = function() { window.print(); window.close(); }
