@@ -1020,6 +1020,19 @@ function onManualMotoHourChange(periodIdx, dayIdx, val) {
     const verifFuelEl = document.getElementById('verif-total-fuel');
     if (verifHoursEl) verifHoursEl.textContent = (isIntegerHours ? Math.round(totalMotoHoursAll) : totalMotoHoursAll.toFixed(1)) + ' год';
     if (verifFuelEl) verifFuelEl.textContent = totalFuelAll.toFixed(1) + ' л';
+    updateAggregateDailyTotals(totalMotoHoursAll, totalFuelAll, totalOilAll, isIntegerHours);
+}
+
+function updateAggregateDailyTotals(hours, fuel, oil, integerHours) {
+    const totals = {
+        'agg-daily-total-hours': (integerHours ? hours.toFixed(0) : hours.toFixed(1)) + ' год',
+        'agg-daily-total-fuel': fuel.toFixed(1) + ' л',
+        'agg-daily-total-oil': oil.toFixed(2) + ' л'
+    };
+    for (const [id, value] of Object.entries(totals)) {
+        const cell = document.getElementById(id);
+        if (cell) cell.textContent = value;
+    }
 }
 
 function parsedNumWithOneDec(n) {
@@ -1056,6 +1069,7 @@ function displayCalcResults(eq, totalMotoHours, daysCount, totalFuel, totalOil, 
 
     let displayTotalMotoHours = 0;
     let verificationTotalFuel = 0;
+    let displayTotalOil = 0;
     let dailyTableRows = '';
     const firstDatedRow = aggregateFirstDatedRow();
     let dayDate = NaN;
@@ -1102,6 +1116,7 @@ function displayCalcResults(eq, totalMotoHours, daysCount, totalFuel, totalOil, 
             let rawOil = dailyOils[dayIdx] || 0;
             let rawFuel = dailyFuels[dayIdx] || 0;
             let adaptedOil = rawOil * (rawFuel > 0 ? (adaptedFuel / rawFuel) : 1);
+            displayTotalOil += adaptedOil;
             
             let fuelDisplay = `${adaptedFuel.toFixed(1)} л`;
             let oilDisplay = isIntegerHours ? `${Math.round(adaptedOil)} л` : `${adaptedOil.toFixed(2)} л`;
@@ -1185,10 +1200,20 @@ function displayCalcResults(eq, totalMotoHours, daysCount, totalFuel, totalOil, 
                     <tbody>
                         ${dailyTableRows}
                     </tbody>
+                    <tfoot style="background:#e8f5e9;font-weight:bold;text-align:center;">
+                        <tr>
+                            <th scope="row">Всього</th>
+                            <td id="agg-daily-total-hours"></td>
+                            <td></td>
+                            <td id="agg-daily-total-fuel" style="color:#a82d22;"></td>
+                            <td id="agg-daily-total-oil" style="color:#236b97;"></td>
+                        </tr>
+                    </tfoot>
                 </table>
             </div>
         </div>
     `;
+    updateAggregateDailyTotals(displayTotalMotoHours, verificationTotalFuel, displayTotalOil, isIntegerHours);
 }
 
 // ДРУК ЗВІТУ
