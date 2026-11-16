@@ -48,9 +48,9 @@ function generatorHoursIdentity(item) {
     return matches.length === 1 ? 'serial:' + serial : item.uniqueId;
 }
 
-function saveEquipmentMonthlyHours(input, id, serialNumber = '') {
+function saveEquipmentMonthlyHours(input, id, serialNumber = '', period = equipmentReportPeriod()) {
     if (!canEditEquipmentReport()) return;
-    const date = equipmentHoursMonth(equipmentReportPeriod());
+    const date = equipmentHoursMonth(period);
     if (!date) return;
     const value = input.value.trim().replace(',', '.');
     const previous = readEquipmentMonthlyHours(date.month, id);
@@ -456,6 +456,9 @@ function initEqReportPeriodDropdown() {
 function updateEquipmentReportHeaders() {
     const periodInput = document.getElementById('eq-report-custom-period');
     const periodStr = periodInput ? periodInput.value.trim() : (activeEquipmentReportPeriod || "01.10-10.10");
+    const hoursMonth = equipmentHoursMonth(periodStr)?.month;
+    const hoursHeading = document.getElementById('eq-report-hours-month');
+    if (hoursHeading) hoursHeading.textContent = hoursMonth ? hoursMonth.slice(5) + '.' + hoursMonth.slice(0, 4) : '';
     let parts = periodStr.split('-');
     let startDate = parts[0] ? parts[0].trim() : "01.10";
     let endDate = parts[1] ? parts[1].trim() : startDate;
@@ -910,7 +913,7 @@ function renderEquipmentReportView() {
         `;
         tbody.appendChild(tr);
         const hoursInput = tr.querySelector('[data-equipment-month-hours]');
-        if (hoursInput) hoursInput.addEventListener('change', () => saveEquipmentMonthlyHours(hoursInput, hoursId, item.serialNumber));
+        if (hoursInput) hoursInput.addEventListener('change', () => saveEquipmentMonthlyHours(hoursInput, hoursId, item.serialNumber, periodStr));
         tr.querySelector('[data-remove-eq-id]')?.addEventListener('click', () => removeEquipmentReportItem(item.uniqueId));
     });
 

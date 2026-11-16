@@ -29,6 +29,17 @@ test('Monthly hours replace the previous entry for the same unit and month', () 
     c.saveEquipmentMonthlyHours({value: ''}, id);
     assert.equal(values.size, 0);
 });
+test('Monthly hours remain separate when switching report months', () => {
+    const {c} = fixture();
+    const id = 'serial:0252-09878';
+    const november = '11.11-20.11';
+    const december = '01.12-10.12';
+    c.saveEquipmentMonthlyHours({value: '444'}, id, '0252-09878', november);
+    assert.equal(c.readEquipmentMonthlyHours(c.equipmentHoursMonth(december).month, id), null);
+    c.saveEquipmentMonthlyHours({value: '20'}, id, '0252-09878', december);
+    assert.equal(c.readEquipmentMonthlyHours(c.equipmentHoursMonth(november).month, id).hours, 444);
+    assert.equal(c.readEquipmentMonthlyHours(c.equipmentHoursMonth(december).month, id).hours, 20);
+});
 test('Generator totals recover old report rows by serial and count each month once', () => {
     const {c, values} = fixture();
     vm.runInContext(fs.readFileSync(path.join(__dirname, '../generators.js'), 'utf8'), c);
