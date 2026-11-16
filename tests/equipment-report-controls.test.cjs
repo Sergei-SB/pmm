@@ -16,6 +16,19 @@ function fixture(role='admin') {
     const storageKey='equipment_report_data_'+period;
     return {c,values,listeners,inventory,period,storageKey,setInputs:items=>{inputs=items.map(([id,field,value])=>({value,getAttribute:name=>name==='data-id'?id:field}));}};
 }
+test('Monthly hours replace the previous entry for the same unit and month', () => {
+    const {c, values, period} = fixture();
+    const id = 'Генератор_1';
+    const {month, start} = c.equipmentHoursMonth(period);
+    c.saveEquipmentMonthlyHours({value: '12,5'}, id);
+    c.saveEquipmentMonthlyHours({value: '14'}, id);
+    c.saveEquipmentMonthlyHours({value: 'invalid'}, id);
+    assert.equal(values.size, 1);
+    assert.deepEqual(JSON.parse(values.get(c.equipmentHoursKey(month, id))), {hours: 14, start});
+    c.localStorage.removeItem = key => values.delete(key);
+    c.saveEquipmentMonthlyHours({value: ''}, id);
+    assert.equal(values.size, 0);
+});
 test('Report serial numbers come from equipment without changing identifiers or registry data',()=>{
     const {c,inventory,period}=fixture();const rows=c.getEquipmentReportItems(period);
     assert.equal(rows[0].serialNumber,'GEN-001');assert.equal(rows[1].serialNumber,'PUMP-001');

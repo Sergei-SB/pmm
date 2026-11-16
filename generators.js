@@ -101,7 +101,31 @@ function printCurrentEquipmentTable() {
     }
 }
 
+function generatorHoursTotals() {
+    const totals = new Map();
+    for (let index = 0; index < localStorage.length; index++) {
+        const match = /^equipment_moto_hours_(\d{4}-\d{2}):Генератор_(.+)$/.exec(localStorage.key(index) || '');
+        if (!match) continue;
+        const record = readEquipmentMonthlyHours(match[1], 'Генератор_' + match[2]);
+        if (!Number.isFinite(record?.hours) || record.hours < 0) continue;
+        const total = totals.get(match[2]) || {hours: 0, start: ''};
+        total.hours += record.hours;
+        if (record.hours > 0 && /^\d{4}-\d{2}-\d{2}$/.test(record.start) &&
+            (!total.start || record.start < total.start)) total.start = record.start;
+        totals.set(match[2], total);
+    }
+    return totals;
+}
+
+function generatorHoursText(item, totals) {
+    const monthly = totals.get(String(item.id));
+    if (!monthly) return String(item.motoHours ?? '');
+    const baseline = equipmentLimitNumber(item.motoHours) ?? 0;
+    return new Intl.NumberFormat('uk-UA', {useGrouping: false, maximumFractionDigits: 6}).format(baseline + monthly.hours);
+}
+
 function printGeneratorsTable() {
+    const hoursTotals = generatorHoursTotals();
     const printWindow = window.open('', '_blank');
     let list = getGeneratorsList().filter(item => !/знищ/ui.test(String(item.note || item.comment || '')));
     let html = `
@@ -137,7 +161,7 @@ function printGeneratorsTable() {
             <td>${item.consumption || ''}</td><td>${item.oilNorm10Days || ''}</td><td>${item.max5Days || ''}</td>
             <td>${item.max10Days || ''}</td><td>${item.max30Days || ''}</td><td>${item.motoHoursDay || ''}</td>
             <td>${item.subdivision || ''}</td><td>${item.responsiblePerson || ''}</td><td>${item.locationSubdivision || ''}</td>
-            <td>${item.serialNumber || ''}</td><td>${escapeHtml(String(item.motoHours ?? ''))}</td><td>${item.note || ''}</td>
+            <td>${item.serialNumber || ''}</td><td>${escapeHtml(generatorHoursText(item, hoursTotals))}</td><td>${item.note || ''}</td>
         </tr>`;
     });
     html += `</tbody></table></body></html>`;
@@ -148,6 +172,7 @@ function printGeneratorsTable() {
 }
 
 function renderGeneratorsView() {
+    const hoursTotals = generatorHoursTotals();
     const wrapper = document.getElementById('equipment-table-wrapper');
     if (!wrapper) return;
 
@@ -348,7 +373,7 @@ function renderGeneratorsView() {
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.responsiblePerson || ''}" oninput="updateGeneratorProp(${item.id}, 'responsiblePerson', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.locationSubdivision || ''}" oninput="updateGeneratorProp(${item.id}, 'locationSubdivision', this.value)"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.serialNumber || ''}" oninput="updateGeneratorProp(${item.id}, 'serialNumber', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
-            <td style="padding: 3px 4px;"><input type="text" inputmode="decimal" class="table-cell-input" aria-label="Мотогодини" value="${escapeHtml(String(item.motoHours ?? ''))}" oninput="updateGeneratorProp(${item.id}, 'motoHours', this.value)" style="box-sizing:border-box;"></td>
+            <td title="${hoursTotals.get(String(item.id))?.start ? 'Початок обліку мотогодин: ' + hoursTotals.get(String(item.id)).start.split('-').reverse().join('.') : 'Дата початку обліку ще не визначена'}">${escapeHtml(generatorHoursText(item, hoursTotals))}</td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.note || ''}" oninput="updateGeneratorProp(${item.id}, 'note', this.value); if(/знищ/ui.test(this.value)) { renderGeneratorsView(); }" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
             <td style="text-align: center; padding: 3px 4px;"><button class="delete-row-btn" style="padding: 2px 6px; font-size: 10px;" onclick="deleteGeneratorRow(${item.id})">Видалити</button></td>
         `;

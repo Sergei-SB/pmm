@@ -15,6 +15,48 @@ function equipmentReportPeriod() {
     return document.getElementById('eq-report-custom-period')?.value.trim() || activeEquipmentReportPeriod || '01.10-10.10';
 }
 
+function equipmentHoursMonth(period) {
+    const match = /^(\d{1,2})\.(\d{1,2})(?:\.(\d{4}))?/.exec(period);
+    if (!match || Number(match[2]) < 1 || Number(match[2]) > 12) return null;
+    const year = match[3] || new Intl.DateTimeFormat('en', {year: 'numeric', timeZone: 'Europe/Kyiv'}).format(new Date());
+    const month = year + '-' + match[2].padStart(2, '0');
+    return {month, start: month + '-' + match[1].padStart(2, '0')};
+}
+
+function equipmentHoursKey(month, id) {
+    return 'equipment_moto_hours_' + month + ':' + id;
+}
+
+function readEquipmentMonthlyHours(month, id) {
+    if (!month) return null;
+    try {
+        return JSON.parse(localStorage.getItem(equipmentHoursKey(month, id)));
+    } catch (_) {
+        return null;
+    }
+}
+
+function saveEquipmentMonthlyHours(input, id) {
+    if (!canEditEquipmentReport()) return;
+    const date = equipmentHoursMonth(equipmentReportPeriod());
+    if (!date) return;
+    const value = input.value.trim().replace(',', '.');
+    const previous = readEquipmentMonthlyHours(date.month, id);
+    if (value && (!/^\d+(?:\.\d+)?$/.test(value) || !Number.isFinite(Number(value)))) {
+        alert('Введіть невід’ємне число мотогодин.');
+        input.value = previous?.hours ?? '';
+        return;
+    }
+    const key = equipmentHoursKey(date.month, id);
+    try {
+        if (value === '') localStorage.removeItem(key);
+        else localStorage.setItem(key, JSON.stringify({hours: Number(value), start: previous?.start || date.start}));
+    } catch (_) {
+        input.value = previous?.hours ?? '';
+        alert('Не вдалося зберегти мотогодини.');
+    }
+}
+
 function readEquipmentReportData(period) {
     const data = JSON.parse(localStorage.getItem('equipment_report_data_' + period) || '{}');
     if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Неправильний формат збереженого звіту');
@@ -842,9 +884,12 @@ function renderEquipmentReportView() {
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p3Oil" value="${itemData.p3Oil || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input eq-refuel-date" inputmode="numeric" oninput="formatEquipmentRefuelDates(this, event)" autocomplete="off" data-id="${equipmentReportEscape(item.uniqueId)}" data-field="p3Date" aria-label="Дати заправок за 3-й період" value="${equipmentReportEscape(itemData.p3Date)}" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="nextFuel" value="${itemData.nextFuel || ''}" style="width: 100%; text-align: center; border: 1px solid #27ae60; background: #f0fdf4; padding: 4px; font-weight: bold; color: #166534;" placeholder="0.0" ${eqLock}></td>
+            <td><input type="text" inputmode="decimal" class="eq-rep-input" data-equipment-month-hours aria-label="Мотогодини за місяць" value="${equipmentReportEscape(readEquipmentMonthlyHours(equipmentHoursMonth(periodStr)?.month, item.uniqueId)?.hours)}" style="width:100%;border:1px solid #ccc;text-align:center;" ${eqLock}></td>
             <td class="eq-report-action"><button type="button" data-remove-eq-id="${equipmentReportEscape(item.uniqueId)}" ${canEditEq?'':'disabled'} style="background:#c0392b;color:white;border:0;border-radius:4px;padding:6px;cursor:pointer">Видалити</button></td>
         `;
         tbody.appendChild(tr);
+        const hoursInput = tr.querySelector('[data-equipment-month-hours]');
+        if (hoursInput) hoursInput.addEventListener('change', () => saveEquipmentMonthlyHours(hoursInput, item.uniqueId));
         tr.querySelector('[data-remove-eq-id]')?.addEventListener('click', () => removeEquipmentReportItem(item.uniqueId));
     });
 
@@ -944,7 +989,7 @@ function updateEquipmentReportTotals() {
             <td rowspan="2" style="text-align: center; vertical-align: middle; border-left: 1px solid #dcdcdc; border-right: 1px solid #dcdcdc; font-size: 11px;">${formatFluidBreakdown(sumP3OilMap)}</td>
             <td rowspan="2"></td>
             <td style="text-align: center; color: #27ae60; border-bottom: 1px solid #dcdcdc; font-weight: bold;">${dpNextFuel !== 0 ? dpNextFuel.toFixed(1) + ' л' : '0 л'}</td>
-            <td class="eq-report-action" rowspan="2"></td>
+            <td rowspan="2"></td><td class="eq-report-action" rowspan="2"></td>
         </tr>
         <tr style="background-color: #eaeaea; font-weight: bold; border-bottom: 2px solid #bdc3c7;">
             <td colspan="6" style="text-align: right; padding-right: 10px; border-bottom: 2px solid #bdc3c7;">${footerLabel} (АБ)</td>
@@ -959,7 +1004,7 @@ function updateEquipmentReportTotals() {
             <td colspan="2" style="text-align: center; color: #27ae60;">Початковий: ДП ${dpPrevFuel.toFixed(1)} л | АБ ${abPrevFuel.toFixed(1)} л</td>
             <td colspan="9" style="text-align: left; padding-left: 15px; color: #2c3e50;">Заправка: ДП <strong style="color: #27ae60;">${totalDpPeriod.toFixed(1)} л</strong> | АБ <strong style="color: #2980b9;">${totalAbPeriod.toFixed(1)} л</strong> | Мастило <strong style="color: #8e44ad;">${formatFluidBreakdown(totalOilPeriodMap)}</strong></td>
             <td style="text-align: center; color: #145a32; font-weight: bold;">${(dpNextFuel + abNextFuel) > 0 ? (dpNextFuel + abNextFuel).toFixed(1) + ' л' : '0 л'}</td>
-            <td class="eq-report-action"></td>
+            <td></td><td class="eq-report-action"></td>
         </tr>
     `;
 }

@@ -131,14 +131,16 @@ th {
 }
 
 #equipment-report-table .eq-report-index-col { width: 2.3%; }
-#equipment-report-table .eq-report-category-col { width: 8%; }
+#equipment-report-table .eq-report-category-col { width: 5.5%; }
+#equipment-report-table .eq-report-subdivision-col { width: 8%; }
+#equipment-report-table .eq-report-hours-col { width: 4.5%; }
 #equipment-report-table .eq-report-model-col { width: 10.5%; }
 #equipment-report-table .eq-report-serial-col { width: 9%; }
 #equipment-report-table .eq-report-fuel-type-col { width: 3.4%; }
 #equipment-report-table .eq-report-amount-col { width: 4.15%; }
 #equipment-report-table .eq-report-dates-col { width: 4.7%; }
 #equipment-report-table .eq-report-ending-col { width: 4.5%; }
-#equipment-report-table .eq-report-action-col { width: 7%; }
+#equipment-report-table .eq-report-action-col { width: 5%; }
 
 #equipment-report-table tbody td {
     padding: 2px 3px;
