@@ -25,6 +25,7 @@ function saveAggCalcState() {
                 start: document.getElementById(`b-start-${i}`)?.value || '',
                 autoStart: document.getElementById(`b-start-${i}`)?.dataset?.auto === 'true',
                 rec: document.getElementById(`b-rec-${i}`)?.value || '',
+                receiptDate: document.getElementById(`b-receipt-date-${i}`)?.value || '',
                 end: document.getElementById(`b-end-${i}`)?.value || '',
                 spent: document.getElementById(`b-spent-${i}`)?.value || ''
             });
@@ -237,6 +238,7 @@ function renderAggregatesCalcView() {
                                     <th style="padding: 4px; border: 1px solid #bdc3c7; font-size: 10px; width: 18%;">Кільк. днів</th>
                                     <th style="padding: 4px; border: 1px solid #bdc3c7; font-size: 10px; width: 20.5%;">Залишок на поч.</th>
                                     <th style="padding: 4px; border: 1px solid #bdc3c7; font-size: 10px; width: 20.5%;">Отримано</th>
+                                    <th style="padding: 4px; font-size: 10px; width: 105px;">Дата отримання</th>
                                     <th style="padding: 4px; border: 1px solid #bdc3c7; font-size: 10px; width: 20.5%;">Залишок на кін.</th>
                                     <th style="padding: 4px; border: 1px solid #bdc3c7; font-size: 10px; width: 20.5%;">Витрачено ПММ</th>
                                 </tr>
@@ -251,6 +253,7 @@ function renderAggregatesCalcView() {
                 <td style="padding: 2px; border: 1px solid #bdc3c7;"><input type="number" step="1" min="0" max="31" id="b-days-${i}" value="${rowData.days || ''}" oninput="onDaysInputChange(${i})" style="width: 100%; border: none; text-align: center; font-size: 11px; padding: 3px;" placeholder=""></td>
                 <td style="padding: 2px; border: 1px solid #bdc3c7;"><input type="number" step="0.1" id="b-start-${i}" data-auto="${rowData.autoStart === true}" value="${rowData.start || ''}" oninput="this.dataset.auto='false'; calculateVariantBRow(${i})" style="width: 100%; border: none; text-align: center; font-size: 11px; padding: 3px;" placeholder=""></td>
                 <td style="padding: 2px; border: 1px solid #bdc3c7;"><input type="number" step="0.1" id="b-rec-${i}" value="${rowData.rec || ''}" oninput="calculateVariantBRow(${i})" style="width: 100%; border: none; text-align: center; font-size: 11px; padding: 3px;" placeholder=""></td>
+                <td style="padding: 2px;"><input type="date" id="b-receipt-date-${i}" aria-label="Дата отримання пального, рядок ${i}" value="${/^\d{4}-\d{2}-\d{2}$/.test(rowData.receiptDate || '') ? rowData.receiptDate : ''}" oninput="onDaysInputChange(${i})" style="width:100%;box-sizing:border-box;font-size:11px;padding:2px;"></td>
                 <td style="padding: 2px; border: 1px solid #bdc3c7;"><input type="number" step="0.1" id="b-end-${i}" value="${rowData.end || ''}" oninput="calculateVariantBRow(${i})" style="width: 100%; border: none; text-align: center; font-size: 11px; padding: 3px;" placeholder=""></td>
                 <td style="padding: 2px; border: 1px solid #bdc3c7;"><input type="number" step="0.1" id="b-spent-${i}" value="${rowData.spent || ''}" readonly style="width: 100%; border: none; text-align: center; font-size: 11px; padding: 3px; font-weight: bold; color: #c0392b; background: #f9f9f9;" placeholder=""></td>
             </tr>
@@ -385,6 +388,8 @@ function resetAggregatesCalc() {
             startIn.dataset.auto = 'false'; 
         }
         if (recIn) recIn.value = '';
+        const receiptDate = document.getElementById(`b-receipt-date-${i}`);
+        if (receiptDate) receiptDate.value = '';
         if (endIn) endIn.value = '';
         if (spentIn) spentIn.value = '';
     }
@@ -794,6 +799,25 @@ function reseedChaosDistribution() {
 }
 
 // ОСНОВНА ФУНКЦІЯ РОЗРАХУНКУ
+function aggregateReceiptDate(row) {
+    const value = document.getElementById(`b-receipt-date-${row}`)?.value;
+    return value ? Date.parse(value + 'T00:00:00Z') : NaN;
+}
+
+function aggregateFirstDatedRow() {
+    for (let row = 1; row <= 10; row++) {
+        if (Number(document.getElementById(`b-days-${row}`)?.value) > 0 &&
+            Number.isFinite(aggregateReceiptDate(row))) return row;
+    }
+    return 1;
+}
+
+function aggregateScheduledDays(row, firstDatedRow) {
+    const days = parseInt(document.getElementById(`b-days-${row}`)?.value, 10) || 0;
+    const spent = Number(document.getElementById(`b-spent-${row}`)?.value) || 0;
+    return row < firstDatedRow && spent <= 0 ? 0 : days;
+}
+
 function triggerRecalc() {
     const eq = getSelectedEquipment();
     if (!eq) return;
@@ -811,6 +835,7 @@ function triggerRecalc() {
 
     let totalMotoHoursAll = 0;
     let totalFuelAll = 0;
+    const firstDatedRow = aggregateFirstDatedRow();
     let totalOilAll = 0;
     let allDailyFuels = [];
     let allDailyHours = [];
@@ -831,7 +856,7 @@ function triggerRecalc() {
 
         if (!daysInput || !spentInput) continue;
 
-        let periodDays = parseInt(daysInput.value) || 0;
+        let periodDays = aggregateScheduledDays(i, firstDatedRow);
         let periodSpent = parseFloat(spentInput.value) || 0;
 
         if (periodDays <= 0) continue;
@@ -939,10 +964,11 @@ function onManualMotoHourChange(periodIdx, dayIdx, val) {
     let totalFuelAll = 0;
     let totalOilAll = 0;
     let globalDayCounter = 0;
+    const firstDatedRow = aggregateFirstDatedRow();
 
     for (let i = 1; i <= 10; i++) {
         const daysInput = document.getElementById(`b-days-${i}`);
-        let pDays = parseInt(daysInput?.value) || 0;
+        let pDays = aggregateScheduledDays(i, firstDatedRow);
         if (pDays <= 0) continue;
 
         let periodSpentSum = 0;
@@ -1031,12 +1057,16 @@ function displayCalcResults(eq, totalMotoHours, daysCount, totalFuel, totalOil, 
     let displayTotalMotoHours = 0;
     let verificationTotalFuel = 0;
     let dailyTableRows = '';
+    const firstDatedRow = aggregateFirstDatedRow();
+    let dayDate = NaN;
     
     let globalDayCounter = 0;
     for (let i = 1; i <= 10; i++) {
         const daysInput = document.getElementById(`b-days-${i}`);
-        let pDays = parseInt(daysInput?.value) || 0;
+        let pDays = aggregateScheduledDays(i, firstDatedRow);
         if (pDays <= 0) continue;
+        const receiptDate = aggregateReceiptDate(i);
+        if (Number.isFinite(receiptDate)) dayDate = receiptDate;
 
         for (let d = 0; d < pDays; d++) {
             let dayIdx = globalDayCounter;
@@ -1079,11 +1109,13 @@ function displayCalcResults(eq, totalMotoHours, daysCount, totalFuel, totalOil, 
             dailyTableRows += '<tr style="background-color: ' + rowBg + ';">' +
                 '<td style="text-align: center; padding: 5px; border-bottom: 1px solid #e0e0e0;"><strong>День ' + (dayIdx + 1) + '</strong></td>' +
                 '<td style="text-align: center; padding: 5px; border-bottom: 1px solid #e0e0e0;">' + motoCellContent + '</td>' +
+                '<td style="text-align:center;">' + (Number.isFinite(dayDate) ? new Date(dayDate).toISOString().slice(0, 10).split('-').reverse().join('.') : '—') + '</td>' +
                 '<td id="row-fuel-' + i + '-' + d + '" style="text-align: center; padding: 5px; border-bottom: 1px solid #e0e0e0; color: #c0392b; font-weight: bold;">' + fuelDisplay + '</td>' +
                 '<td id="row-oil-' + i + '-' + d + '" style="text-align: center; padding: 5px; border-bottom: 1px solid #e0e0e0; color: #2980b9;">' + oilDisplay + '</td>' +
                 '</tr>';
 
             globalDayCounter++;
+            dayDate += 86400000;
         }
     }
 
@@ -1145,6 +1177,7 @@ function displayCalcResults(eq, totalMotoHours, daysCount, totalFuel, totalOil, 
                         <tr style="background: #2e7d32; color: white;">
                             <th style="padding: 6px; text-align: center;">Період</th>
                             <th style="padding: 6px; text-align: center;">Мото-години</th>
+                            <th style="padding: 6px; text-align: center;">Дата</th>
                             <th style="padding: 6px; text-align: center;">Витрата палива</th>
                             <th style="padding: 6px; text-align: center;">Витрата мастила</th>
                         </tr>
