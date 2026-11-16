@@ -126,7 +126,7 @@ function printGeneratorsTable() {
                     <tr>
                         <th>№</th><th>Модель</th><th>кВт</th><th>Тип пал.</th><th>Розхід літ./год.</th><th>Норма мастил</th>
                         <th>Макс з. на 5 діб</th><th>Макс з. на 10 діб</th><th>Макс з. на 30 діб</th><th>Норма мотог.</th>
-                        <th>Підрозділ</th><th>Мат. Відп. Особа</th><th>Де знаходиться</th><th>Серійний номер</th><th>Примітка</th>
+                        <th>Підрозділ</th><th>Мат. Відп. Особа</th><th>Де знаходиться</th><th>Серійний номер</th><th>Мотогодини</th><th>Примітка</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -137,7 +137,7 @@ function printGeneratorsTable() {
             <td>${item.consumption || ''}</td><td>${item.oilNorm10Days || ''}</td><td>${item.max5Days || ''}</td>
             <td>${item.max10Days || ''}</td><td>${item.max30Days || ''}</td><td>${item.motoHoursDay || ''}</td>
             <td>${item.subdivision || ''}</td><td>${item.responsiblePerson || ''}</td><td>${item.locationSubdivision || ''}</td>
-            <td>${item.serialNumber || ''}</td><td>${item.note || ''}</td>
+            <td>${item.serialNumber || ''}</td><td>${escapeHtml(String(item.motoHours ?? ''))}</td><td>${item.note || ''}</td>
         </tr>`;
     });
     html += `</tbody></table></body></html>`;
@@ -290,6 +290,7 @@ function renderGeneratorsView() {
                             ${efBtn('serialNumber', 'Серійний номер')}
                         </div>
                     </th>
+                    <th style="width:75px;">Мотогодини ${efBtn('motoHours', 'Мотогодини')}</th>
                     <th style="padding: 6px 4px; min-width: 80px;">
                         <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
                             <span>Примітка</span>
@@ -347,6 +348,7 @@ function renderGeneratorsView() {
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.responsiblePerson || ''}" oninput="updateGeneratorProp(${item.id}, 'responsiblePerson', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.locationSubdivision || ''}" oninput="updateGeneratorProp(${item.id}, 'locationSubdivision', this.value)"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.serialNumber || ''}" oninput="updateGeneratorProp(${item.id}, 'serialNumber', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
+            <td style="padding: 3px 4px;"><input type="text" inputmode="decimal" class="table-cell-input" aria-label="Мотогодини" value="${escapeHtml(String(item.motoHours ?? ''))}" oninput="updateGeneratorProp(${item.id}, 'motoHours', this.value)" style="box-sizing:border-box;"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.note || ''}" oninput="updateGeneratorProp(${item.id}, 'note', this.value); if(/знищ/ui.test(this.value)) { renderGeneratorsView(); }" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
             <td style="text-align: center; padding: 3px 4px;"><button class="delete-row-btn" style="padding: 2px 6px; font-size: 10px;" onclick="deleteGeneratorRow(${item.id})">Видалити</button></td>
         `;
