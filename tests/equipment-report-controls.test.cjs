@@ -64,6 +64,10 @@ test('Generator totals recover old report rows by serial and count each month on
     values.set(c.equipmentHoursKey('2026-11', 'serial:0252-09878'), JSON.stringify({hours: 100}));
     values.set(c.equipmentHoursKey('2026-12', 'serial:0252-09878'), JSON.stringify({hours: 25}));
     assert.equal(c.generatorHoursTotals().get('73').hours, 125);
+    values.set('equipment_report_data_01.11-30.11', JSON.stringify({
+        report_gen_1: {_equipment: {category: 'Генератор', serialNumber: '0252-09878'}, p2Fuel: '60', p2Date: '12,11.', p2DateYear: '2026'}
+    }));
+    assert.equal(c.generatorFirstRefuelDates().get('73'), '2026-11-12');
 });
 test('Report serial numbers come from equipment without changing identifiers or registry data',()=>{
     const {c,inventory,period}=fixture();const rows=c.getEquipmentReportItems(period);

@@ -167,15 +167,18 @@ function generatorFirstRefuelDates() {
         const period = key.slice(prefix.length);
         const reportMonth = equipmentHoursMonth(period);
         if (!reportMonth) continue;
-        let rows;
-        try { rows = readEquipmentReportData(period); } catch (_) { continue; }
+        let rows, reportItems;
+        try {
+            rows = readEquipmentReportData(period);
+            reportItems = new Map(getEquipmentReportItems(period, true).map(item => [item.uniqueId, item]));
+        } catch (_) { continue; }
         for (const [id, row] of Object.entries(rows)) {
-            if (!row || (!id.startsWith('Генератор_') && row._equipment?.category !== 'Генератор')) continue;
-            const serial = equipmentSerialKey(row.serialNumber || row._equipment?.serialNumber);
+            const item = reportItems.get(id);
+            if (!row || (!id.startsWith('Генератор_') && (item?.category || row._equipment?.category) !== 'Генератор')) continue;
+            const serial = equipmentSerialKey(item?.serialNumber || row.serialNumber || row._equipment?.serialNumber);
             const generatorId = serials.get(serial) || (id.startsWith('Генератор_') ? id.slice('Генератор_'.length) : null);
             if (!generatorId) continue;
             for (let group = 1; group <= 3; group++) {
-                if (!(evaluateExpression(String(row['p' + group + 'Fuel'] ?? '')) > 0)) continue;
                 const field = 'p' + group + 'Date';
                 const fallbackYear = row[field + 'Year'] || reportMonth.month.slice(0, 4);
                 const dateParts = String(row[field] ?? '').matchAll(/\b(?:(\d{4})-(\d{2})-(\d{2})|(\d{1,2})[.,](\d{1,2})(?:[.,](\d{4}))?)\b/g);
