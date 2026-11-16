@@ -27,7 +27,7 @@
         let lastDay = 0;
         for (const row of rows) {
             const storedDay = Number(row.dataset.routeDay);
-            const day = Number.isInteger(storedDay) && storedDay >= 1 && storedDay <= 31 ? storedDay : 0;
+            const day = Number.isInteger(storedDay) && storedDay >= 1 && storedDay <= 31 ? storedDay : (lastDay || 1);
             for (let missingDay = lastDay + 1; day && missingDay < day; missingDay++) {
                 groups.push({day: missingDay, rows: []});
             }
@@ -142,7 +142,7 @@
             const nextRoute = groups.slice(index + 1).find(item => item.rows.length)?.rows[0] ?? null;
             const start = group.rows[0] ?? nextRoute;
             const end = group.rows.at(-1)?.nextSibling ?? nextRoute;
-            const title = group.day ? days[group.day - 1] || `День ${group.day}` : 'Маршрути без дати';
+            const title = days[group.day - 1] || `День ${group.day}`;
             insertDecoration(start, 'daily-route-date').textContent = title;
             const cell = insertDecoration(end, 'daily-route-footer');
             cell.appendChild(addDayButton('+ Додати рядок маршруту', () => cell.parentElement, group.day, disabled));

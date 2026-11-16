@@ -154,7 +154,7 @@ test('Daily mode groups routes, saves the last balance and leaves the ten-day ca
     let rendered;
     c.renderDailyRoutes = (result, closingFuel) => {rendered = {result, closingFuel};};
     const example = c.calculateDailyRoutes([route(undefined, '100')], 21.5, [1, 2, 3], false);
-    assert.equal(example.groups[0].day, 0);
+    assert.equal(example.groups[0].day, 1);
     assert.equal(example.totalFuel, 21.53);
     assert.deepEqual(Array.from(example.calculatedResults, item => item.resVal.toFixed(2)), ['8.51', '4.06', '8.95']);
     const gap = c.calculateDailyRoutes([route(2, '100')], 21.5, [1, 2, 3], false);
