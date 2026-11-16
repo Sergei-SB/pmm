@@ -8,6 +8,25 @@ function fixture(){
     vm.createContext(c);vm.runInContext(fs.readFileSync(path.join(__dirname,'../aggregates_calc.js'),'utf8'),c);
     return {c,nodes};
 }
+test('Editing the upper balance immediately updates daily fuel up to the hours limit', () => {
+    const {c, nodes} = fixture();
+    c.getSelectedEquipment = () => ({consumption: 1.35});
+    c._periodRandomSeeds = {};
+    c._isIntegerHours = true;
+    c.updateVariantBSummary = () => {};
+    for (const [key, value] of Object.entries({days: '7', start: '67', rec: '100', end: '52', spent: ''})) {
+        nodes['b-' + key + '-1'] = {value, dataset: {}};
+    }
+    nodes['calc-max-daily-hours'] = {value: '12'};
+    let fuel;
+    c.displayCalcResults = (...args) => { fuel = args[5]; };
+    c.calculateVariantBRow(1);
+    assert.equal(fuel.reduce((sum, value) => sum + Math.round(value * 10), 0), 1134);
+    nodes['b-end-1'].value = '60';
+    c.calculateVariantBRow(1);
+    assert.equal(fuel.reduce((sum, value) => sum + Math.round(value * 10), 0), 1070);
+    assert.ok(fuel.every(value => value <= 16.2));
+});
 test('Calculator uses current inventory norms with decimal commas for each category and distinct IDs',()=>{
     const {c,nodes}=fixture();let current=[];c.getAllEquipmentList=()=>current;
     for(const category of ['Генератор','Webasto','Теплова пушка','Бензопила','Помпа']){

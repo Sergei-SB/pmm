@@ -23,6 +23,7 @@ function saveAggCalcState() {
             rows.push({
                 days: document.getElementById(`b-days-${i}`)?.value || '',
                 start: document.getElementById(`b-start-${i}`)?.value || '',
+                autoStart: document.getElementById(`b-start-${i}`)?.dataset?.auto === 'true',
                 rec: document.getElementById(`b-rec-${i}`)?.value || '',
                 end: document.getElementById(`b-end-${i}`)?.value || '',
                 spent: document.getElementById(`b-spent-${i}`)?.value || ''
@@ -248,7 +249,7 @@ function renderAggregatesCalcView() {
         html += `
             <tr>
                 <td style="padding: 2px; border: 1px solid #bdc3c7;"><input type="number" step="1" min="0" max="31" id="b-days-${i}" value="${rowData.days || ''}" oninput="onDaysInputChange(${i})" style="width: 100%; border: none; text-align: center; font-size: 11px; padding: 3px;" placeholder=""></td>
-                <td style="padding: 2px; border: 1px solid #bdc3c7;"><input type="number" step="0.1" id="b-start-${i}" value="${rowData.start || ''}" oninput="this.dataset.auto='false'; calculateVariantBRow(${i})" style="width: 100%; border: none; text-align: center; font-size: 11px; padding: 3px;" placeholder=""></td>
+                <td style="padding: 2px; border: 1px solid #bdc3c7;"><input type="number" step="0.1" id="b-start-${i}" data-auto="${rowData.autoStart === true}" value="${rowData.start || ''}" oninput="this.dataset.auto='false'; calculateVariantBRow(${i})" style="width: 100%; border: none; text-align: center; font-size: 11px; padding: 3px;" placeholder=""></td>
                 <td style="padding: 2px; border: 1px solid #bdc3c7;"><input type="number" step="0.1" id="b-rec-${i}" value="${rowData.rec || ''}" oninput="calculateVariantBRow(${i})" style="width: 100%; border: none; text-align: center; font-size: 11px; padding: 3px;" placeholder=""></td>
                 <td style="padding: 2px; border: 1px solid #bdc3c7;"><input type="number" step="0.1" id="b-end-${i}" value="${rowData.end || ''}" oninput="calculateVariantBRow(${i})" style="width: 100%; border: none; text-align: center; font-size: 11px; padding: 3px;" placeholder=""></td>
                 <td style="padding: 2px; border: 1px solid #bdc3c7;"><input type="number" step="0.1" id="b-spent-${i}" value="${rowData.spent || ''}" readonly style="width: 100%; border: none; text-align: center; font-size: 11px; padding: 3px; font-weight: bold; color: #c0392b; background: #f9f9f9;" placeholder=""></td>
@@ -459,10 +460,10 @@ function calculateVariantBRow(rowIdx, skipPropagate) {
         spentInput.value = '';
     }
 
-    if (!skipPropagate && rowIdx < 10 && !isNaN(endVal)) {
+    if (!skipPropagate && rowIdx < 10) {
         let nextStartInput = document.getElementById(`b-start-${rowIdx + 1}`);
         if (nextStartInput && (!nextStartInput.value || nextStartInput.dataset.auto === 'true')) {
-            nextStartInput.value = endVal.toFixed(1);
+            nextStartInput.value = Number.isNaN(endVal) ? '' : endVal.toFixed(1);
             nextStartInput.dataset.auto = 'true';
             calculateVariantBRow(rowIdx + 1, false);
         }
@@ -833,7 +834,7 @@ function triggerRecalc() {
         let periodDays = parseInt(daysInput.value) || 0;
         let periodSpent = parseFloat(spentInput.value) || 0;
 
-        if (periodDays <= 0 || periodSpent <= 0) continue;
+        if (periodDays <= 0) continue;
 
         let targetFuelToSpend = periodSpent;
         if (targetFuelToSpend < 0) targetFuelToSpend = 0;
@@ -849,10 +850,6 @@ function triggerRecalc() {
                     : (targetFuelToSpend / periodDays / hourlyRate);
                 
                 let dHours = isIntegerHours ? Math.round(parseFloat(rawVal) || 0) : (parseFloat(rawVal) || 0);
-                if (window._manualMotoHours && window._manualMotoHours[mInputKey] === undefined) {
-                    window._manualMotoHours[mInputKey] = dHours;
-                }
-
                 let dFuel = parsedNumWithOneDec(dHours * hourlyRate);
                 periodDailyFuels.push(dFuel);
                 periodSpentSum += dFuel;
@@ -870,32 +867,20 @@ function triggerRecalc() {
                 window._periodRandomSeeds[i] = seedWeights.map(w => w / sumW * periodDays);
             }
 
-            let weights = window._periodRandomSeeds[i];
-            let allocatedSum = 0;
+            const weights = window._periodRandomSeeds[i];
+            let remainingWeight = weights.reduce((sum, weight) => sum + weight, 0);
+            const dailyLimit = Math.floor(hourlyRate * maxDailyHours * 10 + 1e-9);
+            let remaining = Math.min(Math.round(targetFuelToSpend * 10), dailyLimit * periodDays);
 
             for (let d = 0; d < periodDays; d++) {
-                if (d === periodDays - 1) {
-                    let rest = targetFuelToSpend - allocatedSum;
-                    let maxRest = hourlyRate * maxDailyHours;
-                    if (rest > maxRest) rest = maxRest;
-                    periodDailyFuels.push(parsedNumWithOneDec(rest));
-                } else {
-                    let f = (targetFuelToSpend / periodDays) * weights[d];
-                    let maxDayFuel = hourlyRate * maxDailyHours;
-                    if (f > maxDayFuel) f = maxDayFuel;
-                    
-                    let rounded = parsedNumWithOneDec(f);
-                    periodDailyFuels.push(rounded);
-                    allocatedSum += rounded;
-                }
+                const minimum = Math.max(0, remaining - dailyLimit * (periodDays - d - 1));
+                const desired = Math.round(remaining * weights[d] / remainingWeight);
+                const allocated = Math.max(minimum, Math.min(dailyLimit, remaining, desired));
+                periodDailyFuels.push(allocated / 10);
+                remaining -= allocated;
+                remainingWeight -= weights[d];
             }
-
-            let currentSum = periodDailyFuels.reduce((a, b) => a + b, 0);
-            let diff = parsedNumWithOneDec(targetFuelToSpend - currentSum);
-            if (diff !== 0 && periodDays > 0) {
-                let adjusted = parsedNumWithOneDec(periodDailyFuels[periodDays - 1] + diff);
-                periodDailyFuels[periodDays - 1] = Math.max(0, adjusted);
-            }
+            targetFuelToSpend = periodDailyFuels.reduce((sum, fuel) => sum + fuel, 0);
         }
 
         let periodOil = baseOilNorm10Days > 0 ? (baseOilNorm10Days / 120) * (targetFuelToSpend / hourlyRate) : targetFuelToSpend * 0.025;
@@ -967,7 +952,7 @@ function onManualMotoHourChange(periodIdx, dayIdx, val) {
             let mInputKey = `${i}_${d}`;
             let manualVal = (window._manualMotoHours && window._manualMotoHours[mInputKey] !== undefined) 
                 ? window._manualMotoHours[mInputKey] 
-                : 0;
+                : document.getElementById(`row-hours-${i}-${d}`)?.value;
             
             let dHours = isIntegerHours ? Math.round(parseFloat(manualVal) || 0) : (parseFloat(manualVal) || 0);
             let dFuel = parsedNumWithOneDec(dHours * hourlyRate);
@@ -981,7 +966,8 @@ function onManualMotoHourChange(periodIdx, dayIdx, val) {
 
         for (let d = 0; d < pDays; d++) {
             let mInputKey = `${i}_${d}`;
-            let dHours = window._manualMotoHours[mInputKey] || 0;
+            const hours = parseFloat(window._manualMotoHours[mInputKey] ?? document.getElementById(`row-hours-${i}-${d}`)?.value) || 0;
+            const dHours = isIntegerHours ? Math.round(hours) : hours;
             totalMotoHoursAll += dHours;
 
             let adaptedFuel = parsedNumWithOneDec(dHours * hourlyRate);
@@ -1067,12 +1053,8 @@ function displayCalcResults(eq, totalMotoHours, daysCount, totalFuel, totalOil, 
                 
                 let currentVal = isIntegerHours ? Math.round(parseFloat(rawVal) || 0) : (parseFloat(Number(rawVal).toFixed(1)) || 0);
 
-                if (window._manualMotoHours[mInputKey] === undefined || (isIntegerHours && window._manualMotoHours[mInputKey] !== currentVal)) {
-                    window._manualMotoHours[mInputKey] = currentVal;
-                }
-
                 let stepVal = isIntegerHours ? "1" : "0.1";
-                motoCellContent = `<input type="number" step="${stepVal}" min="0" value="${currentVal}" oninput="onManualMotoHourChange(${i}, ${d}, this.value)" style="width: 70px; border: 1px solid #bdc3c7; border-radius: 3px; text-align: center; font-size: 11px; padding: 2px;"> год`;
+                motoCellContent = `<input type="number" id="row-hours-${i}-${d}" step="${stepVal}" min="0" value="${currentVal}" oninput="onManualMotoHourChange(${i}, ${d}, this.value)" style="width: 70px; border: 1px solid #bdc3c7; border-radius: 3px; text-align: center; font-size: 11px; padding: 2px;"> год`;
             } else {
                 let formattedH = isIntegerHours ? Math.round(hVal) : parseFloat(hVal.toFixed(1));
                 motoCellContent = `${formattedH} год`;
@@ -1084,7 +1066,7 @@ function displayCalcResults(eq, totalMotoHours, daysCount, totalFuel, totalOil, 
 
             displayTotalMotoHours += parseFloat(effectiveH) || 0;
 
-            let adaptedFuel = parsedNumWithOneDec(effectiveH * hourlyRate);
+            let adaptedFuel = isVerification ? parsedNumWithOneDec(effectiveH * hourlyRate) : (dailyFuels[dayIdx] || 0);
             verificationTotalFuel += adaptedFuel;
 
             let rawOil = dailyOils[dayIdx] || 0;
