@@ -535,7 +535,7 @@
         <section id="equipment-report-view" class="view-section">
             <div class="card-header-panel" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 15px;">
                 <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                    <h2 style="margin: 0; color: #2c3e50;">Десятиденний звіт по обладнанню (Генератори, Webasto, Пушки, Пили, Помпи)</h2>
+                    <h2 style="margin: 0; color: #2c3e50;">Місячний звіт по обладнанню (Генератори, Webasto, Пушки, Пили, Помпи)</h2>
                     <button class="action-btn" onclick="switchView('generators')" style="background-color: #34495e; color: white; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; display: inline-flex; align-items: center; gap: 5px;">← До обліку обладнання</button>
                 </div>
                 <div class="report-controls" style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
@@ -552,7 +552,7 @@
                         <select id="eq-report-period-select" onchange="changeEqReportPeriod(this.value)" style="padding: 4px 8px; font-size: 13px; border-radius: 3px; border: 1px solid #7f8c8d; background: white; cursor: pointer; font-weight: bold; color: #2c3e50;"></select>
                         <button id="eq-rep-nav-next-btn" type="button" class="action-btn" onclick="navigateEquipmentReportPeriod(1)" style="background: #34495e; padding: 4px 8px; font-size: 11px; color: white; border: none; border-radius: 3px; cursor: pointer;">►</button>
                     </div>
-                    <input type="hidden" id="eq-report-custom-period" value="01.10-10.10">
+                    <input type="hidden" id="eq-report-custom-period" value="01.10-31.10">
 
                     <button id="eq-report-add-generator-btn" class="action-btn" onclick="openEquipmentReportGeneratorDialog()" style="background:#27ae60;color:white;border:0;border-radius:4px;padding:6px 14px;font-weight:bold;cursor:pointer">+ Додати обладнання</button>
                     <button id="eq-report-restore-btn" class="action-btn" onclick="openEquipmentReportRestoreDialog()" style="background:#546e7a;color:white;border:0;border-radius:4px;padding:6px 14px;font-weight:bold;cursor:pointer">Повернути видалене</button>
@@ -797,7 +797,7 @@
     <script src="admin_layout.js?v=20261026-dual-admin"></script>
     <script src="permissions_registry.js"></script>
     <script src="broadcast_mail.js?v=20261114-developer-recipient"></script>
-    <script src="equipment_report.js?v=20261116-period-hours"></script>
+    <script src="equipment_report.js?v=20261116-monthly-periods"></script>
     <script src="driver_routes.js?v=20261110-daily-routes"></script>
     <script src="route_trailer.js?v=20261110-daily-routes"></script>
     <script src="daily_routes.js?v=20261116-dated-routes"></script>

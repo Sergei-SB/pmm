@@ -73,9 +73,39 @@ function saveEquipmentMonthlyHours(input, id, serialNumber = '', period = equipm
 }
 
 function readEquipmentReportData(period) {
-    const data = JSON.parse(localStorage.getItem('equipment_report_data_' + period) || '{}');
+    const stored = localStorage.getItem('equipment_report_data_' + period);
+    if (stored === null && isFullEquipmentMonth(period)) {
+        const month = period.slice(3, 5);
+        const end = period.split('-')[1];
+        const merged = Object.create(null);
+        for (const decade of [`01.${month}-10.${month}`, `11.${month}-20.${month}`, `21.${month}-${end}`]) {
+            for (const [id, row] of Object.entries(readEquipmentReportData(decade))) {
+                const target = merged[id] ||= Object.create(null);
+                for (const [field, value] of Object.entries(row)) {
+                    if (value === '' || value == null) continue;
+                    if (['prevFuel', 'prevOil', '_autoCarried'].includes(field) && Object.hasOwn(target, field)) continue;
+                    target[field] = value;
+                }
+            }
+        }
+        return merged;
+    }
+    const data = JSON.parse(stored || '{}');
     if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Неправильний формат збереженого звіту');
     return data;
+}
+
+function equipmentFullMonth(period, offset = 0) {
+    const info = equipmentHoursMonth(period);
+    if (!info) return '';
+    const [year, month] = info.month.split('-').map(Number);
+    const end = new Date(Date.UTC(year, month + offset, 0));
+    const mm = String(end.getUTCMonth() + 1).padStart(2, '0');
+    return `01.${mm}-${end.getUTCDate()}.${mm}`;
+}
+
+function isFullEquipmentMonth(period) {
+    return !!period && equipmentFullMonth(period) === period;
 }
 
 function equipmentReportEscape(value) {
@@ -422,7 +452,7 @@ function getSavedEquipmentPeriodsList() {
             if (p && !periods.includes(p)) periods.push(p);
         }
     }
-    return periods;
+    return [...new Set(periods.map(period => equipmentFullMonth(period)).filter(Boolean))];
 }
 
 function initEqReportPeriodDropdown() {
@@ -432,8 +462,8 @@ function initEqReportPeriodDropdown() {
     
     if (!activeEquipmentReportPeriod) {
         activeEquipmentReportPeriod = (typeof activeReportPeriod !== 'undefined' && activeReportPeriod)
-            ? activeReportPeriod
-            : (periods[periods.length - 1] || "01.10-10.10");
+            ? equipmentFullMonth(activeReportPeriod)
+            : (periods[periods.length - 1] || equipmentFullMonth('01.10'));
     }
 
     let html = '';
@@ -481,7 +511,9 @@ function updateEquipmentReportHeaders() {
 
     // Розраховуємо початок наступного періоду
     let nextStartDate = "";
-    if (typeof getNextTenDayPeriod === 'function') {
+    if (isFullEquipmentMonth(periodStr)) {
+        nextStartDate = equipmentFullMonth(periodStr, 1).split('-')[0];
+    } else if (typeof getNextTenDayPeriod === 'function') {
         const nextP = getNextTenDayPeriod(periodStr);
         if (nextP && nextP.includes('-')) {
             nextStartDate = nextP.split('-')[0].trim();
@@ -506,6 +538,7 @@ function updateEquipmentReportHeaders() {
 }
 
 function getPreviousEquipmentPeriodKey(currentPeriod) {
+    if (isFullEquipmentMonth(currentPeriod)) return equipmentFullMonth(currentPeriod, -1);
     if (typeof getPrevPeriodKey === 'function') {
         const p = getPrevPeriodKey(currentPeriod);
         if (p) return p;
@@ -536,7 +569,9 @@ function getPreviousEquipmentPeriodKey(currentPeriod) {
 function propagateNextFuelToNextPeriod(periodStr, reportData) {
     if (!periodStr || !reportData) return;
     let nextPeriodKey = null;
-    if (typeof getNextTenDayPeriod === 'function') {
+    if (isFullEquipmentMonth(periodStr)) {
+        nextPeriodKey = equipmentFullMonth(periodStr, 1);
+    } else if (typeof getNextTenDayPeriod === 'function') {
         nextPeriodKey = getNextTenDayPeriod(periodStr);
     }
     if (!nextPeriodKey) {
@@ -561,9 +596,7 @@ function propagateNextFuelToNextPeriod(periodStr, reportData) {
 
     try {
         const nextKey = `equipment_report_data_${nextPeriodKey}`;
-        let nextData = {};
-        const stored = localStorage.getItem(nextKey);
-        if (stored) nextData = JSON.parse(stored);
+        const nextData = readEquipmentReportData(nextPeriodKey);
 
         let changed = false;
         for (let uid in reportData) {
@@ -573,6 +606,8 @@ function propagateNextFuelToNextPeriod(periodStr, reportData) {
                 if (!nextData[uid]) {
                     nextData[uid] = { prevFuel: '', prevOil: '', p1Fuel: '', p1Oil: '', p2Fuel: '', p2Oil: '', p3Fuel: '', p3Oil: '', nextFuel: '' };
                 }
+                if (isFullEquipmentMonth(periodStr) && nextData[uid].prevFuel !== '' &&
+                    nextData[uid].prevFuel != null && !nextData[uid]._autoCarried) continue;
                 nextData[uid].prevFuel = String(nextVal).trim();
                 nextData[uid]._autoCarried = true;
                 changed = true;
@@ -603,9 +638,9 @@ function saveCurrentEquipmentReportSilently() {
 function changeEqReportPeriod(val) {
     if (!val) return;
     saveCurrentEquipmentReportSilently();
-    activeEquipmentReportPeriod = val;
+    activeEquipmentReportPeriod = equipmentFullMonth(val) || val;
     const customInput = document.getElementById('eq-report-custom-period');
-    if (customInput) customInput.value = val;
+    if (customInput) customInput.value = activeEquipmentReportPeriod;
     updateEquipmentReportHeaders();
     renderEquipmentReportView();
     if (typeof applyModeratorReportLock === 'function') {
@@ -626,12 +661,9 @@ window.navigateEquipmentReportPeriod = function(direction) {
 
     if (direction > 0 && newIdx >= periods.length) {
         let nextPeriod = null;
-        if (typeof getNextTenDayPeriod === 'function') {
-            nextPeriod = getNextTenDayPeriod(periods[periods.length - 1]);
-        }
+        nextPeriod = equipmentFullMonth(current || periods.at(-1), 1);
         if (nextPeriod && !periods.includes(nextPeriod)) {
             periods.push(nextPeriod);
-            localStorage.setItem('app_saved_periods_list', JSON.stringify(periods));
             localStorage.setItem('eq_saved_periods_list', JSON.stringify(periods));
         }
         if (nextPeriod) {
@@ -839,11 +871,9 @@ function renderEquipmentReportView() {
     const resultStatus = document.getElementById('eq-report-search-status');
     if (resultStatus) resultStatus.textContent = `Знайдено: ${filteredItems.length} із ${items.length}` + (filteredItems.length ? '' : '. Змініть або очистьте фільтри.');
 
-    const storageKey = `equipment_report_data_${periodStr}`;
     let savedData = {};
     try {
-        const stored = localStorage.getItem(storageKey);
-        if (stored) savedData = JSON.parse(stored);
+        savedData = readEquipmentReportData(periodStr);
     } catch(e) {}
 
     // Читаємо дані попереднього періоду для автоматичного перенесення залишку палива
@@ -851,8 +881,7 @@ function renderEquipmentReportView() {
     let prevPeriodSavedData = {};
     if (prevPeriodKey) {
         try {
-            const prevStored = localStorage.getItem(`equipment_report_data_${prevPeriodKey}`);
-            if (prevStored) prevPeriodSavedData = JSON.parse(prevStored);
+            prevPeriodSavedData = readEquipmentReportData(prevPeriodKey);
         } catch(e) {}
     }
 
@@ -1096,7 +1125,7 @@ function printEquipmentReport() {
             </style>
         </head>
         <body>
-            <h2>ДЕСЯТИДЕННИЙ ЗВІТ ПО ОБЛАДНАННЮ${subLabel} — Період: ${periodStr}</h2>
+            <h2>МІСЯЧНИЙ ЗВІТ ПО ОБЛАДНАННЮ${subLabel} — Період: ${periodStr}</h2>
             ${table.outerHTML}
         </body>
         </html>

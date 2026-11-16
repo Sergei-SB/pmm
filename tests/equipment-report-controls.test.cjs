@@ -29,6 +29,16 @@ test('Monthly hours replace the previous entry for the same unit and month', () 
     c.saveEquipmentMonthlyHours({value: ''}, id);
     assert.equal(values.size, 0);
 });
+test('A full month uses saved decade values until a monthly report is saved', () => {
+    const {c, values} = fixture();
+    values.set('equipment_report_data_01.11-10.11', JSON.stringify({gen_1: {prevFuel: '7', p1Fuel: '20'}}));
+    values.set('equipment_report_data_11.11-20.11', JSON.stringify({gen_1: {prevFuel: '9', p1Fuel: '', p2Fuel: '60'}}));
+    assert.equal(c.equipmentFullMonth('11.11-20.11'), '01.11-30.11');
+    assert.equal(c.equipmentFullMonth('21.11-30.11', 1), '01.12-31.12');
+    assert.deepEqual({...c.readEquipmentReportData('01.11-30.11').gen_1}, {prevFuel: '7', p1Fuel: '20', p2Fuel: '60'});
+    values.set('equipment_report_data_01.11-30.11', JSON.stringify({gen_1: {p2Fuel: ''}}));
+    assert.equal(c.readEquipmentReportData('01.11-30.11').gen_1.p2Fuel, '');
+});
 test('Monthly hours remain separate when switching report months', () => {
     const {c} = fixture();
     const id = 'serial:0252-09878';
