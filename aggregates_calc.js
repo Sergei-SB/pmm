@@ -894,14 +894,17 @@ function triggerRecalc() {
 
             const weights = window._periodRandomSeeds[i];
             let remainingWeight = weights.reduce((sum, weight) => sum + weight, 0);
-            const dailyLimit = Math.floor(hourlyRate * maxDailyHours * 10 + 1e-9);
-            let remaining = Math.min(Math.round(targetFuelToSpend * 10), dailyLimit * periodDays);
+            const wholeHours = isIntegerHours && Number.isInteger(hourlyRate);
+            const fuelStep = wholeHours ? hourlyRate : 0.1;
+            const dailyLimit = Math.floor(hourlyRate * maxDailyHours / fuelStep + 1e-9);
+            const requestedUnits = wholeHours ? Math.floor(targetFuelToSpend / fuelStep) : Math.round(targetFuelToSpend * 10);
+            let remaining = Math.min(requestedUnits, dailyLimit * periodDays);
 
             for (let d = 0; d < periodDays; d++) {
                 const minimum = Math.max(0, remaining - dailyLimit * (periodDays - d - 1));
                 const desired = Math.round(remaining * weights[d] / remainingWeight);
                 const allocated = Math.max(minimum, Math.min(dailyLimit, remaining, desired));
-                periodDailyFuels.push(allocated / 10);
+                periodDailyFuels.push(wholeHours ? allocated * hourlyRate : allocated / 10);
                 remaining -= allocated;
                 remainingWeight -= weights[d];
             }
@@ -1001,7 +1004,7 @@ function onManualMotoHourChange(periodIdx, dayIdx, val) {
 
             const fuelCell = document.getElementById(`row-fuel-${i}-${d}`);
             const oilCell = document.getElementById(`row-oil-${i}-${d}`);
-            if (fuelCell) fuelCell.textContent = adaptedFuel.toFixed(1) + ' л';
+            if (fuelCell) fuelCell.textContent = formatAggregateDailyFuel(adaptedFuel, hourlyRate, dHours);
             if (oilCell) oilCell.textContent = (isIntegerHours ? Math.round(adaptedOil) : adaptedOil.toFixed(2)) + ' л';
 
             globalDayCounter++;
@@ -1020,13 +1023,17 @@ function onManualMotoHourChange(periodIdx, dayIdx, val) {
     const verifFuelEl = document.getElementById('verif-total-fuel');
     if (verifHoursEl) verifHoursEl.textContent = (isIntegerHours ? Math.round(totalMotoHoursAll) : totalMotoHoursAll.toFixed(1)) + ' год';
     if (verifFuelEl) verifFuelEl.textContent = totalFuelAll.toFixed(1) + ' л';
-    updateAggregateDailyTotals(totalMotoHoursAll, totalFuelAll, totalOilAll, isIntegerHours);
+    updateAggregateDailyTotals(totalMotoHoursAll, totalFuelAll, totalOilAll, isIntegerHours, hourlyRate);
 }
 
-function updateAggregateDailyTotals(hours, fuel, oil, integerHours) {
+function formatAggregateDailyFuel(fuel, rate, hours) {
+    return fuel.toFixed(Number.isInteger(rate) && Number.isInteger(hours) && Number.isInteger(fuel) ? 0 : 1) + ' л';
+}
+
+function updateAggregateDailyTotals(hours, fuel, oil, integerHours, rate) {
     const totals = {
         'agg-daily-total-hours': (integerHours ? hours.toFixed(0) : hours.toFixed(1)) + ' год',
-        'agg-daily-total-fuel': fuel.toFixed(1) + ' л',
+        'agg-daily-total-fuel': formatAggregateDailyFuel(fuel, rate, hours),
         'agg-daily-total-oil': oil.toFixed(2) + ' л'
     };
     for (const [id, value] of Object.entries(totals)) {
@@ -1118,7 +1125,7 @@ function displayCalcResults(eq, totalMotoHours, daysCount, totalFuel, totalOil, 
             let adaptedOil = rawOil * (rawFuel > 0 ? (adaptedFuel / rawFuel) : 1);
             displayTotalOil += adaptedOil;
             
-            let fuelDisplay = `${adaptedFuel.toFixed(1)} л`;
+            let fuelDisplay = formatAggregateDailyFuel(adaptedFuel, hourlyRate, effectiveH);
             let oilDisplay = isIntegerHours ? `${Math.round(adaptedOil)} л` : `${adaptedOil.toFixed(2)} л`;
 
             dailyTableRows += '<tr style="background-color: ' + rowBg + ';">' +
@@ -1213,7 +1220,7 @@ function displayCalcResults(eq, totalMotoHours, daysCount, totalFuel, totalOil, 
             </div>
         </div>
     `;
-    updateAggregateDailyTotals(displayTotalMotoHours, verificationTotalFuel, displayTotalOil, isIntegerHours);
+    updateAggregateDailyTotals(displayTotalMotoHours, verificationTotalFuel, displayTotalOil, isIntegerHours, hourlyRate);
 }
 
 // ДРУК ЗВІТУ
