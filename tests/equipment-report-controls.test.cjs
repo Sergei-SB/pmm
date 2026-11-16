@@ -29,6 +29,21 @@ test('Monthly hours replace the previous entry for the same unit and month', () 
     c.saveEquipmentMonthlyHours({value: ''}, id);
     assert.equal(values.size, 0);
 });
+test('Generator totals recover old report rows by serial and count each month once', () => {
+    const {c, values} = fixture();
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '../generators.js'), 'utf8'), c);
+    c.getGeneratorsList = () => [{id: 73, serialNumber: '0252-09878'}];
+    Object.defineProperty(c.localStorage, 'length', {get: () => values.size});
+    c.localStorage.key = index => [...values.keys()][index];
+    values.set('equipment_report_data_11.11-20.11', JSON.stringify({
+        report_gen_1: {_equipment: {category: 'Генератор'}, serialNumber: '0252-09878'}
+    }));
+    values.set(c.equipmentHoursKey('2026-11', 'report_gen_1'), JSON.stringify({hours: 999}));
+    assert.equal(c.generatorHoursTotals().get('73').hours, 999);
+    values.set(c.equipmentHoursKey('2026-11', 'serial:0252-09878'), JSON.stringify({hours: 100}));
+    values.set(c.equipmentHoursKey('2026-12', 'serial:0252-09878'), JSON.stringify({hours: 25}));
+    assert.equal(c.generatorHoursTotals().get('73').hours, 125);
+});
 test('Report serial numbers come from equipment without changing identifiers or registry data',()=>{
     const {c,inventory,period}=fixture();const rows=c.getEquipmentReportItems(period);
     assert.equal(rows[0].serialNumber,'GEN-001');assert.equal(rows[1].serialNumber,'PUMP-001');

@@ -36,7 +36,19 @@ function readEquipmentMonthlyHours(month, id) {
     }
 }
 
-function saveEquipmentMonthlyHours(input, id) {
+function equipmentSerialKey(value) {
+    const serial = String(value ?? '').normalize('NFKC').trim().toUpperCase().replace(/\s+/g, '');
+    return !serial || /^0+$|^БЕЗНОМЕР/.test(serial) ? '' : serial;
+}
+
+function generatorHoursIdentity(item) {
+    const serial = equipmentSerialKey(item.serialNumber);
+    if (!serial || item.category !== 'Генератор') return item.uniqueId;
+    const matches = getGeneratorsList().filter(generator => equipmentSerialKey(generator.serialNumber) === serial);
+    return matches.length === 1 ? 'serial:' + serial : item.uniqueId;
+}
+
+function saveEquipmentMonthlyHours(input, id, serialNumber = '') {
     if (!canEditEquipmentReport()) return;
     const date = equipmentHoursMonth(equipmentReportPeriod());
     if (!date) return;
@@ -49,8 +61,11 @@ function saveEquipmentMonthlyHours(input, id) {
     }
     const key = equipmentHoursKey(date.month, id);
     try {
-        if (value === '') localStorage.removeItem(key);
-        else localStorage.setItem(key, JSON.stringify({hours: Number(value), start: previous?.start || date.start}));
+        if (value === '' && !id.startsWith('serial:')) localStorage.removeItem(key);
+        else localStorage.setItem(key, JSON.stringify({
+            hours: value === '' ? null : Number(value), start: previous?.start || date.start,
+            ...(serialNumber ? {serialNumber} : {})
+        }));
     } catch (_) {
         input.value = previous?.hours ?? '';
         alert('Не вдалося зберегти мотогодини.');
@@ -867,6 +882,9 @@ function renderEquipmentReportView() {
         const eqLock = canEditEq ? '' : 'disabled readonly style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px; background-color: #f1f2f6; cursor: not-allowed; color: #2c3e50;" title="Редагування доступне тільки для Адміна та Розробника"';
 
         const tr = document.createElement('tr');
+        const hoursId = generatorHoursIdentity(item);
+        const month = equipmentHoursMonth(periodStr)?.month;
+        const hoursRecord = readEquipmentMonthlyHours(month, hoursId) ?? readEquipmentMonthlyHours(month, item.uniqueId);
         tr.setAttribute('data-fuel-type', (item.fuelType || '').toUpperCase());
         tr.innerHTML = `
             <td style="text-align: center;">${idx + 1}</td>
@@ -887,12 +905,12 @@ function renderEquipmentReportView() {
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p3Oil" value="${itemData.p3Oil || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input eq-refuel-date" inputmode="numeric" oninput="formatEquipmentRefuelDates(this, event)" autocomplete="off" data-id="${equipmentReportEscape(item.uniqueId)}" data-field="p3Date" aria-label="Дати заправок за 3-й період" value="${equipmentReportEscape(itemData.p3Date)}" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="nextFuel" value="${itemData.nextFuel || ''}" style="width: 100%; text-align: center; border: 1px solid #27ae60; background: #f0fdf4; padding: 4px; font-weight: bold; color: #166534;" placeholder="0.0" ${eqLock}></td>
-            <td><input type="text" inputmode="decimal" class="eq-rep-input" data-equipment-month-hours aria-label="Мотогодини за місяць" value="${equipmentReportEscape(readEquipmentMonthlyHours(equipmentHoursMonth(periodStr)?.month, item.uniqueId)?.hours)}" style="width:100%;border:1px solid #ccc;text-align:center;" ${eqLock}></td>
+            <td><input type="text" inputmode="decimal" class="eq-rep-input" data-equipment-month-hours aria-label="Мотогодини за місяць" value="${equipmentReportEscape(hoursRecord?.hours)}" style="width:100%;border:1px solid #ccc;text-align:center;" ${eqLock}></td>
             <td class="eq-report-action"><button type="button" data-remove-eq-id="${equipmentReportEscape(item.uniqueId)}" ${canEditEq?'':'disabled'} style="background:#c0392b;color:white;border:0;border-radius:4px;padding:6px;cursor:pointer">Видалити</button></td>
         `;
         tbody.appendChild(tr);
         const hoursInput = tr.querySelector('[data-equipment-month-hours]');
-        if (hoursInput) hoursInput.addEventListener('change', () => saveEquipmentMonthlyHours(hoursInput, item.uniqueId));
+        if (hoursInput) hoursInput.addEventListener('change', () => saveEquipmentMonthlyHours(hoursInput, hoursId, item.serialNumber));
         tr.querySelector('[data-remove-eq-id]')?.addEventListener('click', () => removeEquipmentReportItem(item.uniqueId));
     });
 

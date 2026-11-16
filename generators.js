@@ -101,22 +101,65 @@ function printCurrentEquipmentTable() {
     }
 }
 
+function generatorSerialIndex(items) {
+    const ids = new Map();
+    for (const item of items) {
+        const serial = equipmentSerialKey(item.serialNumber);
+        if (serial) ids.set(serial, ids.has(serial) ? null : String(item.id));
+    }
+    return ids;
+}
+
 function generatorHoursTotals() {
-    const totals = new Map();
+    const items = getGeneratorsList();
+    const ids = new Set(items.map(item => String(item.id)));
+    const serials = generatorSerialIndex(items);
+    const aliases = new Map();
+    const reportPrefix = 'equipment_report_data_';
     for (let index = 0; index < localStorage.length; index++) {
-        const match = /^equipment_moto_hours_(\d{4}-\d{2}):Генератор_(.+)$/.exec(localStorage.key(index) || '');
+        const key = localStorage.key(index);
+        if (!key?.startsWith(reportPrefix)) continue;
+        const period = key.slice(reportPrefix.length);
+        const month = equipmentHoursMonth(period)?.month.slice(5);
+        if (!month) continue;
+        try {
+            for (const [id, row] of Object.entries(readEquipmentReportData(period))) {
+                if (!id.startsWith('Генератор_') && row?._equipment?.category !== 'Генератор') continue;
+                const serial = equipmentSerialKey(row?.serialNumber || row?._equipment?.serialNumber);
+                if (!serial) continue;
+                const alias = month + ':' + id;
+                aliases.set(alias, !aliases.has(alias) || aliases.get(alias) === serial ? serial : null);
+            }
+        } catch (_) {}
+    }
+    const months = new Map();
+    for (let index = 0; index < localStorage.length; index++) {
+        const match = /^equipment_moto_hours_(\d{4}-\d{2}):(.+)$/.exec(localStorage.key(index) || '');
         if (!match) continue;
-        const record = readEquipmentMonthlyHours(match[1], 'Генератор_' + match[2]);
-        if (!Number.isFinite(record?.hours) || record.hours < 0) continue;
-        const total = totals.get(match[2]) || {hours: 0, start: ''};
-        total.hours += record.hours;
-        totals.set(match[2], total);
+        const [, month, identity] = match;
+        const record = readEquipmentMonthlyHours(month, identity);
+        if (!record || (record.hours !== null && (!Number.isFinite(record.hours) || record.hours < 0))) continue;
+        const bySerial = identity.startsWith('serial:');
+        const directId = identity.startsWith('Генератор_') ? identity.slice('Генератор_'.length) : '';
+        if (!bySerial && !directId && !identity.startsWith('report_gen_')) continue;
+        const serial = bySerial ? identity.slice(7)
+            : equipmentSerialKey(record.serialNumber) || aliases.get(month.slice(5) + ':' + identity);
+        const id = (serial && serials.get(serial)) || (ids.has(directId) ? directId : null);
+        if (!id) continue;
+        const key = month + ':' + id;
+        const priority = bySerial ? 3 : directId === id ? 2 : 1;
+        if ((months.get(key)?.priority || 0) < priority) months.set(key, {id, hours: record.hours, priority});
+    }
+    const totals = new Map();
+    for (const {id, hours} of months.values()) {
+        if (hours !== null) totals.set(id, {hours: (totals.get(id)?.hours || 0) + hours});
     }
     return totals;
 }
 
 function generatorFirstRefuelDates() {
     const dates = new Map();
+    const serials = generatorSerialIndex(getGeneratorsList());
     const prefix = 'equipment_report_data_';
     for (let index = 0; index < localStorage.length; index++) {
         const key = localStorage.key(index);
@@ -127,8 +170,10 @@ function generatorFirstRefuelDates() {
         let rows;
         try { rows = readEquipmentReportData(period); } catch (_) { continue; }
         for (const [id, row] of Object.entries(rows)) {
-            if (!id.startsWith('Генератор_') || !row) continue;
-            const generatorId = id.slice('Генератор_'.length);
+            if (!row || (!id.startsWith('Генератор_') && row._equipment?.category !== 'Генератор')) continue;
+            const serial = equipmentSerialKey(row.serialNumber || row._equipment?.serialNumber);
+            const generatorId = serials.get(serial) || (id.startsWith('Генератор_') ? id.slice('Генератор_'.length) : null);
+            if (!generatorId) continue;
             for (let group = 1; group <= 3; group++) {
                 if (!(evaluateExpression(String(row['p' + group + 'Fuel'] ?? '')) > 0)) continue;
                 const field = 'p' + group + 'Date';
