@@ -1,26 +1,4 @@
 // Shared fuel limits: litres/hour × operating hours/day × days.
-function updateEquipmentCellTooltip(event) {
-    const input = event.target;
-    if (!input.matches?.('tbody td input.table-cell-input[type="text"]') ||
-        !input.closest('#generators-table, #webasto-table, #heaters-table, #chainsaws-table, #pumps-table')) return;
-
-    const style = getComputedStyle(input);
-    const availableWidth = input.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
-    const context = document.createElement('canvas').getContext('2d');
-    if (!context) return;
-    context.font = style.font || `${style.fontSize} ${style.fontFamily}`;
-    if (input.value && context.measureText(input.value).width > availableWidth) {
-        input.title = input.value;
-    } else {
-        input.removeAttribute('title');
-    }
-}
-
-if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
-    document.addEventListener('mouseover', updateEquipmentCellTooltip);
-    document.addEventListener('input', updateEquipmentCellTooltip);
-}
-
 function equipmentLimitNumber(value) {
     const text = String(value ?? '').trim().replace(',', '.');
     if (!/^\d+(?:\.\d*)?$/.test(text)) return null;
