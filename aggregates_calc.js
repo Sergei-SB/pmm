@@ -1053,7 +1053,7 @@ function formatAggregateDailyFuel(fuel, rate, hours) {
 
 function updateAggregateDailyTotals(hours, fuel, oil, integerHours, rate) {
     const totals = {
-        'agg-daily-total-hours': (integerHours ? hours.toFixed(0) : hours.toFixed(1)) + ' год',
+        'agg-daily-total-hours': (integerHours ? hours.toFixed(0) : hours.toFixed(1)) + ' м/г',
         'agg-daily-total-fuel': formatAggregateDailyFuel(fuel, rate, hours),
         'agg-daily-total-oil': oil.toFixed(2) + ' л'
     };
@@ -1126,10 +1126,10 @@ function displayCalcResults(eq, totalMotoHours, daysCount, totalFuel, totalOil, 
                 let currentVal = isIntegerHours ? Math.round(parseFloat(rawVal) || 0) : (parseFloat(Number(rawVal).toFixed(1)) || 0);
 
                 let stepVal = isIntegerHours ? "1" : "0.1";
-                motoCellContent = `<input type="number" id="row-hours-${i}-${d}" step="${stepVal}" min="0" value="${currentVal}" oninput="onManualMotoHourChange(${i}, ${d}, this.value)" style="width: 70px; border: 1px solid #bdc3c7; border-radius: 3px; text-align: center; font-size: 11px; padding: 2px;"> год`;
+                motoCellContent = `<input type="number" id="row-hours-${i}-${d}" step="${stepVal}" min="0" value="${currentVal}" oninput="onManualMotoHourChange(${i}, ${d}, this.value)" style="width: 70px; border: 1px solid #bdc3c7; border-radius: 3px; text-align: center; font-size: 11px; padding: 2px;"> м/г`;
             } else {
                 let formattedH = isIntegerHours ? Math.round(hVal) : parseFloat(hVal.toFixed(1));
-                motoCellContent = `${formattedH} год`;
+                motoCellContent = `${formattedH} м/г`;
             }
 
             let effectiveH = isVerification 
