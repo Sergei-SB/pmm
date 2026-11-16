@@ -853,7 +853,7 @@ function triggerRecalc() {
                     window._manualMotoHours[mInputKey] = dHours;
                 }
 
-                let dFuel = isIntegerHours ? Math.round(dHours * hourlyRate) : (dHours * hourlyRate);
+                let dFuel = parsedNumWithOneDec(dHours * hourlyRate);
                 periodDailyFuels.push(dFuel);
                 periodSpentSum += dFuel;
             }
@@ -878,22 +878,22 @@ function triggerRecalc() {
                     let rest = targetFuelToSpend - allocatedSum;
                     let maxRest = hourlyRate * maxDailyHours;
                     if (rest > maxRest) rest = maxRest;
-                    periodDailyFuels.push(isIntegerHours ? Math.round(rest) : (Math.round(rest * 10) / 10));
+                    periodDailyFuels.push(parsedNumWithOneDec(rest));
                 } else {
                     let f = (targetFuelToSpend / periodDays) * weights[d];
                     let maxDayFuel = hourlyRate * maxDailyHours;
                     if (f > maxDayFuel) f = maxDayFuel;
                     
-                    let rounded = isIntegerHours ? Math.round(f) : (Math.round(f * 10) / 10);
+                    let rounded = parsedNumWithOneDec(f);
                     periodDailyFuels.push(rounded);
                     allocatedSum += rounded;
                 }
             }
 
             let currentSum = periodDailyFuels.reduce((a, b) => a + b, 0);
-            let diff = isIntegerHours ? Math.round(targetFuelToSpend - currentSum) : (Math.round((targetFuelToSpend - currentSum) * 10) / 10);
+            let diff = parsedNumWithOneDec(targetFuelToSpend - currentSum);
             if (diff !== 0 && periodDays > 0) {
-                let adjusted = isIntegerHours ? Math.round(periodDailyFuels[periodDays - 1] + diff) : (Math.round((periodDailyFuels[periodDays - 1] + diff) * 10) / 10);
+                let adjusted = parsedNumWithOneDec(periodDailyFuels[periodDays - 1] + diff);
                 periodDailyFuels[periodDays - 1] = Math.max(0, adjusted);
             }
         }
@@ -904,7 +904,7 @@ function triggerRecalc() {
             let dHours = periodDailyFuels[d] / hourlyRate;
             if (dHours > maxDailyHours && !isVerification) {
                 dHours = maxDailyHours;
-                periodDailyFuels[d] = isIntegerHours ? Math.round(dHours * hourlyRate) : (Math.round((dHours * hourlyRate) * 10) / 10);
+                periodDailyFuels[d] = parsedNumWithOneDec(dHours * hourlyRate);
             }
             if (isIntegerHours && !isVerification) {
                 dHours = Math.round(dHours);
@@ -970,7 +970,7 @@ function onManualMotoHourChange(periodIdx, dayIdx, val) {
                 : 0;
             
             let dHours = isIntegerHours ? Math.round(parseFloat(manualVal) || 0) : (parseFloat(manualVal) || 0);
-            let dFuel = isIntegerHours ? Math.round(dHours * hourlyRate) : (dHours * hourlyRate);
+            let dFuel = parsedNumWithOneDec(dHours * hourlyRate);
             periodDailyFuels.push(dFuel);
             periodSpentSum += dFuel;
         }
@@ -984,12 +984,12 @@ function onManualMotoHourChange(periodIdx, dayIdx, val) {
             let dHours = window._manualMotoHours[mInputKey] || 0;
             totalMotoHoursAll += dHours;
 
-            let adaptedFuel = isIntegerHours ? Math.round(dHours * hourlyRate) : (dHours * hourlyRate);
+            let adaptedFuel = parsedNumWithOneDec(dHours * hourlyRate);
             let adaptedOil = periodOil * (periodSpentSum > 0 ? (periodDailyFuels[d] / periodSpentSum) : 0);
 
             const fuelCell = document.getElementById(`row-fuel-${i}-${d}`);
             const oilCell = document.getElementById(`row-oil-${i}-${d}`);
-            if (fuelCell) fuelCell.textContent = (isIntegerHours ? Math.round(adaptedFuel) : adaptedFuel.toFixed(1)) + ' л';
+            if (fuelCell) fuelCell.textContent = adaptedFuel.toFixed(1) + ' л';
             if (oilCell) oilCell.textContent = (isIntegerHours ? Math.round(adaptedOil) : adaptedOil.toFixed(2)) + ' л';
 
             globalDayCounter++;
@@ -1007,7 +1007,7 @@ function onManualMotoHourChange(periodIdx, dayIdx, val) {
     const verifHoursEl = document.getElementById('verif-total-hours');
     const verifFuelEl = document.getElementById('verif-total-fuel');
     if (verifHoursEl) verifHoursEl.textContent = (isIntegerHours ? Math.round(totalMotoHoursAll) : totalMotoHoursAll.toFixed(1)) + ' год';
-    if (verifFuelEl) verifFuelEl.textContent = (isIntegerHours ? Math.round(totalFuelAll) : totalFuelAll.toFixed(1)) + ' л';
+    if (verifFuelEl) verifFuelEl.textContent = totalFuelAll.toFixed(1) + ' л';
 }
 
 function parsedNumWithOneDec(n) {
@@ -1084,14 +1084,14 @@ function displayCalcResults(eq, totalMotoHours, daysCount, totalFuel, totalOil, 
 
             displayTotalMotoHours += parseFloat(effectiveH) || 0;
 
-            let adaptedFuel = isIntegerHours ? Math.round(effectiveH * hourlyRate) : (effectiveH * hourlyRate);
+            let adaptedFuel = parsedNumWithOneDec(effectiveH * hourlyRate);
             verificationTotalFuel += adaptedFuel;
 
             let rawOil = dailyOils[dayIdx] || 0;
             let rawFuel = dailyFuels[dayIdx] || 0;
             let adaptedOil = rawOil * (rawFuel > 0 ? (adaptedFuel / rawFuel) : 1);
             
-            let fuelDisplay = isIntegerHours ? `${Math.round(adaptedFuel)} л` : `${adaptedFuel.toFixed(1)} л`;
+            let fuelDisplay = `${adaptedFuel.toFixed(1)} л`;
             let oilDisplay = isIntegerHours ? `${Math.round(adaptedOil)} л` : `${adaptedOil.toFixed(2)} л`;
 
             dailyTableRows += '<tr style="background-color: ' + rowBg + ';">' +
@@ -1113,7 +1113,7 @@ function displayCalcResults(eq, totalMotoHours, daysCount, totalFuel, totalOil, 
     const verifHoursEl = document.getElementById('verif-total-hours');
     const verifFuelEl = document.getElementById('verif-total-fuel');
     if (verifHoursEl) verifHoursEl.textContent = (isIntegerHours ? Math.round(displayTotalMotoHours) : displayTotalMotoHours.toFixed(1)) + ' год';
-    if (verifFuelEl) verifFuelEl.textContent = (isIntegerHours ? Math.round(verificationTotalFuel) : verificationTotalFuel.toFixed(1)) + ' л';
+    if (verifFuelEl) verifFuelEl.textContent = verificationTotalFuel.toFixed(1) + ' л';
 
     box.innerHTML = `
         <div style="background: white; padding: 15px; border-radius: 6px; border: 1px solid #dcdcdc;">
