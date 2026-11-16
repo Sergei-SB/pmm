@@ -253,7 +253,7 @@ function renderAggregatesCalcView() {
                 <td style="padding: 2px; border: 1px solid #bdc3c7;"><input type="number" step="1" min="0" max="31" id="b-days-${i}" value="${rowData.days || ''}" oninput="onDaysInputChange(${i})" style="width: 100%; border: none; text-align: center; font-size: 11px; padding: 3px;" placeholder=""></td>
                 <td style="padding: 2px; border: 1px solid #bdc3c7;"><input type="number" step="0.1" id="b-start-${i}" data-auto="${rowData.autoStart === true}" value="${rowData.start || ''}" oninput="this.dataset.auto='false'; calculateVariantBRow(${i})" style="width: 100%; border: none; text-align: center; font-size: 11px; padding: 3px;" placeholder=""></td>
                 <td style="padding: 2px; border: 1px solid #bdc3c7;"><input type="number" step="0.1" id="b-rec-${i}" value="${rowData.rec || ''}" oninput="calculateVariantBRow(${i})" style="width: 100%; border: none; text-align: center; font-size: 11px; padding: 3px;" placeholder=""></td>
-                <td style="padding: 2px;"><input type="date" id="b-receipt-date-${i}" aria-label="Дата отримання пального, рядок ${i}" value="${/^\d{4}-\d{2}-\d{2}$/.test(rowData.receiptDate || '') ? rowData.receiptDate : ''}" oninput="onDaysInputChange(${i})" style="width:100%;box-sizing:border-box;font-size:11px;padding:2px;"></td>
+                <td style="padding: 2px;"><input type="text" inputmode="numeric" maxlength="5" placeholder="дд.мм" id="b-receipt-date-${i}" aria-label="Дата отримання пального, рядок ${i}" value="${aggregateReceiptDayMonth(rowData.receiptDate)}" oninput="formatAggregateReceiptInput(this); onDaysInputChange(${i})" style="width:100%;box-sizing:border-box;font-size:11px;padding:2px;"></td>
                 <td style="padding: 2px; border: 1px solid #bdc3c7;"><input type="number" step="0.1" id="b-end-${i}" value="${rowData.end || ''}" oninput="calculateVariantBRow(${i})" style="width: 100%; border: none; text-align: center; font-size: 11px; padding: 3px;" placeholder=""></td>
                 <td style="padding: 2px; border: 1px solid #bdc3c7;"><input type="number" step="0.1" id="b-spent-${i}" value="${rowData.spent || ''}" readonly style="width: 100%; border: none; text-align: center; font-size: 11px; padding: 3px; font-weight: bold; color: #c0392b; background: #f9f9f9;" placeholder=""></td>
             </tr>
@@ -789,9 +789,27 @@ function reseedChaosDistribution() {
 }
 
 // ОСНОВНА ФУНКЦІЯ РОЗРАХУНКУ
+function aggregateReceiptDayMonth(value) {
+    const legacy = /^\d{4}-(\d{2})-(\d{2})$/.exec(value || '');
+    if (legacy) return legacy[2] + '.' + legacy[1];
+    return /^\d{0,2}(?:\.\d{0,2})?$/.test(value || '') ? value || '' : '';
+}
+
+function formatAggregateReceiptInput(input) {
+    const digits = input.value.replace(/\D/g, '').slice(0, 4);
+    const formatted = digits.length > 2 ? digits.slice(0, 2) + '.' + digits.slice(2) : digits;
+    if (input.value !== formatted) input.value = formatted;
+}
+
 function aggregateReceiptDate(row) {
     const value = document.getElementById(`b-receipt-date-${row}`)?.value;
-    return value ? Date.parse(value + 'T00:00:00Z') : NaN;
+    const match = /^(\d{2})\.(\d{2})$/.exec(aggregateReceiptDayMonth(value));
+    if (!match) return NaN;
+    const day = Number(match[1]);
+    const month = Number(match[2]);
+    const year = Number(new Intl.DateTimeFormat('en', {year: 'numeric', timeZone: 'Europe/Kyiv'}).format(new Date()));
+    const date = new Date(Date.UTC(year, month - 1, day));
+    return date.getUTCMonth() === month - 1 && date.getUTCDate() === day ? +date : NaN;
 }
 
 function aggregateFirstDatedRow() {
@@ -1121,7 +1139,7 @@ function displayCalcResults(eq, totalMotoHours, daysCount, totalFuel, totalOil, 
             dailyTableRows += '<tr style="background-color: ' + rowBg + ';">' +
                 '<td style="text-align: center; padding: 5px; border-bottom: 1px solid #e0e0e0;"><strong>День ' + (dayIdx + 1) + '</strong></td>' +
                 '<td style="text-align: center; padding: 5px; border-bottom: 1px solid #e0e0e0;">' + motoCellContent + '</td>' +
-                '<td style="text-align:center;">' + (Number.isFinite(dayDate) ? new Date(dayDate).toISOString().slice(0, 10).split('-').reverse().join('.') : '—') + '</td>' +
+                '<td style="text-align:center;">' + (Number.isFinite(dayDate) ? new Date(dayDate).toISOString().slice(5, 10).split('-').reverse().join('.') : '—') + '</td>' +
                 '<td id="row-fuel-' + i + '-' + d + '" style="text-align: center; padding: 5px; border-bottom: 1px solid #e0e0e0; color: #c0392b; font-weight: bold;">' + fuelDisplay + '</td>' +
                 '<td id="row-oil-' + i + '-' + d + '" style="text-align: center; padding: 5px; border-bottom: 1px solid #e0e0e0; color: #2980b9;">' + oilDisplay + '</td>' +
                 '</tr>';
