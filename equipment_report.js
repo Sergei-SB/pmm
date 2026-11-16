@@ -25,6 +25,18 @@ function equipmentReportEscape(value) {
     return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+function formatEquipmentRefuelDates(input, event) {
+    if (event.isComposing || event.inputType?.startsWith('delete')) return;
+    const value = input.value;
+    // Leave legacy formats and edits in the middle of the field intact.
+    if (input.selectionEnd !== value.length || !/^(?:\d{2},\d{2}\.\s*)*(?:\d{1,2}(?:,\d{0,2})?|\d*)$/.test(value)) return;
+    const digits = value.replace(/\D/g, '');
+    input.value = (digits.match(/.{1,4}/g) || []).map(date => {
+        if (date.length < 2) return date;
+        return date.slice(0, 2) + ',' + date.slice(2) + (date.length === 4 ? '.' : '');
+    }).join(' ');
+}
+
 function collectEquipmentReportInputs(period) {
     // Keep rows hidden by subdivision filters or excluded from this period.
     const data = readEquipmentReportData(period);
@@ -822,13 +834,13 @@ function renderEquipmentReportView() {
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="prevOil" value="${itemData.prevOil || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p1Fuel" value="${itemData.p1Fuel || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p1Oil" value="${itemData.p1Oil || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
-            <td><input type="text" class="eq-rep-input eq-refuel-date" autocomplete="off" data-id="${equipmentReportEscape(item.uniqueId)}" data-field="p1Date" aria-label="Дати заправок за 1-й період" value="${equipmentReportEscape(itemData.p1Date)}" ${eqLock}></td>
+            <td><input type="text" class="eq-rep-input eq-refuel-date" inputmode="numeric" oninput="formatEquipmentRefuelDates(this, event)" autocomplete="off" data-id="${equipmentReportEscape(item.uniqueId)}" data-field="p1Date" aria-label="Дати заправок за 1-й період" value="${equipmentReportEscape(itemData.p1Date)}" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p2Fuel" value="${itemData.p2Fuel || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p2Oil" value="${itemData.p2Oil || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
-            <td><input type="text" class="eq-rep-input eq-refuel-date" autocomplete="off" data-id="${equipmentReportEscape(item.uniqueId)}" data-field="p2Date" aria-label="Дати заправок за 2-й період" value="${equipmentReportEscape(itemData.p2Date)}" ${eqLock}></td>
+            <td><input type="text" class="eq-rep-input eq-refuel-date" inputmode="numeric" oninput="formatEquipmentRefuelDates(this, event)" autocomplete="off" data-id="${equipmentReportEscape(item.uniqueId)}" data-field="p2Date" aria-label="Дати заправок за 2-й період" value="${equipmentReportEscape(itemData.p2Date)}" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p3Fuel" value="${itemData.p3Fuel || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p3Oil" value="${itemData.p3Oil || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
-            <td><input type="text" class="eq-rep-input eq-refuel-date" autocomplete="off" data-id="${equipmentReportEscape(item.uniqueId)}" data-field="p3Date" aria-label="Дати заправок за 3-й період" value="${equipmentReportEscape(itemData.p3Date)}" ${eqLock}></td>
+            <td><input type="text" class="eq-rep-input eq-refuel-date" inputmode="numeric" oninput="formatEquipmentRefuelDates(this, event)" autocomplete="off" data-id="${equipmentReportEscape(item.uniqueId)}" data-field="p3Date" aria-label="Дати заправок за 3-й період" value="${equipmentReportEscape(itemData.p3Date)}" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="nextFuel" value="${itemData.nextFuel || ''}" style="width: 100%; text-align: center; border: 1px solid #27ae60; background: #f0fdf4; padding: 4px; font-weight: bold; color: #166534;" placeholder="0.0" ${eqLock}></td>
             <td class="eq-report-action"><button type="button" data-remove-eq-id="${equipmentReportEscape(item.uniqueId)}" ${canEditEq?'':'disabled'} style="background:#c0392b;color:white;border:0;border-radius:4px;padding:6px;cursor:pointer">Видалити</button></td>
         `;
