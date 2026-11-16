@@ -110,16 +110,47 @@ function generatorHoursTotals() {
         if (!Number.isFinite(record?.hours) || record.hours < 0) continue;
         const total = totals.get(match[2]) || {hours: 0, start: ''};
         total.hours += record.hours;
-        if (record.hours > 0 && /^\d{4}-\d{2}-\d{2}$/.test(record.start) &&
-            (!total.start || record.start < total.start)) total.start = record.start;
         totals.set(match[2], total);
     }
     return totals;
 }
 
+function generatorFirstRefuelDates() {
+    const dates = new Map();
+    const prefix = 'equipment_report_data_';
+    for (let index = 0; index < localStorage.length; index++) {
+        const key = localStorage.key(index);
+        if (!key?.startsWith(prefix)) continue;
+        const period = key.slice(prefix.length);
+        const reportMonth = equipmentHoursMonth(period);
+        if (!reportMonth) continue;
+        let rows;
+        try { rows = readEquipmentReportData(period); } catch (_) { continue; }
+        for (const [id, row] of Object.entries(rows)) {
+            if (!id.startsWith('Генератор_') || !row) continue;
+            const generatorId = id.slice('Генератор_'.length);
+            for (let group = 1; group <= 3; group++) {
+                if (!(evaluateExpression(String(row['p' + group + 'Fuel'] ?? '')) > 0)) continue;
+                const field = 'p' + group + 'Date';
+                const fallbackYear = row[field + 'Year'] || reportMonth.month.slice(0, 4);
+                const dateParts = String(row[field] ?? '').matchAll(/\b(?:(\d{4})-(\d{2})-(\d{2})|(\d{1,2})[.,](\d{1,2})(?:[.,](\d{4}))?)\b/g);
+                for (const [, isoYear, isoMonth, isoDay, day, month, explicitYear] of dateParts) {
+                    const year = isoYear || explicitYear || fallbackYear;
+                    if (!/^\d{4}$/.test(year)) continue;
+                    const date = year + '-' + (isoMonth || month).padStart(2, '0') + '-' + (isoDay || day).padStart(2, '0');
+                    const parsed = new Date(date + 'T00:00:00Z');
+                    if (!Number.isFinite(+parsed) || parsed.toISOString().slice(0, 10) !== date) continue;
+                    if (!dates.has(generatorId) || date < dates.get(generatorId)) dates.set(generatorId, date);
+                }
+            }
+        }
+    }
+    return dates;
+}
+
 function generatorHoursText(item, totals) {
     const monthly = totals.get(String(item.id));
-    if (!monthly) return String(item.motoHours ?? '');
+    if (!monthly) return String(item.motoHours ?? '') || '0';
     const baseline = equipmentLimitNumber(item.motoHours) ?? 0;
     return new Intl.NumberFormat('uk-UA', {useGrouping: false, maximumFractionDigits: 6}).format(baseline + monthly.hours);
 }
@@ -173,6 +204,7 @@ function printGeneratorsTable() {
 
 function renderGeneratorsView() {
     const hoursTotals = generatorHoursTotals();
+    const firstRefuels = generatorFirstRefuelDates();
     const wrapper = document.getElementById('equipment-table-wrapper');
     if (!wrapper) return;
 
@@ -373,7 +405,7 @@ function renderGeneratorsView() {
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.responsiblePerson || ''}" oninput="updateGeneratorProp(${item.id}, 'responsiblePerson', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.locationSubdivision || ''}" oninput="updateGeneratorProp(${item.id}, 'locationSubdivision', this.value)"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.serialNumber || ''}" oninput="updateGeneratorProp(${item.id}, 'serialNumber', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
-            <td title="${hoursTotals.get(String(item.id))?.start ? 'Початок обліку мотогодин: ' + hoursTotals.get(String(item.id)).start.split('-').reverse().join('.') : 'Дата початку обліку ще не визначена'}">${escapeHtml(generatorHoursText(item, hoursTotals))}</td>
+            <td title="${firstRefuels.has(String(item.id)) ? 'Введено в експлуатацію (перша заправка): ' + firstRefuels.get(String(item.id)).split('-').reverse().join('.') : 'У звітах немає дати першої заправки'}">${escapeHtml(generatorHoursText(item, hoursTotals))}</td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.note || ''}" oninput="updateGeneratorProp(${item.id}, 'note', this.value); if(/знищ/ui.test(this.value)) { renderGeneratorsView(); }" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
             <td style="text-align: center; padding: 3px 4px;"><button class="delete-row-btn" style="padding: 2px 6px; font-size: 10px;" onclick="deleteGeneratorRow(${item.id})">Видалити</button></td>
         `;

@@ -86,6 +86,9 @@ function collectEquipmentReportInputs(period) {
         const id = input.getAttribute('data-id'), field = input.getAttribute('data-field');
         if (!id || !field) return;
         if (!Object.prototype.hasOwnProperty.call(data, id)) data[id] = {};
+        if (/^p[123]Date$/.test(field) && data[id][field] !== input.value) {
+            data[id][field + 'Year'] = equipmentHoursMonth(period)?.month.slice(0, 4);
+        }
         data[id][field] = input.value;
     });
     return data;
