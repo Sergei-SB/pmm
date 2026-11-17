@@ -144,11 +144,12 @@ function getEquipmentReportItems(period, includeExcluded = false) {
     const items = getAllEquipmentItemsUnified().map(item => ({...item, ...data[item.uniqueId]?._equipment,
         uniqueId: item.uniqueId,
         subdivision: item.inventoryLocation ?? data[item.uniqueId]?.subdivision ?? data[item.uniqueId]?._equipment?.subdivision ?? item.subdivision ?? '',
-        serialNumber: data[item.uniqueId]?.serialNumber ?? item.serialNumber ?? item.rawItem?.serialNumber ?? ''}));
+        serialNumber: data[item.uniqueId]?.serialNumber ?? item.serialNumber ?? item.rawItem?.serialNumber ?? '',
+        waybillNumber: data[item.uniqueId]?.waybillNumber ?? ''}));
     for (const [id, row] of Object.entries(data)) {
         if (['Генератор','Webasto','Теплова пушка','Бензопила','Помпа'].includes(row?._equipment?.category) && !items.some(item => item.uniqueId === id)) {
             items.push({...row._equipment, uniqueId: id, subdivision: row.subdivision ?? row._equipment.subdivision ?? '',
-                serialNumber: row.serialNumber ?? row._equipment.serialNumber ?? ''});
+                serialNumber: row.serialNumber ?? row._equipment.serialNumber ?? '', waybillNumber: row.waybillNumber ?? ''});
         }
     }
     const categoryOrder = ['Генератор','Webasto','Теплова пушка','Бензопила','Помпа'];
@@ -362,7 +363,7 @@ function openEquipmentReportGeneratorDialog() {
             dialog.remove();
             const filter = document.getElementById('equipment-subdivision-filter');
             if (filter) filter.value = 'all';
-            for (const fieldId of ['eq-report-model-search','eq-report-serial-search']) {
+            for (const fieldId of ['eq-report-model-search','eq-report-serial-search','eq-report-waybill-search']) {
                 const input = document.getElementById(fieldId); if (input) input.value = '';
             }
             renderEquipmentReportView();
@@ -805,12 +806,14 @@ function mergeFluidMaps(targetMap, sourceMap) {
     return targetMap;
 }
 
-function filterEquipmentReportItems(items, subdivision = 'all', model = '', serial = '') {
+function filterEquipmentReportItems(items, subdivision = 'all', model = '', serial = '', waybill = '') {
     const normalize = normalizeEquipmentGeneratorSearch;
+    const waybillQuery = normalize(waybill);
     return items.filter(item => {
         const unit = String(item.subdivision || '').trim();
         return (subdivision === 'all' || (subdivision === '__unassigned__' ? !unit : unit === subdivision)) &&
-            normalize(item.model).includes(normalize(model)) && normalize(item.serialNumber).includes(normalize(serial));
+            normalize(item.model).includes(normalize(model)) && normalize(item.serialNumber).includes(normalize(serial)) &&
+            normalize(item.waybillNumber).includes(waybillQuery);
     });
 }
 
@@ -867,7 +870,8 @@ function renderEquipmentReportView() {
     if (models && models.innerHTML !== modelOptions) models.innerHTML = modelOptions;
     const modelQuery = document.getElementById('eq-report-model-search')?.value || '';
     const serialQuery = document.getElementById('eq-report-serial-search')?.value || '';
-    const filteredItems = filterEquipmentReportItems(items, selectedSub, modelQuery, serialQuery);
+    const waybillQuery = document.getElementById('eq-report-waybill-search')?.value || '';
+    const filteredItems = filterEquipmentReportItems(items, selectedSub, modelQuery, serialQuery, waybillQuery);
     const resultStatus = document.getElementById('eq-report-search-status');
     if (resultStatus) resultStatus.textContent = `Знайдено: ${filteredItems.length} із ${items.length}` + (filteredItems.length ? '' : '. Змініть або очистьте фільтри.');
 
@@ -1016,7 +1020,8 @@ function updateEquipmentReportTotals() {
     if (subFilterEl && subFilterEl.value !== 'all') {
         footerLabel = `ВСЬОГО ПО ПІДРОЗДІЛУ (${subFilterEl.value === '__unassigned__' ? 'Без підрозділу' : equipmentReportEscape(subFilterEl.value)}):`;
     }
-    if (document.getElementById('eq-report-model-search')?.value || document.getElementById('eq-report-serial-search')?.value) {
+    if (document.getElementById('eq-report-model-search')?.value || document.getElementById('eq-report-serial-search')?.value ||
+        document.getElementById('eq-report-waybill-search')?.value) {
         footerLabel = 'ВСЬОГО ЗА ФІЛЬТРОМ:';
     }
 

@@ -212,6 +212,23 @@ test('Changing search filters saves pending edits and preserves rows hidden by p
     readOnly.c.changeEquipmentReportFilter('model','PUMP');assert.equal(readOnly.values.size,0);
 });
 
+test('Waybill search combines with other filters and reads the number saved for the report period', () => {
+    const {c, values, storageKey, period} = fixture();
+    values.set(storageKey, JSON.stringify({
+        gen_1: {waybillNumber: 'ДЛ-057'},
+        pump_1: {waybillNumber: 57},
+        report_gen_2: {waybillNumber: 'ДЛ-058', _equipment: {
+            category: 'Генератор', model: 'GEN', serialNumber: 'GEN-002', subdivision: 'РМТЗ'
+        }}
+    }));
+    const items = c.getEquipmentReportItems(period);
+    assert.equal(c.filterEquipmentReportItems(items, 'all', '', '', '57').length, 2);
+    assert.equal(c.filterEquipmentReportItems(items, 'РМТЗ', 'gen', '001', 'дл-05')[0].uniqueId, 'gen_1');
+    assert.equal(c.filterEquipmentReportItems(items, 'РМТЗ', 'gen', '002', '58')[0].uniqueId, 'report_gen_2');
+    assert.equal(c.filterEquipmentReportItems(items, 'РМТЗ', 'gen', '001', '58').length, 0);
+    assert.equal(c.filterEquipmentReportItems(c.getEquipmentReportItems('01.12-31.12'), 'all', '', '', '57').length, 0);
+});
+
 test('Inline subdivision edits persist per period for inventory and report-only rows and are used by search and generator dialog',()=>{
     const {c,inventory,period,values,storageKey,setInputs,listeners}=fixture();
     const id=c.addEquipmentReportGenerator({model:'CUSTOM',subdivision:'РМТЗ'},'',period);
