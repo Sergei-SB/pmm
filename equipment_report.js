@@ -927,6 +927,7 @@ function renderEquipmentReportView() {
             <td style="text-align: center;" class="eq-row-fuel-type">${equipmentReportEscape(item.fuelType)}</td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="prevFuel" value="${itemData.prevFuel || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px; ${itemData._autoCarried ? 'background-color: #f0fdf4;' : ''}" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="prevOil" value="${itemData.prevOil || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
+            <td><input type="text" class="eq-rep-input table-cell-input" data-id="${equipmentReportEscape(item.uniqueId)}" data-field="waybillNumber" aria-label="№ Д/Л" value="${equipmentReportEscape(itemData.waybillNumber)}" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p1Fuel" value="${itemData.p1Fuel || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p1Oil" value="${itemData.p1Oil || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input eq-refuel-date" inputmode="numeric" oninput="formatEquipmentRefuelDates(this, event)" autocomplete="off" data-id="${equipmentReportEscape(item.uniqueId)}" data-field="p1Date" aria-label="Дати заправок за 1-й період" value="${equipmentReportEscape(itemData.p1Date)}" ${eqLock}></td>
@@ -1032,6 +1033,7 @@ function updateEquipmentReportTotals() {
             <td colspan="6" style="text-align: right; padding-right: 10px; border-bottom: 1px solid #dcdcdc;">${footerLabel} (ДП)</td>
             <td style="text-align: center; color: #27ae60; border-bottom: 1px solid #dcdcdc;">${dpPrevFuel !== 0 ? dpPrevFuel.toFixed(1) + ' л' : '0 л'}</td>
             <td rowspan="2" style="text-align: center; vertical-align: middle; border-left: 1px solid #dcdcdc; border-right: 1px solid #dcdcdc; font-size: 11px;">${formatFluidBreakdown(sumPrevOilMap)}</td>
+            <td rowspan="2"></td>
             <td style="text-align: center; color: #27ae60; border-bottom: 1px solid #dcdcdc;">${dpP1Fuel !== 0 ? dpP1Fuel.toFixed(1) + ' л' : '0 л'}</td>
             <td rowspan="2" style="text-align: center; vertical-align: middle; border-left: 1px solid #dcdcdc; border-right: 1px solid #dcdcdc; font-size: 11px;">${formatFluidBreakdown(sumP1OilMap)}</td>
             <td rowspan="2"></td>
@@ -1055,6 +1057,7 @@ function updateEquipmentReportTotals() {
         <tr style="background-color: #d5f5e3; font-weight: bold; border-top: 2px solid #27ae60; border-bottom: 2px solid #27ae60;">
             <td colspan="6" style="text-align: right; padding-right: 10px; color: #145a32;">ВСЬОГО ЗА ПЕРІУД:</td>
             <td colspan="2" style="text-align: center; color: #27ae60;">Початковий: ДП ${dpPrevFuel.toFixed(1)} л | АБ ${abPrevFuel.toFixed(1)} л</td>
+            <td></td>
             <td colspan="9" style="text-align: left; padding-left: 15px; color: #2c3e50;">Заправка: ДП <strong style="color: #27ae60;">${totalDpPeriod.toFixed(1)} л</strong> | АБ <strong style="color: #2980b9;">${totalAbPeriod.toFixed(1)} л</strong> | Мастило <strong style="color: #8e44ad;">${formatFluidBreakdown(totalOilPeriodMap)}</strong></td>
             <td style="text-align: center; color: #145a32; font-weight: bold;">${(dpNextFuel + abNextFuel) > 0 ? (dpNextFuel + abNextFuel).toFixed(1) + ' л' : '0 л'}</td>
             <td></td><td class="eq-report-action"></td>

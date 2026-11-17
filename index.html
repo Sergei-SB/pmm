@@ -88,7 +88,7 @@
             reader.readAsDataURL(file);
         }
     </script>
-    <link rel="stylesheet" href="style.css?v=20261116-monthly-equipment-hours">
+    <link rel="stylesheet" href="style.css?v=20261117-equipment-waybill">
     <style>
         html:not(.registry-developer) #base-view .registry-developer-only { display: none !important; }
         html:not(.registry-admin-columns) #base-view .registry-admin-only:not([data-editor-allowed]) { display: none !important; }
@@ -574,6 +574,7 @@
                         <col class="eq-report-serial-col">
                         <col class="eq-report-fuel-type-col">
                         <col span="2" class="eq-report-amount-col">
+                        <col class="eq-report-waybill-col">
                         <col span="2" class="eq-report-amount-col"><col class="eq-report-dates-col">
                         <col span="2" class="eq-report-amount-col"><col class="eq-report-dates-col">
                         <col span="2" class="eq-report-amount-col"><col class="eq-report-dates-col">
@@ -590,6 +591,7 @@
                             <th rowspan="2" style="padding: 6px 4px; min-width: 140px;">Серійний номер<input class="eq-report-search" id="eq-report-serial-search" type="search" aria-label="Пошук за серійним номером" placeholder="Введіть цифри або букви…" autocomplete="off" oninput="changeEquipmentReportFilter('serial',this.value)" style="display:block;width:100%;margin-top:5px;padding:4px;box-sizing:border-box"></th>
                             <th rowspan="2">Тип<br>пал.</th>
                             <th colspan="2">Залишки на <span class="eq-rep-start">01.10</span></th>
+                            <th rowspan="2" scope="col">№ Д/Л</th>
                             <th colspan="3">Заправка <span class="eq-rep-p1-label">1-10.10</span></th>
                             <th colspan="3">Заправка <span class="eq-rep-p2-label">11-20.10</span></th>
                             <th colspan="3">Заправка <span class="eq-rep-p3-label">21-31.10</span></th>
@@ -797,7 +799,7 @@
     <script src="admin_layout.js?v=20261026-dual-admin"></script>
     <script src="permissions_registry.js"></script>
     <script src="broadcast_mail.js?v=20261114-developer-recipient"></script>
-    <script src="equipment_report.js?v=20261116-monthly-periods"></script>
+    <script src="equipment_report.js?v=20261117-equipment-waybill"></script>
     <script src="driver_routes.js?v=20261110-daily-routes"></script>
     <script src="route_trailer.js?v=20261110-daily-routes"></script>
     <script src="daily_routes.js?v=20261116-dated-routes"></script>
