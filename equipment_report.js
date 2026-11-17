@@ -133,6 +133,7 @@ function collectEquipmentReportInputs(period) {
         if (!Object.prototype.hasOwnProperty.call(data, id)) data[id] = {};
         if (/^p[123]Date$/.test(field) && data[id][field] !== input.value) {
             data[id][field + 'Year'] = equipmentHoursMonth(period)?.month.slice(0, 4);
+            if (input.dataset) input.dataset.year = data[id][field + 'Year'] || '';
         }
         data[id][field] = input.value;
     });
@@ -934,13 +935,13 @@ function renderEquipmentReportView() {
             <td><input type="text" class="eq-rep-input table-cell-input" data-id="${equipmentReportEscape(item.uniqueId)}" data-field="waybillNumber" aria-label="№ Д/Л" value="${equipmentReportEscape(itemData.waybillNumber)}" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p1Fuel" value="${itemData.p1Fuel || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p1Oil" value="${itemData.p1Oil || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
-            <td><input type="text" class="eq-rep-input eq-refuel-date" inputmode="numeric" oninput="formatEquipmentRefuelDates(this, event)" autocomplete="off" data-id="${equipmentReportEscape(item.uniqueId)}" data-field="p1Date" aria-label="Дати заправок за 1-й період" value="${equipmentReportEscape(itemData.p1Date)}" ${eqLock}></td>
+            <td><input type="text" class="eq-rep-input eq-refuel-date" inputmode="numeric" oninput="formatEquipmentRefuelDates(this, event)" autocomplete="off" data-id="${equipmentReportEscape(item.uniqueId)}" data-field="p1Date" data-year="${equipmentReportEscape(itemData.p1DateYear)}" aria-label="Дати заправок за 1-й період" value="${equipmentReportEscape(itemData.p1Date)}" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p2Fuel" value="${itemData.p2Fuel || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p2Oil" value="${itemData.p2Oil || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
-            <td><input type="text" class="eq-rep-input eq-refuel-date" inputmode="numeric" oninput="formatEquipmentRefuelDates(this, event)" autocomplete="off" data-id="${equipmentReportEscape(item.uniqueId)}" data-field="p2Date" aria-label="Дати заправок за 2-й період" value="${equipmentReportEscape(itemData.p2Date)}" ${eqLock}></td>
+            <td><input type="text" class="eq-rep-input eq-refuel-date" inputmode="numeric" oninput="formatEquipmentRefuelDates(this, event)" autocomplete="off" data-id="${equipmentReportEscape(item.uniqueId)}" data-field="p2Date" data-year="${equipmentReportEscape(itemData.p2DateYear)}" aria-label="Дати заправок за 2-й період" value="${equipmentReportEscape(itemData.p2Date)}" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p3Fuel" value="${itemData.p3Fuel || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="p3Oil" value="${itemData.p3Oil || ''}" style="width: 100%; text-align: center; border: 1px solid #ccc; padding: 4px;" ${eqLock}></td>
-            <td><input type="text" class="eq-rep-input eq-refuel-date" inputmode="numeric" oninput="formatEquipmentRefuelDates(this, event)" autocomplete="off" data-id="${equipmentReportEscape(item.uniqueId)}" data-field="p3Date" aria-label="Дати заправок за 3-й період" value="${equipmentReportEscape(itemData.p3Date)}" ${eqLock}></td>
+            <td><input type="text" class="eq-rep-input eq-refuel-date" inputmode="numeric" oninput="formatEquipmentRefuelDates(this, event)" autocomplete="off" data-id="${equipmentReportEscape(item.uniqueId)}" data-field="p3Date" data-year="${equipmentReportEscape(itemData.p3DateYear)}" aria-label="Дати заправок за 3-й період" value="${equipmentReportEscape(itemData.p3Date)}" ${eqLock}></td>
             <td><input type="text" class="eq-rep-input" data-id="${item.uniqueId}" data-field="nextFuel" value="${itemData.nextFuel || ''}" style="width: 100%; text-align: center; border: 1px solid #27ae60; background: #f0fdf4; padding: 4px; font-weight: bold; color: #166534;" placeholder="0.0" ${eqLock}></td>
             <td><input type="text" inputmode="decimal" class="eq-rep-input" data-equipment-month-hours aria-label="Мотогодини за місяць" value="${equipmentReportEscape(hoursRecord?.hours)}" style="width:100%;border:1px solid #ccc;text-align:center;" ${eqLock}></td>
             <td class="eq-report-action"><button type="button" data-remove-eq-id="${equipmentReportEscape(item.uniqueId)}" ${canEditEq?'':'disabled'} style="background:#c0392b;color:white;border:0;border-radius:4px;padding:6px;cursor:pointer">Видалити</button></td>
@@ -965,6 +966,44 @@ function renderEquipmentReportView() {
     updateEquipmentReportTotals();
 }
 
+let equipmentSummaryRange = null;
+
+function setEquipmentSummaryRange(form) {
+    const from = form.elements.from.value;
+    const to = form.elements.to.value;
+    if (!from || !to || from > to) {
+        form.querySelector('[role="status"]').textContent = 'Вкажіть обидві дати. Дата «До» має бути не раніше дати «Від».';
+        return;
+    }
+    equipmentSummaryRange = {period: equipmentReportPeriod(), from, to};
+    updateEquipmentReportTotals();
+}
+
+function equipmentDatedAmounts(value, dates, range, parseAmount) {
+    const text = String(value ?? '').trim();
+    if (!text || text === '-') return {amounts: [], skipped: false};
+    const parts = dates.length === 1 ? [text] : text.split(/\+(?![^()]*\))/).map(part => part.trim());
+    if (!dates.length || dates.length !== parts.length || parts.some(part => !part)) {
+        return {amounts: [], skipped: true};
+    }
+    return {
+        amounts: parts.flatMap((part, i) => dates[i] >= range.from && dates[i] <= range.to ? [parseAmount(part)] : []),
+        skipped: false
+    };
+}
+
+function equipmentSummaryDates(value, year) {
+    const text = String(value ?? '').trim();
+    const matches = [...text.matchAll(/(\d{1,2})[.,/](\d{1,2})(?:[./](\d{4}))?\.?/g)];
+    if (!year || text.replace(/(\d{1,2})[.,/](\d{1,2})(?:[./](\d{4}))?\.?/g, '').replace(/[\s,;]+/g, '')) return [];
+    const dates = matches.map(([, day, month, explicitYear]) => {
+        const iso = (explicitYear || year) + '-' + month.padStart(2, '0') + '-' + day.padStart(2, '0');
+        const date = new Date(iso + 'T00:00:00Z');
+        return Number.isFinite(+date) && date.toISOString().slice(0, 10) === iso ? iso : null;
+    });
+    return dates.includes(null) ? [] : dates;
+}
+
 function updateEquipmentReportTotals() {
     let table = document.getElementById('equipment-report-table');
     if (!table) return;
@@ -984,6 +1023,11 @@ function updateEquipmentReportTotals() {
     let sumP1OilMap = {};
     let sumP2OilMap = {};
     let sumP3OilMap = {};
+    const period = equipmentReportPeriod();
+    const range = equipmentSummaryRange?.period === period ? equipmentSummaryRange : null;
+    const month = equipmentHoursMonth(period)?.month;
+    const rangeOil = {};
+    let rangeDp = 0, rangeAb = 0, skipped = 0;
 
     document.querySelectorAll('#equipment-report-tbody tr').forEach(row => {
         const fuelTypeCell = row.querySelector('.eq-row-fuel-type');
@@ -1013,6 +1057,20 @@ function updateEquipmentReportTotals() {
         mergeFluidMaps(sumP1OilMap, parseFluidEntries(row.querySelector('.eq-rep-input[data-field="p1Oil"]')?.value));
         mergeFluidMaps(sumP2OilMap, parseFluidEntries(row.querySelector('.eq-rep-input[data-field="p2Oil"]')?.value));
         mergeFluidMaps(sumP3OilMap, parseFluidEntries(row.querySelector('.eq-rep-input[data-field="p3Oil"]')?.value));
+        if (range) {
+            for (const prefix of ['p1', 'p2', 'p3']) {
+                const input = field => row.querySelector(`.eq-rep-input[data-field="${prefix}${field}"]`);
+                const dateInput = input('Date');
+                const dates = equipmentSummaryDates(dateInput?.value, dateInput?.dataset.year || month?.slice(0, 4));
+                const fuel = equipmentDatedAmounts(input('Fuel')?.value, dates, range, evaluateExpression);
+                const oil = equipmentDatedAmounts(input('Oil')?.value, dates, range, parseFluidEntries);
+                const liters = fuel.amounts.reduce((total, amount) => total + amount, 0);
+                if (fType.includes('ДП')) rangeDp += liters;
+                else rangeAb += liters;
+                for (const amounts of oil.amounts) mergeFluidMaps(rangeOil, amounts);
+                skipped += Number(fuel.skipped) + Number(oil.skipped);
+            }
+        }
     });
 
     const subFilterEl = document.getElementById('equipment-subdivision-filter');
@@ -1032,6 +1090,11 @@ function updateEquipmentReportTotals() {
     mergeFluidMaps(totalOilPeriodMap, sumP1OilMap);
     mergeFluidMaps(totalOilPeriodMap, sumP2OilMap);
     mergeFluidMaps(totalOilPeriodMap, sumP3OilMap);
+    const formatDate = iso => iso.split('-').reverse().join('.');
+    const firstDay = month ? month + '-01' : '';
+    const lastDay = month ? month + '-' + new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5)), 0)).getUTCDate() : '';
+    const from = range?.from || firstDay;
+    const to = range?.to || lastDay;
 
     tfoot.innerHTML = `
         <tr style="background-color: #eaeaea; font-weight: bold; border-top: 2px solid #bdc3c7;">
@@ -1060,11 +1123,22 @@ function updateEquipmentReportTotals() {
             <td style="text-align: center; color: #2980b9; border-bottom: 2px solid #bdc3c7; font-weight: bold;">${abNextFuel !== 0 ? abNextFuel.toFixed(1) + ' л' : '0 л'}</td>
         </tr>
         <tr style="background-color: #d5f5e3; font-weight: bold; border-top: 2px solid #27ae60; border-bottom: 2px solid #27ae60;">
-            <td colspan="6" style="text-align: right; padding-right: 10px; color: #145a32;">ВСЬОГО ЗА ПЕРІУД:</td>
-            <td colspan="2" style="text-align: center; color: #27ae60;">Початковий: ДП ${dpPrevFuel.toFixed(1)} л | АБ ${abPrevFuel.toFixed(1)} л</td>
+            <td colspan="6" style="padding: 6px 10px; color: #145a32;">
+                <strong>${range ? formatDate(from) + ' – ' + formatDate(to) : 'ВСЬОГО ЗА ПЕРІУД'}</strong>
+                <form class="eq-report-search" onsubmit="event.preventDefault(); setEquipmentSummaryRange(this)" style="display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:4px;">
+                    <button type="button" onclick="equipmentSummaryRange = null; updateEquipmentReportTotals()">За весь період</button>
+                    <label>Від <input type="date" name="from" value="${from}" min="${firstDay}" max="${lastDay}" required></label>
+                    <label>До <input type="date" name="to" value="${to}" min="${firstDay}" max="${lastDay}" required></label>
+                    <button type="submit">За датами</button>
+                    <span role="status"></span>
+                </form>
+            </td>
+            <td colspan="2" style="text-align: center; color: #27ae60;">${range ? '' : `Початковий: ДП ${dpPrevFuel.toFixed(1)} л | АБ ${abPrevFuel.toFixed(1)} л`}</td>
             <td></td>
-            <td colspan="9" style="text-align: left; padding-left: 15px; color: #2c3e50;">Заправка: ДП <strong style="color: #27ae60;">${totalDpPeriod.toFixed(1)} л</strong> | АБ <strong style="color: #2980b9;">${totalAbPeriod.toFixed(1)} л</strong> | Мастило <strong style="color: #8e44ad;">${formatFluidBreakdown(totalOilPeriodMap)}</strong></td>
-            <td style="text-align: center; color: #145a32; font-weight: bold;">${(dpNextFuel + abNextFuel) > 0 ? (dpNextFuel + abNextFuel).toFixed(1) + ' л' : '0 л'}</td>
+            <td colspan="9" style="text-align: left; padding-left: 15px; color: #2c3e50;">Заправка: ДП <strong style="color: #27ae60;">${(range ? rangeDp : totalDpPeriod).toFixed(1)} л</strong> | АБ <strong style="color: #2980b9;">${(range ? rangeAb : totalAbPeriod).toFixed(1)} л</strong> | Мастило <strong style="color: #8e44ad;">${formatFluidBreakdown(range ? rangeOil : totalOilPeriodMap)}</strong>
+                ${range && skipped ? `<div>Пропущено полів без однозначної відповідності дат і обсягів: ${skipped}.</div>` : ''}
+            </td>
+            <td style="text-align: center; color: #145a32; font-weight: bold;">${range ? '' : (dpNextFuel + abNextFuel).toFixed(1) + ' л'}</td>
             <td></td><td class="eq-report-action"></td>
         </tr>
     `;

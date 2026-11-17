@@ -16,6 +16,19 @@ function fixture(role='admin') {
     const storageKey='equipment_report_data_'+period;
     return {c,values,listeners,inventory,period,storageKey,setInputs:items=>{inputs=items.map(([id,field,value])=>({value,getAttribute:name=>name==='data-id'?id:field}));}};
 }
+test('Date summary matches amounts in order and includes both boundary dates', () => {
+    const {c} = fixture();
+    const range = {from:'2026-11-01', to:'2026-11-15'};
+    const dates = c.equipmentSummaryDates('01,11. 15.11 17,11.', '2026');
+    const fuel = c.equipmentDatedAmounts('60+100+120', dates, range, c.evaluateExpression);
+    assert.deepEqual(Array.from(fuel.amounts), [60, 100]);
+    assert.equal(c.equipmentDatedAmounts('280', dates, range, c.evaluateExpression).skipped, true);
+    assert.equal(c.equipmentDatedAmounts('60', [], range, c.evaluateExpression).skipped, true);
+    assert.equal(c.equipmentSummaryDates('31,11.', '2026').length, 0);
+    const oil = c.equipmentDatedAmounts('1,5 (М10)+2 (М10)', dates.slice(1), range, c.parseFluidEntries);
+    assert.equal(oil.amounts[0]['м10'], 1.5);
+});
+
 test('Monthly hours replace the previous entry for the same unit and month', () => {
     const {c, values, period} = fixture();
     const id = 'Генератор_1';
