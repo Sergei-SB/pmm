@@ -66,6 +66,66 @@ function saveGeneratorsList(list) {
     localStorage.setItem('generators_custom_data', JSON.stringify(list));
 }
 
+const equipmentWriteOffGuideKey = 'equipment_write_off_guide';
+
+function canEditEquipmentWriteOffGuide() {
+    const role = window.getCurrentAppRole?.() || (typeof currentRole !== 'undefined' ? currentRole : 'user');
+    return role === 'developer' || role === 'dev' || !!window.canRoleEdit?.(role, 'equipment');
+}
+
+function setEquipmentWriteOffEditing(editing) {
+    document.getElementById('equipment-write-off-text').hidden = editing;
+    document.getElementById('equipment-write-off-editor-label').hidden = !editing;
+    document.getElementById('equipment-write-off-edit').hidden = editing || !canEditEquipmentWriteOffGuide();
+    document.getElementById('equipment-write-off-save').hidden = !editing;
+}
+
+function openEquipmentWriteOffGuide() {
+    const dialog = document.getElementById('equipment-write-off-guide');
+    const text = document.getElementById('equipment-write-off-text');
+    const status = document.getElementById('equipment-write-off-status');
+    status.textContent = '';
+    try {
+        const saved = localStorage.getItem(equipmentWriteOffGuideKey);
+        if (saved !== null) text.textContent = saved;
+    } catch {
+        status.textContent = 'Не вдалося прочитати збережену довідку.';
+    }
+    setEquipmentWriteOffEditing(false);
+    dialog.showModal();
+}
+
+function editEquipmentWriteOffGuide() {
+    if (!canEditEquipmentWriteOffGuide()) return;
+    const editor = document.getElementById('equipment-write-off-editor');
+    editor.value = document.getElementById('equipment-write-off-text').textContent;
+    document.getElementById('equipment-write-off-status').textContent = '';
+    setEquipmentWriteOffEditing(true);
+    editor.focus();
+}
+
+function saveEquipmentWriteOffGuide() {
+    if (!canEditEquipmentWriteOffGuide()) return;
+    const editor = document.getElementById('equipment-write-off-editor');
+    const status = document.getElementById('equipment-write-off-status');
+    const value = editor.value.trim();
+    if (!value) {
+        status.textContent = 'Введіть текст довідки.';
+        editor.focus();
+        return;
+    }
+    try {
+        localStorage.setItem(equipmentWriteOffGuideKey, value);
+    } catch {
+        status.textContent = 'Не вдалося зберегти зміни в браузері.';
+        return;
+    }
+    document.getElementById('equipment-write-off-text').textContent = value;
+    setEquipmentWriteOffEditing(false);
+    status.textContent = 'Довідку збережено.';
+    document.getElementById('equipment-write-off-edit').focus();
+}
+
 function switchEquipmentTab(tabName) {
     currentEquipmentTabName = tabName;
     document.querySelectorAll('.eq-tab-btn').forEach(btn => btn.classList.remove('active'));

@@ -523,12 +523,54 @@
                     <button class="eq-tab-btn" id="tab-heaters" onclick="switchEquipmentTab('heaters')">Теплові пушки</button>
                     <button class="eq-tab-btn" id="tab-chainsaws" onclick="switchEquipmentTab('chainsaws')">Бензо пили</button>
                     <button class="eq-tab-btn" id="tab-pumps" onclick="switchEquipmentTab('pumps')">Помпи</button>
+                    <button class="eq-tab-btn" type="button" onclick="openEquipmentWriteOffGuide()">Норми списання</button>
                 </div>
                 <div style="display: flex; gap: 8px; align-items: center;">
                     <button class="action-btn" style="background-color: #27ae60; font-weight: bold; padding: 6px 12px;" onclick="addCurrentEquipmentRow()">+ Додати позицію</button>
                 </div>
             </div>
             <div class="table-container" style="max-height: 78vh; overflow-y: auto;" id="equipment-table-wrapper"></div>
+            <dialog id="equipment-write-off-guide" aria-labelledby="equipment-write-off-title"
+                    style="width: min(820px, 90vw); max-height: 85vh; box-sizing: border-box; border: 1px solid #aab7c1; border-radius: 8px; padding: 24px; color: #263746;">
+                <h2 id="equipment-write-off-title" style="margin-top: 0;">Норми списання генераторів</h2>
+                <p id="equipment-write-off-text" style="white-space: pre-wrap; line-height: 1.55;">Військові електроагрегати та електростанції належать до електротехнічних засобів (ЕТЗ) у складі інженерного майна. Для обліку напрацювання й експлуатації застосовують наказ МОУ № 35 від 30.01.2018. Порядок списання військового майна встановлює наказ МОУ № 81 від 29.03.2021.
+
+1. Норми напрацювання та строки служби
+
+Для штатних електроагрегатів звіряйте норми до ремонту й списання за додатком 5 до наказу № 35. Для цивільних, імпортних і волонтерських моделей перевіряйте паспорт або формуляр виробника. Якщо норми для конкретного зразка відсутні, звірте порядок застосування норми однотипного зразка з чинною редакцією наказу № 35.
+
+Орієнтири з наданого матеріалу, які потребують звірки для конкретної моделі:
+• Бензинові електроагрегати типу АБ: до капремонту 1 500–3 000 мотогодин, загальний ресурс 3 000–6 000 мотогодин або 8–10 років. Для побутових моделей наведено 1 000–2 500 мотогодин.
+• Дизельні електроагрегати типу ЕД та ЕСД: до капремонту 6 000–10 000 мотогодин, загальний ресурс 12 000–20 000 мотогодин або 10–15 років.
+
+2. Підстави для списання
+
+Вироблення ресурсу або закінчення строку служби працездатного агрегату саме по собі не є підставою для списання. Для списання через знос комісія оцінює технічний стан, можливість і економічну доцільність відновлення та підстави для переведення в останню категорію.
+
+Напрацювання фіксують у робочому листі агрегату, книзі обліку роботи техніки та формулярі або паспорті. Вимоги до справності й опломбування лічильника звіряйте з правилами експлуатації конкретного агрегату.
+
+Для обліку фактичних витрат моторесурсу та ПММ під час виконання завдань в особливий період застосовуйте положення чинного наказу № 35. У разі бойового пошкодження, втрати або знищення порядок оформлення визначають за обставинами та чинною редакцією наказу № 81. Перевірте, чи для конкретного випадку передбачено єдиний акт списання.
+
+3. Документи для списання через знос
+
+• Формуляр або паспорт із записами про напрацювання й технічне обслуговування.
+• Акт якісного (технічного) стану з висновком комісії.
+• Документ на списання за процедурою, що застосовується в конкретному випадку. За наявності відповідних підстав перевірте вимоги до інспекторського посвідчення.
+• Документи про вилучення й оприбуткування придатних вузлів, якщо це передбачено рішенням служби забезпечення.
+
+Для вибору процедури зафіксуйте модель генератора, тип обліку, фактичне напрацювання та причину списання.</p>
+                <label id="equipment-write-off-editor-label" hidden>Текст довідки
+                    <textarea id="equipment-write-off-editor" rows="15" style="display: block; width: 100%; box-sizing: border-box; font: inherit; margin-top: 6px;"></textarea>
+                </label>
+                <p><a href="https://zakon.rada.gov.ua/laws/show/z0274-18" target="_blank" rel="noopener">Наказ МОУ № 35</a> ·
+                    <a href="https://zakon.rada.gov.ua/laws/show/z0655-21" target="_blank" rel="noopener">Наказ МОУ № 81</a></p>
+                <p id="equipment-write-off-status" role="status"></p>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                    <button type="button" class="eq-tab-btn" id="equipment-write-off-edit" onclick="editEquipmentWriteOffGuide()">Редагувати</button>
+                    <button type="button" class="eq-tab-btn" id="equipment-write-off-save" onclick="saveEquipmentWriteOffGuide()" hidden>Зберегти</button>
+                    <button type="button" class="eq-tab-btn" onclick="this.closest('dialog').close()">Закрити</button>
+                </div>
+            </dialog>
         </section>
 
         <!-- РОЗДІЛ: ЗВІТ ПО ОБЛАДНАННЮ -->
@@ -783,7 +825,7 @@
     <script src="excel_filter.js?v=20261024-pumps"></script>
     <script src="table_tooltips.js?v=20261116"></script>
     <script src="equipment_limits.js?v=20261116"></script>
-    <script src="generators.js?v=20261116-report-refuel-date"></script>
+    <script src="generators.js?v=20261117-write-off-guide"></script>
     <script src="webasto.js?v=20261115-empty-position"></script>
     <script src="heaters.js?v=20261115-empty-position"></script>
     <script src="chainsaws.js?v=20261115-empty-position"></script>
