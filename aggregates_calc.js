@@ -1151,7 +1151,7 @@ function displayCalcResults(eq, totalMotoHours, daysCount, totalFuel, totalOil, 
 
             dailyTableRows += '<tr style="background-color: ' + rowBg + ';">' +
                 '<td style="text-align: center; padding: 5px; border-bottom: 1px solid #e0e0e0;"><strong>День ' + (dayIdx + 1) + '</strong></td>' +
-                '<td style="text-align: center; padding: 5px; border-bottom: 1px solid #e0e0e0;">' + motoCellContent + '</td>' +
+                '<td style="text-align: center; padding: 5px; border-bottom: 1px solid #e0e0e0;">' + motoCellContent + ' × ' + new Intl.NumberFormat('uk-UA', {useGrouping: false, maximumFractionDigits: 6}).format(hourlyRate) + ' л</td>' +
                 '<td style="text-align:center;">' + (Number.isFinite(dayDate) ? new Date(dayDate).toISOString().slice(5, 10).split('-').reverse().join('.') : '—') + '</td>' +
                 '<td id="row-fuel-' + i + '-' + d + '" style="text-align: center; padding: 5px; border-bottom: 1px solid #e0e0e0; color: #c0392b; font-weight: bold;">' + fuelDisplay + '</td>' +
                 '<td id="row-oil-' + i + '-' + d + '" style="text-align: center; padding: 5px; border-bottom: 1px solid #e0e0e0; color: #2980b9;">' + oilDisplay + '</td>' +
