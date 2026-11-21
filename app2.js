@@ -653,6 +653,8 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 window.switchView = function(viewName) {
+    if (viewName === 'deputy-tech-report' && !canViewDeputyTechReport()) return;
+
     const viewMapping = {
         'base': 'base-view',
         'card': 'card-view',
@@ -698,6 +700,8 @@ window.switchView = function(viewName) {
         loadCarDataForActivePeriod();
     } else if (viewName === 'subdivisions' && typeof renderSubdivisionsView === 'function') {
         renderSubdivisionsView();
+    } else if (viewName === 'deputy-tech-report') {
+        renderDeputyTechReport();
     } else if (viewName === 'generators' && typeof switchEquipmentTab === 'function') {
         switchEquipmentTab('generators');
     } else if (viewName === 'report' && typeof renderReportTable === 'function') {

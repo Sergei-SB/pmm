@@ -88,7 +88,7 @@
             reader.readAsDataURL(file);
         }
     </script>
-    <link rel="stylesheet" href="style.css?v=20261117-equipment-waybill">
+    <link rel="stylesheet" href="style.css?v=20261122-deputy-tech">
     <style>
         html:not(.registry-developer) #base-view .registry-developer-only { display: none !important; }
         html:not(.registry-admin-columns) #base-view .registry-admin-only:not([data-editor-allowed]) { display: none !important; }
@@ -206,6 +206,7 @@
             <button class="nav-btn" id="nav-btn-equipment" onclick="switchView('generators')" style="display: none;">Облік обладнання</button>
             <button class="nav-btn" id="nav-btn-equipment-report" onclick="switchView('equipment-report-view')" style="display: none;">Звіт по обладнанню</button>
             <button class="nav-btn" id="nav-btn-aggregates-calc" onclick="switchView('aggregates-calc')">Розрахунок агрегатів</button>
+            <button class="nav-btn" id="nav-btn-deputy-tech-report" onclick="switchView('deputy-tech-report')" style="display: none;">Звіт для зампотехів</button>
             <button class="nav-btn" id="nav-btn-destroyed" onclick="switchView('destroyed')" style="display: none;">Знищена техніка</button>
             <!-- Вкладка Конструктора документів та шаблонів -->
             <button class="nav-btn" id="nav-btn-documents" onclick="switchView('documents')" style="display: none;">📄 Документи та Шаблони</button>
@@ -784,6 +785,11 @@
             <div id="aggregates-calc-container"></div>
         </section>
 
+        <!-- РОЗДІЛ: ЗВІТ ДЛЯ ЗАМПОТЕХІВ -->
+        <section id="deputy-tech-report-view" class="view-section">
+            <div id="deputy-tech-report" class="deputy-tech-report"></div>
+        </section>
+
         <!-- РОЗДІЛ: ЗНИЩЕНА ТЕХНІКА -->
         <section id="destroyed-view" class="view-section">
             <div id="destroyed-equipment-container"></div>
@@ -823,7 +829,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="cars.js?v=20261108-towed-types"></script>
     <script src="formulas.js"></script>
-    <script src="report.js?v=20261121-bbssp-assigned-only"></script>
+    <script src="report.js?v=20261122-deputy-tech"></script>
+    <script src="deputy_tech_report.js?v=20261122"></script>
     <script src="excel_filter.js?v=20261024-pumps"></script>
     <script src="table_tooltips.js?v=20261116"></script>
     <script src="equipment_limits.js?v=20261116"></script>
@@ -839,7 +846,7 @@
     <script src="moderator.js?v=20261112-server-passwords"></script>
     <script src="developer_mail.js"></script>
     <script src="developer_notes.js?v=20261113-wide-task-v2"></script>
-    <script src="developer_panel.js?v=20261113-notes"></script>
+    <script src="developer_panel.js?v=20261122-deputy-tech"></script>
     <script src="admin_layout.js?v=20261026-dual-admin"></script>
     <script src="permissions_registry.js"></script>
     <script src="broadcast_mail.js?v=20261114-developer-recipient"></script>
@@ -849,7 +856,7 @@
     <script src="route_trailer.js?v=20261110-daily-routes"></script>
     <script src="daily_routes.js?v=20261116-dated-routes"></script>
     <script src="app.js?v=20261115-vin-search"></script>
-    <script src="app2.js?v=20261110-daily-starter-row"></script>
+    <script src="app2.js?v=20261122-deputy-tech"></script>
     <script src="aggregates_calc.js?v=20261119-hours-rate"></script>
     <script src="destroyed_equipment.js?v=20261024-pumps"></script>
     <script src="pdf_links.js?v=20261113-share-sync"></script>

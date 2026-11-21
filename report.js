@@ -220,10 +220,10 @@ function buildMonthSelectorWidgetHtml() {
 }
 
 // Зверху праворуч у Звіті по підрозділах тепер залишається тільки кнопка "Друк звіту"
-function buildSubdivisionTopPrintButtonHtml() {
+function buildSubdivisionTopPrintButtonHtml(printAction = 'printSubdivisionReport()') {
     return `
         <div class="no-print" style="position: absolute; top: 15px; right: 20px; display: flex; align-items: center; gap: 10px;">
-            <button class="action-btn print-btn" onclick="printSubdivisionReport()" style="background-color: #337ab7; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; white-space: nowrap;">
+            <button class="action-btn print-btn" onclick="${printAction}" style="background-color: #337ab7; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; white-space: nowrap;">
                 <span style="font-size: 14px; margin-right: 6px; vertical-align: middle;">🖨️</span> Друк звіту
             </button>
         </div>

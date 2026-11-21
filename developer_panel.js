@@ -536,6 +536,7 @@ window.updateRoleUI = function() {
     setNavBtnDisplay("nav-btn-base", isDev || window.canRoleAccess(role, 'base'));
     setNavBtnDisplay("nav-btn-card", isDev || window.canRoleAccess(role, 'card'));
     setNavBtnDisplay("nav-btn-report", isDev || window.canRoleAccess(role, 'report'));
+    setNavBtnDisplay("nav-btn-deputy-tech-report", canViewDeputyTechReport());
     setNavBtnDisplay("nav-btn-subdivisions", isDev || window.canRoleAccess(role, 'subdivisions'));
     setNavBtnDisplay("nav-btn-equipment", isDev || window.canRoleAccess(role, 'equipment'));
     setNavBtnDisplay("nav-btn-equipment-report", isDev || window.canRoleAccess(role, 'equipment_report'));
@@ -568,6 +569,7 @@ window.updateRoleUI = function() {
 
     checkRedirect("report-view", "report");
     checkRedirect("subdivisions-view", "subdivisions");
+    if (!canViewDeputyTechReport() && document.getElementById("deputy-tech-report-view")?.classList.contains("active")) switchView("base");
     checkRedirect("generators-view", "equipment");
     checkRedirect("equipment-report-view", "equipment_report");
     checkRedirect("destroyed-view", "destroyed");
