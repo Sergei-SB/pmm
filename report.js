@@ -1233,7 +1233,7 @@ function showSubdivisionDetails(subName) {
     let statsCustom = calculateSubStatsDetailed(subName, [currentCustomPeriod]);
     let monthPeriods = getThreePeriodsForMonth(activeSubdivisionMonth);
     let stats30 = calculateSubStatsDetailed(subName, monthPeriods);
-    let statsAll = calculateSubStatsDetailed(subName, periods);
+    let statsAll = calculateSubStatsDetailed(subName, subdivisionAllEquipmentPeriods(periods));
 
     let carsListHtml = subCars.length > 0 ? subCars.map(c => '<li style="margin-bottom: 4px;"><strong>' + c.plate + '</strong> — ' + c.model + ' (<span style="color: #27ae60; font-weight: bold;">' + subdivisionFuelLabel(c.fuelType) + '</span>)</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає автомобілів</li>';
     let eqListHtml = eqItems.length > 0 ? eqItems.map(i => '<li style="margin-bottom: 4px;"><span style="background: #e8f8f5; padding: 1px 4px; border-radius: 3px; font-size: 11px; color: #16a085; font-weight: bold;">' + i.category + '</span> <strong>' + i.model + '</strong> (<span style="color: #27ae60; font-weight: bold;">' + subdivisionFuelLabel(i.fuelType, i.category === 'Бензопила' ? 'АБ' : 'ДП') + '</span>)</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає обладнання</li>';
@@ -1392,7 +1392,7 @@ function showNoSubdivisionDetails() {
     let statsCustom = calculateNoSubStatsDetailed([currentCustomPeriod]);
     let monthPeriods = getThreePeriodsForMonth(activeSubdivisionMonth);
     let stats30 = calculateNoSubStatsDetailed(monthPeriods);
-    let statsAll = calculateNoSubStatsDetailed(periods);
+    let statsAll = calculateNoSubStatsDetailed(subdivisionAllEquipmentPeriods(periods));
 
     let carsListHtml = subCars.length > 0 ? subCars.map(c => '<li style="margin-bottom: 4px;"><strong>' + c.plate + '</strong> — ' + c.model + ' (<span style="color: #27ae60; font-weight: bold;">' + subdivisionFuelLabel(c.fuelType) + '</span>)</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає не задіяних автомобілів</li>';
     let eqListHtml = eqItems.length > 0 ? eqItems.map(i => '<li style="margin-bottom: 4px;"><span style="background: #e8f8f5; padding: 1px 4px; border-radius: 3px; font-size: 11px; color: #16a085; font-weight: bold;">' + i.category + '</span> <strong>' + i.model + '</strong> (<span style="color: #27ae60; font-weight: bold;">' + subdivisionFuelLabel(i.fuelType, i.category === 'Бензопила' ? 'АБ' : 'ДП') + '</span>)</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає не задіяного обладнання</li>';
@@ -1550,7 +1550,7 @@ function showPolkDetails() {
     let statsCustom = calculatePolkStatsDetailed([currentCustomPeriod]);
     let monthPeriods = getThreePeriodsForMonth(activeSubdivisionMonth);
     let stats30 = calculatePolkStatsDetailed(monthPeriods);
-    let statsAll = calculatePolkStatsDetailed(periods);
+    let statsAll = calculatePolkStatsDetailed(subdivisionAllEquipmentPeriods(periods));
 
     let polkCarsHtml = activePolkCars.length > 0 ? activePolkCars.map(c => '<li style="margin-bottom: 4px;"><strong>' + c.plate + '</strong> — ' + c.model + ' (<span style="color: #2980b9; font-weight: bold;">' + (c.subdivision || 'Без підрозділу') + '</span>, <span style="color: #27ae60; font-weight: bold;">' + subdivisionFuelLabel(c.fuelType) + '</span>)</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає техніки</li>';
     let polkEqHtml = allEqItems.length > 0 ? allEqItems.map(i => '<li style="margin-bottom: 4px;"><span style="background: #e8f8f5; padding: 1px 4px; border-radius: 3px; font-size: 11px; color: #16a085; font-weight: bold;">' + i.category + '</span> <strong>' + i.model + '</strong> (<span style="color: #2980b9; font-weight: bold;">' + (i.subdivision || 'Без підрозділу') + '</span>, <span style="color: #27ae60; font-weight: bold;">' + subdivisionFuelLabel(i.fuelType, i.category === 'Бензопила' ? 'АБ' : 'ДП') + '</span>)</li>').join('') : '<li style="color: #888; font-style: italic; list-style: none; margin-left: -15px;">Немає обладнання</li>';
@@ -1708,9 +1708,48 @@ function printSubdivisionReport() {
     window.print();
 }
 
+function subdivisionAllEquipmentPeriods(periods) {
+    const result = new Set(periods);
+    for (let index = 0; index < localStorage.length; index++) {
+        const key = localStorage.key(index);
+        if (key?.startsWith('equipment_report_data_')) result.add(key.slice('equipment_report_data_'.length));
+    }
+    return [...result];
+}
+
+function calculateEquipmentSubdivisionTotals(periods, subdivision) {
+    const totals = {dpFuel: 0, abFuel: 0, adblue: 0, oilMap: {}, washerMap: {}};
+    const months = new Map();
+    for (const period of periods) {
+        const info = equipmentHoursMonth(period);
+        if (!info) continue;
+        const groups = months.get(info.month) || new Set();
+        if (isFullEquipmentMonth(period)) [1, 2, 3].forEach(group => groups.add(group));
+        else groups.add(Math.min(3, Math.floor((Number(period.split('.')[0]) - 1) / 10) + 1));
+        months.set(info.month, groups);
+    }
+    for (const [month, groups] of months) {
+        const period = equipmentFullMonth('01.' + month.slice(5) + '.' + month.slice(0, 4));
+        const data = readEquipmentReportData(period);
+        for (const item of getEquipmentReportItems(period, true)) {
+            const row = data[item.uniqueId];
+            if (!row || row._excluded || shouldHideItemInReport('equipment', item.uniqueId, item.note, period)) continue;
+            if (subdivision === '' && String(item.subdivision || '').trim()) continue;
+            if (subdivision && normalizeSubdivision(item.subdivision || '') !== normalizeSubdivision(subdivision)) continue;
+            for (const group of groups) {
+                const fuel = evaluateExpression(row['p' + group + 'Fuel']);
+                const field = String(item.fuelType || '').toUpperCase().includes('ДП') ? 'dpFuel' : 'abFuel';
+                totals[field] += fuel;
+                mergeFluidMaps(totals.oilMap, parseFluidEntries(row['p' + group + 'Oil']));
+            }
+        }
+    }
+    return totals;
+}
+
 function calculateSubStatsDetailed(subName, periodList) {
     let carsStat = { dpFuel: 0, abFuel: 0, adblue: 0, oilMap: {}, washerMap: {} };
-    let eqStat = { dpFuel: 0, abFuel: 0, adblue: 0, oilMap: {}, washerMap: {} };
+    let eqStat = calculateEquipmentSubdivisionTotals(periodList, typeof subName === 'undefined' ? null : subName);
 
     const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
 
@@ -1764,33 +1803,7 @@ function calculateSubStatsDetailed(subName, periodList) {
             }
         });
 
-        try {
-            const eqStored = localStorage.getItem('equipment_report_data_' + p);
-            if (eqStored) {
-                const eqDataMap = JSON.parse(eqStored);
-                eqItems.forEach(item => {
-                    const eqData = eqDataMap[item.uniqueId];
-                    if (eqData) {
-                        const f1 = evaluateExpression(eqData.p1Fuel);
-                        const f2 = evaluateExpression(eqData.p2Fuel);
-                        const f3 = evaluateExpression(eqData.p3Fuel);
-                        const totalEqFuel = f1 + f2 + f3;
 
-                        const fType = (item.fuelType || '').toUpperCase();
-                        if (fType.includes('ДП')) {
-                            eqStat.dpFuel += totalEqFuel;
-                        } else {
-                            eqStat.abFuel += totalEqFuel;
-                        }
-
-                        ['p1Oil', 'p2Oil', 'p3Oil'].forEach(field => {
-                            let oParsed = parseFluidEntries(eqData[field]);
-                            mergeFluidMaps(eqStat.oilMap, oParsed);
-                        });
-                    }
-                });
-            }
-        } catch(e) {}
     });
 
     let totalOilMap = {};
@@ -1814,7 +1827,7 @@ function calculateSubStatsDetailed(subName, periodList) {
 
 function calculateNoSubStatsDetailed(periodList) {
     let carsStat = { dpFuel: 0, abFuel: 0, adblue: 0, oilMap: {}, washerMap: {} };
-    let eqStat = { dpFuel: 0, abFuel: 0, adblue: 0, oilMap: {}, washerMap: {} };
+    let eqStat = calculateEquipmentSubdivisionTotals(periodList, '');
 
     const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
 
@@ -1868,33 +1881,7 @@ function calculateNoSubStatsDetailed(periodList) {
             }
         });
 
-        try {
-            const eqStored = localStorage.getItem('equipment_report_data_' + p);
-            if (eqStored) {
-                const eqDataMap = JSON.parse(eqStored);
-                eqItems.forEach(item => {
-                    const eqData = eqDataMap[item.uniqueId];
-                    if (eqData) {
-                        const f1 = evaluateExpression(eqData.p1Fuel);
-                        const f2 = evaluateExpression(eqData.p2Fuel);
-                        const f3 = evaluateExpression(eqData.p3Fuel);
-                        const totalEqFuel = f1 + f2 + f3;
 
-                        const fType = (item.fuelType || '').toUpperCase();
-                        if (fType.includes('ДП')) {
-                            eqStat.dpFuel += totalEqFuel;
-                        } else {
-                            eqStat.abFuel += totalEqFuel;
-                        }
-
-                        ['p1Oil', 'p2Oil', 'p3Oil'].forEach(field => {
-                            let oParsed = parseFluidEntries(eqData[field]);
-                            mergeFluidMaps(eqStat.oilMap, oParsed);
-                        });
-                    }
-                });
-            }
-        } catch(e) {}
     });
 
     let totalOilMap = {};
@@ -1918,7 +1905,7 @@ function calculateNoSubStatsDetailed(periodList) {
 
 function calculatePolkStatsDetailed(periodList) {
     let carsStat = { dpFuel: 0, abFuel: 0, adblue: 0, oilMap: {}, washerMap: {} };
-    let eqStat = { dpFuel: 0, abFuel: 0, adblue: 0, oilMap: {}, washerMap: {} };
+    let eqStat = calculateEquipmentSubdivisionTotals(periodList, typeof subName === 'undefined' ? null : subName);
 
     const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
 
@@ -1972,33 +1959,7 @@ function calculatePolkStatsDetailed(periodList) {
             }
         });
 
-        try {
-            const eqStored = localStorage.getItem('equipment_report_data_' + p);
-            if (eqStored) {
-                const eqDataMap = JSON.parse(eqStored);
-                allEqItems.forEach(item => {
-                    const eqData = eqDataMap[item.uniqueId];
-                    if (eqData) {
-                        const f1 = evaluateExpression(eqData.p1Fuel);
-                        const f2 = evaluateExpression(eqData.p2Fuel);
-                        const f3 = evaluateExpression(eqData.p3Fuel);
-                        const totalEqFuel = f1 + f2 + f3;
 
-                        const fType = (item.fuelType || '').toUpperCase();
-                        if (fType.includes('ДП')) {
-                            eqStat.dpFuel += totalEqFuel;
-                        } else {
-                            eqStat.abFuel += totalEqFuel;
-                        }
-
-                        ['p1Oil', 'p2Oil', 'p3Oil'].forEach(field => {
-                            let oParsed = parseFluidEntries(eqData[field]);
-                            mergeFluidMaps(eqStat.oilMap, oParsed);
-                        });
-                    }
-                });
-            }
-        } catch(e) {}
     });
 
     let totalOilMap = {};
