@@ -596,10 +596,8 @@
                     </div>
                     <input type="hidden" id="eq-report-custom-period" value="01.10-31.10">
 
-                    <button id="eq-report-add-generator-btn" class="action-btn" onclick="openEquipmentReportGeneratorDialog()" style="background:#27ae60;color:white;border:0;border-radius:4px;padding:6px 14px;font-weight:bold;cursor:pointer">+ Додати обладнання</button>
                     <button id="eq-report-restore-btn" class="action-btn" onclick="openEquipmentReportRestoreDialog()" style="background:#546e7a;color:white;border:0;border-radius:4px;padding:6px 14px;font-weight:bold;cursor:pointer">Повернути видалене</button>
                     <button class="action-btn" onclick="saveEquipmentReportData()" style="background-color: #27ae60; font-weight: bold; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">💾 Зберегти звіт</button>
-                    <button type="button" class="action-btn" onclick="openEquipmentRangeReport()">Звіт за датами</button>
                     <button class="action-btn print-btn" onclick="printEquipmentReport()" style="background-color: #337ab7; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">
                         <span style="font-size: 14px; vertical-align: middle;">🖨️</span> Друк звіту
                     </button>
@@ -652,6 +650,9 @@
                     <tbody id="equipment-report-tbody"></tbody>
                     <tfoot></tfoot>
                 </table>
+            </div>
+            <div class="no-print" style="margin-top: 12px; text-align: left;">
+                <button id="eq-report-add-generator-btn" class="action-btn" onclick="openEquipmentReportGeneratorDialog()" style="background:#27ae60;color:white;border:0;border-radius:4px;padding:6px 14px;font-weight:bold;cursor:pointer">+ Додати обладнання</button>
             </div>
         </section>
 
