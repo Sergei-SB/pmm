@@ -676,7 +676,7 @@ function refreshActiveSubdivisionView() {
     const activeSubEl = document.querySelector('#subdivisions-buttons-container .action-btn.active-sub');
     if (activeSubEl) {
         const activeSubName = activeSubEl.getAttribute('data-subname');
-        if (activeSubName === 'ПОЛК') {
+        if (activeSubName === 'ББССП') {
             showPolkDetails();
         } else if (activeSubName === 'НЕ ЗАДІЯНА ТЕХНІКА') {
             showNoSubdivisionDetails();
@@ -1147,7 +1147,7 @@ function normalizeSubdivision(sub) {
 }
 
 // ==========================================
-// ЗВІТ ПО ПІДРОЗДІЛАХ ТА ПОЛКУ (ВКЛАДКА)
+// ЗВІТ ПО ПІДРОЗДІЛАХ ТА ББССП (ВКЛАДКА)
 // ==========================================
 
 function renderSubdivisionsView() {
@@ -1165,7 +1165,7 @@ function renderSubdivisionsView() {
         html += '<button class="action-btn sub-nav-btn" data-subname="' + sub + '" style="padding: 10px 20px; font-size: 14px; background-color: #2980b9; cursor: pointer;" onclick="showSubdivisionDetails(\'' + sub + '\')">' + sub + '</button>';
     });
     html += '<button class="action-btn sub-nav-btn" data-subname="НЕ ЗАДІЯНА ТЕХНІКА" style="padding: 10px 20px; font-size: 14px; background-color: #7f8c8d; cursor: pointer;" onclick="showNoSubdivisionDetails()">Не задіяна техніка</button>';
-    html += '<button class="action-btn sub-nav-btn" data-subname="ПОЛК" style="padding: 10px 20px; font-size: 14px; background-color: #8e44ad; cursor: pointer;" onclick="showPolkDetails()">ПОЛК</button>';
+    html += '<button class="action-btn sub-nav-btn" data-subname="ББССП" style="padding: 10px 20px; font-size: 14px; background-color: #8e44ad; cursor: pointer;" onclick="showPolkDetails()">ББССП</button>';
     container.innerHTML = html;
 
     if (subs.length > 0) {
@@ -1204,7 +1204,7 @@ function showSubdivisionDetails(subName) {
             btn.style.backgroundColor = '#27ae60';
             btn.classList.add('active-sub');
         } else {
-            if (bName === 'ПОЛК') btn.style.backgroundColor = '#8e44ad';
+            if (bName === 'ББССП') btn.style.backgroundColor = '#8e44ad';
             else if (bName === 'НЕ ЗАДІЯНА ТЕХНІКА') btn.style.backgroundColor = '#7f8c8d';
             else btn.style.backgroundColor = '#2980b9';
             btn.classList.remove('active-sub');
@@ -1363,7 +1363,7 @@ function showNoSubdivisionDetails() {
             btn.style.backgroundColor = '#27ae60';
             btn.classList.add('active-sub');
         } else {
-            if (bName === 'ПОЛК') btn.style.backgroundColor = '#8e44ad';
+            if (bName === 'ББССП') btn.style.backgroundColor = '#8e44ad';
             else if (bName === 'НЕ ЗАДІЯНА ТЕХНІКА') btn.style.backgroundColor = '#7f8c8d';
             else btn.style.backgroundColor = '#2980b9';
             btn.classList.remove('active-sub');
@@ -1518,7 +1518,7 @@ function showNoSubdivisionDetails() {
 function showPolkDetails() {
     document.querySelectorAll('#subdivisions-buttons-container .sub-nav-btn').forEach(btn => {
         const bName = btn.getAttribute('data-subname');
-        if (bName === 'ПОЛК') {
+        if (bName === 'ББССП') {
             btn.style.backgroundColor = '#27ae60';
             btn.classList.add('active-sub');
         } else {
@@ -1538,12 +1538,12 @@ function showPolkDetails() {
     let currentCustomPeriod = activeSubdivisionPeriod;
 
     const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
-    const activePolkCars = sourceCars.filter(c => !shouldHideItemInReport('car', c.id, c.note, currentCustomPeriod));
+    const activePolkCars = sourceCars.filter(c => normalizeSubdivision(c.subdivision) && !shouldHideItemInReport('car', c.id, c.note, currentCustomPeriod));
     
     let allEqItems = [];
     try {
         if (typeof getAllEquipmentItemsUnified === 'function') {
-            allEqItems = getAllEquipmentItemsUnified().filter(i => !shouldHideItemInReport('equipment', i.uniqueId || i.id, i.note || i.description, currentCustomPeriod));
+            allEqItems = getAllEquipmentItemsUnified().filter(i => normalizeSubdivision(i.subdivision) && !shouldHideItemInReport('equipment', i.uniqueId || i.id, i.note || i.description, currentCustomPeriod));
         }
     } catch(e) {}
 
@@ -1561,23 +1561,23 @@ function showPolkDetails() {
             
             ${buildSubdivisionTopPrintButtonHtml()}
 
-            <h3 style="color: #2c3e50; margin-top: 0; margin-bottom: 15px;">Зведений звіт по всьому <span style="color: #8e44ad;">ПОЛКУ</span></h3>
+            <h3 style="color: #2c3e50; margin-top: 0; margin-bottom: 15px;">Зведений звіт по всьому <span style="color: #8e44ad;">ББССП</span></h3>
             
-            <h4 style="margin: 15px 0 8px 0; color: #7f8c8d;">Вся техніка полку (${activePolkCars.length}):</h4>
+            <h4 style="margin: 15px 0 8px 0; color: #7f8c8d;">Вся техніка ББССП (${activePolkCars.length}):</h4>
             <div class="print-scroll-box" style="border: 1px solid #e0e0e0; padding: 10px 10px 10px 25px; border-radius: 4px; background: #f9f9f9; margin-bottom: 15px;">
                 <ol style="margin: 0; padding-left: 15px; font-size: 14px;">
                     ${polkCarsHtml}
                 </ol>
             </div>
 
-            <h4 style="margin: 15px 0 8px 0; color: #7f8c8d;">Все обладнання та агрегати полку (${allEqItems.length}):</h4>
+            <h4 style="margin: 15px 0 8px 0; color: #7f8c8d;">Все обладнання та агрегати ББССП (${allEqItems.length}):</h4>
             <div class="print-scroll-box" style="border: 1px solid #e0e0e0; padding: 10px 10px 10px 25px; border-radius: 4px; background: #f9f9f9; margin-bottom: 20px;">
                 <ol style="margin: 0; padding-left: 15px; font-size: 14px;">
                     ${polkEqHtml}
                 </ol>
             </div>
 
-            <h4 style="margin: 15px 0 10px 0; color: #2c3e50;">Отримані матеріали та рідини по всьому полку:</h4>
+            <h4 style="margin: 15px 0 10px 0; color: #2c3e50;">Отримані матеріали та рідини по всьому ББССП:</h4>
             <table class="data-table" style="width: 100%;">
                 <thead>
                     <tr>
@@ -1717,7 +1717,7 @@ function subdivisionAllEquipmentPeriods(periods) {
     return [...result];
 }
 
-function calculateEquipmentSubdivisionTotals(periods, subdivision) {
+function calculateEquipmentSubdivisionTotals(periods, subdivision, assignedOnly = false) {
     const totals = {dpFuel: 0, abFuel: 0, adblue: 0, oilMap: {}, washerMap: {}};
     const months = new Map();
     for (const period of periods) {
@@ -1734,6 +1734,7 @@ function calculateEquipmentSubdivisionTotals(periods, subdivision) {
         for (const item of getEquipmentReportItems(period, true)) {
             const row = data[item.uniqueId];
             if (!row || row._excluded || shouldHideItemInReport('equipment', item.uniqueId, item.note, period)) continue;
+            if (assignedOnly && !normalizeSubdivision(item.subdivision)) continue;
             if (subdivision === '' && String(item.subdivision || '').trim()) continue;
             if (subdivision && normalizeSubdivision(item.subdivision || '') !== normalizeSubdivision(subdivision)) continue;
             for (const group of groups) {
@@ -1905,16 +1906,16 @@ function calculateNoSubStatsDetailed(periodList) {
 
 function calculatePolkStatsDetailed(periodList) {
     let carsStat = { dpFuel: 0, abFuel: 0, adblue: 0, oilMap: {}, washerMap: {} };
-    let eqStat = calculateEquipmentSubdivisionTotals(periodList, typeof subName === 'undefined' ? null : subName);
+    let eqStat = calculateEquipmentSubdivisionTotals(periodList, null, true);
 
     const sourceCars = typeof carsData !== 'undefined' ? carsData : [];
 
     periodList.forEach(p => {
-        const activePolkCars = sourceCars.filter(c => !shouldHideItemInReport('car', c.id, c.note, p));
+        const activePolkCars = sourceCars.filter(c => normalizeSubdivision(c.subdivision) && !shouldHideItemInReport('car', c.id, c.note, p));
         let allEqItems = [];
         try {
             if (typeof getAllEquipmentItemsUnified === 'function') {
-                allEqItems = getAllEquipmentItemsUnified().filter(i => !shouldHideItemInReport('equipment', i.uniqueId || i.id, i.note || i.description, p));
+                allEqItems = getAllEquipmentItemsUnified().filter(i => normalizeSubdivision(i.subdivision) && !shouldHideItemInReport('equipment', i.uniqueId || i.id, i.note || i.description, p));
             }
         } catch(e) {}
 
