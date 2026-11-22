@@ -848,6 +848,13 @@ function openReportCarCard(carId, period) {
     loadCarDataForActivePeriod();
 }
 
+function readTenDayRouteCard(period, carId) {
+    if (!period) return null;
+    try {
+        return JSON.parse(localStorage.getItem(`isolated_car_routes_${period}_${carId}`) || 'null')?.topFields;
+    } catch (_) { return null; }
+}
+
 function getTenDayVehicleValues(car, saved, previousReport, previousCard, card) {
     saved = saved || {};
     previousReport = previousReport || {};
@@ -996,15 +1003,8 @@ function renderReportTable() {
         }
         tr.setAttribute('data-fuel-type', (car.fuelType || '').toUpperCase());
 
-        function cardTop(period) {
-            if (!period) return null;
-            try {
-                return JSON.parse(localStorage.getItem(`isolated_car_routes_${period}_${car.id}`) || 'null')?.topFields;
-            } catch (_) { return null; }
-        }
-
         carData = getTenDayVehicleValues(car, carData, prevPeriodSavedData[car.id],
-            cardTop(prevPeriodKey), cardTop(periodStr));
+            readTenDayRouteCard(prevPeriodKey, car.id), readTenDayRouteCard(periodStr, car.id));
         const trailerReading = trailerMileage.get(String(car.id));
         if (trailerReading) {
             carData.prevOdo = trailerReading.prevOdo;
@@ -1748,6 +1748,12 @@ function calculateEquipmentSubdivisionTotals(periods, subdivision, assignedOnly 
     return totals;
 }
 
+function getSubdivisionVehicleReceipt(car, period, saved) {
+    const card = readTenDayRouteCard(period, car.id);
+    if (!saved && !card) return null;
+    return { ...saved, ...getTenDayVehicleValues(car, saved, null, null, card) };
+}
+
 function calculateSubStatsDetailed(subName, periodList) {
     let carsStat = { dpFuel: 0, abFuel: 0, adblue: 0, oilMap: {}, washerMap: {} };
     let eqStat = calculateEquipmentSubdivisionTotals(periodList, typeof subName === 'undefined' ? null : subName);
@@ -1770,21 +1776,7 @@ function calculateSubStatsDetailed(subName, periodList) {
         } catch(e) {}
 
         subCars.forEach(car => {
-            let carRec = repData[car.id];
-            if (!carRec) {
-                try {
-                    const cardRaw = localStorage.getItem(`isolated_car_routes_${p}_${car.id}`);
-                    if (cardRaw) {
-                        const cardObj = JSON.parse(cardRaw);
-                        if (cardObj && cardObj.topFields) {
-                            carRec = {
-                                refuelFuel: cardObj.topFields.fuelReceived || '',
-                                refuelAdBlue: cardObj.topFields.adblueReceived || ''
-                            };
-                        }
-                    }
-                } catch (e) {}
-            }
+            const carRec = getSubdivisionVehicleReceipt(car, p, repData?.[car.id]);
 
             if (carRec) {
                 const refFuel = evaluateExpression(carRec.refuelFuel);
@@ -1848,21 +1840,7 @@ function calculateNoSubStatsDetailed(periodList) {
         } catch(e) {}
 
         subCars.forEach(car => {
-            let carRec = repData[car.id];
-            if (!carRec) {
-                try {
-                    const cardRaw = localStorage.getItem(`isolated_car_routes_${p}_${car.id}`);
-                    if (cardRaw) {
-                        const cardObj = JSON.parse(cardRaw);
-                        if (cardObj && cardObj.topFields) {
-                            carRec = {
-                                refuelFuel: cardObj.topFields.fuelReceived || '',
-                                refuelAdBlue: cardObj.topFields.adblueReceived || ''
-                            };
-                        }
-                    }
-                } catch (e) {}
-            }
+            const carRec = getSubdivisionVehicleReceipt(car, p, repData?.[car.id]);
 
             if (carRec) {
                 const refFuel = evaluateExpression(carRec.refuelFuel);
@@ -1926,21 +1904,7 @@ function calculatePolkStatsDetailed(periodList) {
         } catch(e) {}
 
         activePolkCars.forEach(car => {
-            let carRec = repData[car.id];
-            if (!carRec) {
-                try {
-                    const cardRaw = localStorage.getItem(`isolated_car_routes_${p}_${car.id}`);
-                    if (cardRaw) {
-                        const cardObj = JSON.parse(cardRaw);
-                        if (cardObj && cardObj.topFields) {
-                            carRec = {
-                                refuelFuel: cardObj.topFields.fuelReceived || '',
-                                refuelAdBlue: cardObj.topFields.adblueReceived || ''
-                            };
-                        }
-                    }
-                } catch (e) {}
-            }
+            const carRec = getSubdivisionVehicleReceipt(car, p, repData?.[car.id]);
 
             if (carRec) {
                 const refFuel = evaluateExpression(carRec.refuelFuel);
