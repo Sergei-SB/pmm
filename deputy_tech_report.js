@@ -116,6 +116,15 @@ function renderDeputyTechReport(keepSelection = false) {
             ${selector('period', 'Період', periods, value => value)}
             ${selector('month', 'Місяць', months, monthRange)}
         </div>
+        <style>
+            .deputy-tech-table tfoot th, .deputy-tech-table tfoot td {
+                background: #d6ead8;
+                color: #143c22;
+                font-weight: 700;
+            }
+            .deputy-tech-table tfoot tr:first-child > * { border-top: 3px solid #28603a; }
+            .deputy-tech-table tfoot th[scope="rowgroup"] { background: #245633; color: #fff; }
+        </style>
         <div class="deputy-tech-table">
             <table>
                 <colgroup><col style="width:12%"><col style="width:4%">${'<col style="width:8%"><col style="width:9%"><col style="width:8.5%"><col style="width:7.5%"><col style="width:5%"><col style="width:4%">'.repeat(2)}</colgroup>
@@ -165,6 +174,8 @@ function printDeputyTechReport() {
         tbody, tfoot, tr { break-inside: avoid; }
         tbody th[scope="rowgroup"], tfoot th[scope="rowgroup"] { text-align: left; }
         thead, tfoot { background: #edf1f3; font-weight: bold; }
+        tfoot th, tfoot td { background: #d6ead8; font-weight: 700; }
+        tfoot tr:first-child > * { border-top: 2px solid #28603a; }
         td:nth-last-child(4), td:last-child { font-weight: bold; }
         .ruler { position: absolute; height: 190mm; width: 0; visibility: hidden; }
         </style><body><div class="ruler"></div><main></main></body></html>`);
