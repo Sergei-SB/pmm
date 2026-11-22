@@ -313,6 +313,7 @@ function renderCarPeriodsAndStats(car) {
     periodsTbody.innerHTML = '';
 
     let totalMileage = 0;
+    let firstOdometer = null;
     let totalReceivedFuel = 0;
     let totalSpentFuel = 0;
     let totalReceivedAdBlue = 0;
@@ -322,31 +323,39 @@ function renderCarPeriodsAndStats(car) {
     let periods = [];
     if (typeof getSavedPeriodsList === 'function') {
         periods = getSavedPeriodsList();
-    } else {
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key && key.startsWith('report_data_')) {
-                const p = key.replace('report_data_', '');
-                if (!periods.includes(p)) periods.push(p);
-            }
-        }
     }
+    periods = [...new Set(periods)];
 
     // Також підтягуємо періоди, для яких збережені маршрути цього автомобіля
     for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
+        if (k?.startsWith('report_data_')) {
+            const p = k.slice('report_data_'.length);
+            if (p && !periods.includes(p)) periods.push(p);
+        }
         if (k && k.startsWith('isolated_car_routes_') && k.endsWith('_' + car.id)) {
-            const p = k.replace('isolated_car_routes_', '').replace('_' + car.id, '');
+            const p = k.slice('isolated_car_routes_'.length, -('_' + car.id).length);
             if (p && !periods.includes(p)) {
                 periods.push(p);
             }
         }
     }
 
-    if (typeof sortPeriodsArray === 'function') {
+    if (typeof parsePeriodDateVal === 'function') {
+        periods.sort((a, b) => parsePeriodDateVal(a) - parsePeriodDateVal(b));
+    } else if (typeof sortPeriodsArray === 'function') {
         periods = sortPeriodsArray(periods);
     }
 
+    const readOdometer = (...values) => {
+        for (const value of values) {
+            const text = String(value ?? '').trim().replace(',', '.');
+            if (!/^\d+(?:\.\d+)?$/.test(text)) continue;
+            const number = Number(text);
+            if (Number.isFinite(number)) return number;
+        }
+        return null;
+    };
     const evalNum = function(val) {
         if (val === undefined || val === null || val === '') return 0;
         if (typeof evaluateExpression === 'function') {
@@ -396,9 +405,11 @@ function renderCarPeriodsAndStats(car) {
                     currOdo = cardObj.topFields.odo2;
                 }
 
-                const prevOdoNum = parseFloat(prevOdo) || 0;
-                const currOdoNum = parseFloat(currOdo) || 0;
-                let driven = (currOdoNum > prevOdoNum) ? (currOdoNum - prevOdoNum) : 0;
+                const prevOdoNum = readOdometer(prevOdo, cardObj?.topFields?.odo1);
+                const currOdoNum = readOdometer(currOdo, cardObj?.topFields?.odo2);
+                firstOdometer ??= prevOdoNum ?? currOdoNum;
+                let driven = prevOdoNum !== null && currOdoNum !== null
+                    ? Math.max(0, currOdoNum - prevOdoNum) : 0;
 
                 // Якщо одометр не заповнений, але є рядки маршрутів
                 if (driven === 0 && cardObj && Array.isArray(cardObj.rows) && cardObj.rows.length > 0) {
@@ -554,6 +565,20 @@ function renderCarPeriodsAndStats(car) {
     }
 
     const elMileage = document.getElementById('det-total-mileage');
+    const mileageCard = elMileage?.closest('.stat-card');
+    if (mileageCard && !document.getElementById('det-first-odometer')) {
+        for (const [id, label] of [['det-first-odometer', 'Початковий одометр'], ['det-distance-travelled', 'Всього пройдено']]) {
+            const card = mileageCard.cloneNode(true);
+            card.querySelector('h4').textContent = label;
+            card.querySelector('strong').id = id;
+            mileageCard.before(card);
+        }
+    }
+    const odometer = document.getElementById('det-first-odometer');
+    const distance = document.getElementById('det-distance-travelled');
+    const formatKm = value => new Intl.NumberFormat('uk-UA', {maximumFractionDigits: 2}).format(value) + ' км';
+    if (odometer) odometer.textContent = firstOdometer === null ? '—' : formatKm(firstOdometer);
+    if (distance) distance.textContent = formatKm(totalMileage);
     const elFuel = document.getElementById('det-total-fuel');
     const elSpent = document.getElementById('det-total-spent-fuel');
     const elLeftFuel = document.getElementById('det-current-left-fuel');
