@@ -141,7 +141,7 @@ function printDeputyTechReport() {
     }
     printWindow.document.write(`<!doctype html><html lang="uk"><meta charset="utf-8">
         <title>Звіт для зампотехів</title><style>
-        @page { size: A4 landscape; margin: 9mm; }
+        @page { size: A4 landscape; margin: 9mm; margin-bottom: 4mm; @bottom-left { content: "ПММ: Стропа & Компанія"; font: 8pt Arial, sans-serif; } @bottom-right { content: counter(page) "/" counter(pages); font: 8pt Arial, sans-serif; } }
         body { margin: 0; font: 10pt Arial, sans-serif; color: #172533; }
         main { width: 279mm; display: flow-root; }
         h2 { font-size: 14pt; text-align: center; margin: 0 0 3mm; }
