@@ -104,7 +104,7 @@ function renderDeputyTechReport() {
         </div>
         <div class="deputy-tech-table">
             <table>
-                <colgroup><col style="width:12%"><col style="width:4%">${'<col style="width:6%"><col style="width:7%"><col style="width:6%"><col style="width:10%"><col style="width:8%"><col style="width:5%">'.repeat(2)}</colgroup>
+                <colgroup><col style="width:12%"><col style="width:4%">${'<col style="width:8%"><col style="width:9%"><col style="width:8.5%"><col style="width:7.5%"><col style="width:5%"><col style="width:4%">'.repeat(2)}</colgroup>
                 <thead>
                     <tr><th rowspan="2" scope="col">Підрозділ</th><th rowspan="2" scope="col">Пальне</th>
                         <th colspan="6" scope="colgroup">Період ${escape(period)}</th>
