@@ -1274,7 +1274,7 @@ function printAggregatesReport() {
             <head>
                 <title>Розрахунок витрати палива та мастил — ${eqName}</title>
                 <style>
-                    @page { size: portrait; margin: 6mm 10mm; }
+                    @page { size: portrait; margin: 6mm 10mm; margin-bottom: 4mm; @bottom-left { content: "ПММ: Стропа & Компанія"; font: 8pt Arial, sans-serif; } @bottom-right { content: counter(page) "/" counter(pages); font: 8pt Arial, sans-serif; } }
                     body { font-family: Arial, sans-serif; padding: 5px; color: #333; margin: 0; font-size: 11px; }
                     h2 { text-align: center; color: #2e7d32; margin: 0 0 8px 0; font-size: 16px; }
                     .subtitle { text-align: center; color: #555; margin-bottom: 10px; font-size: 11px; }
