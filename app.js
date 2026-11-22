@@ -264,7 +264,8 @@ function loadCarsModifications() {
                 'vehicleType', 'category', 'subdivision', 'consumption',
                 'fuelType', 'year', 'transmission', 'tankCapacity', 'drive',
                 'emptyWeight', 'totalWeight', 'gears', 'engineVolume', 'kw',
-                'hasAdBlue', 'isMiles', 'formulas', 'destroyDate', 'destroyTime', 'destroyLocation'
+                'hasAdBlue', 'isMiles', 'formulas', 'destroyDate', 'destroyTime', 'destroyLocation',
+                'summerTyres', 'winterTyres'
             ];
             carsData.forEach(car => {
                 if (mods[car.id]) {
@@ -303,6 +304,8 @@ function saveCarsModificationsToStorage() {
             note: car.note,
             driver: car.driver,
             passportNo: car.passportNo,
+            summerTyres: car.summerTyres,
+            winterTyres: car.winterTyres,
             engineNo: car.engineNo,
             vin: car.vin,
             vehicleType: car.vehicleType,
