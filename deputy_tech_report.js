@@ -34,7 +34,16 @@ function renderDeputyTechReport() {
     const [monthNumber, year] = month.split('.');
     const equipmentMonth = equipmentFullMonth('01.' + monthNumber + '.' + year);
     const escape = equipmentReportEscape;
-    const subdivisions = getUniqueSubdivisions().filter(name => name.toUpperCase() !== 'ББССП');
+    const subdivisions = new Set(getUniqueSubdivisions());
+    const equipmentPeriods = new Set([equipmentFullMonth(period), equipmentMonth]);
+    for (const equipmentPeriod of equipmentPeriods) {
+        if (!equipmentPeriod) continue;
+        for (const item of getEquipmentReportItems(equipmentPeriod)) {
+            const name = normalizeSubdivision(item.subdivision);
+            if (name) subdivisions.add(name);
+        }
+    }
+    const reportSubdivisions = [...subdivisions].filter(name => name.toUpperCase() !== 'ББССП');
     const format = value => deputyTechLitres.format(value);
     const cells = (stats, fuel) => [stats.cars[fuel], stats.eq[fuel], stats.total[fuel]]
         .map(value => '<td>' + format(value) + '</td>').join('');
@@ -83,7 +92,7 @@ function renderDeputyTechReport() {
                         <th colspan="3" scope="colgroup">За місяць ${escape(monthRange(month))}</th></tr>
                     <tr>${'<th scope="col">Авто, л</th><th scope="col">Обладнання, л</th><th scope="col">Усього, л</th>'.repeat(2)}</tr>
                 </thead>
-                ${subdivisions.map(name => '<tbody>' + group(name, dates => calculateSubStatsDetailed(name, dates)) + '</tbody>').join('')}
+                ${reportSubdivisions.map(name => '<tbody>' + group(name, dates => calculateSubStatsDetailed(name, dates)) + '</tbody>').join('')}
                 <tfoot>${rows('ББССП — усього', summary.period, summary.month)}</tfoot>
             </table>
         </div>`;
