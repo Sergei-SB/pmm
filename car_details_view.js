@@ -567,18 +567,14 @@ function renderCarPeriodsAndStats(car) {
     const elMileage = document.getElementById('det-total-mileage');
     const mileageCard = elMileage?.closest('.stat-card');
     if (mileageCard && !document.getElementById('det-first-odometer')) {
-        for (const [id, label] of [['det-first-odometer', 'Початковий одометр'], ['det-distance-travelled', 'Всього пройдено']]) {
-            const card = mileageCard.cloneNode(true);
-            card.querySelector('h4').textContent = label;
-            card.querySelector('strong').id = id;
-            mileageCard.before(card);
-        }
+        const card = mileageCard.cloneNode(true);
+        card.querySelector('h4').textContent = 'Початковий одометр';
+        card.querySelector('strong').id = 'det-first-odometer';
+        mileageCard.before(card);
     }
     const odometer = document.getElementById('det-first-odometer');
-    const distance = document.getElementById('det-distance-travelled');
     const formatKm = value => new Intl.NumberFormat('uk-UA', {maximumFractionDigits: 2}).format(value) + ' км';
     if (odometer) odometer.textContent = firstOdometer === null ? '—' : formatKm(firstOdometer);
-    if (distance) distance.textContent = formatKm(totalMileage);
     const elFuel = document.getElementById('det-total-fuel');
     const elSpent = document.getElementById('det-total-spent-fuel');
     const elLeftFuel = document.getElementById('det-current-left-fuel');
