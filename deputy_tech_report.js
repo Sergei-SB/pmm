@@ -6,11 +6,25 @@ function canViewDeputyTechReport() {
 const deputyTechSelection = { period: '', month: '' };
 const deputyTechLitres = new Intl.NumberFormat('uk-UA', { maximumFractionDigits: 2 });
 
-function renderDeputyTechReport() {
+function renderDeputyTechReport(keepSelection = false) {
     if (!canViewDeputyTechReport()) return;
     const container = document.getElementById('deputy-tech-report');
-    const periods = getSavedPeriodsList();
-    const months = getAvailableMonthsList();
+    const periods = [...getSavedPeriodsList()];
+    const months = [...getAvailableMonthsList()];
+    const [yearToday, monthToday, dayToday] = new Intl.DateTimeFormat('sv-SE', {
+        timeZone: 'Europe/Kyiv', year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(new Date()).split('-');
+    const currentMonth = monthToday + '.' + yearToday;
+    const day = Number(dayToday);
+    const startDay = day <= 10 ? '01' : day <= 20 ? '11' : '21';
+    const endDay = day <= 10 ? 10 : day <= 20 ? 20 : new Date(Number(yearToday), Number(monthToday), 0).getDate();
+    const shortPeriod = startDay + '.' + monthToday + '-' + endDay + '.' + monthToday;
+    const datedPeriod = startDay + '.' + currentMonth + '-' + endDay + '.' + currentMonth;
+    const currentPeriod = String(parsePeriodDateVal(shortPeriod)).slice(0, 4) === yearToday
+        ? shortPeriod : datedPeriod;
+    if (!periods.includes(currentPeriod)) periods.push(currentPeriod);
+    periods.sort((a, b) => parsePeriodDateVal(a) - parsePeriodDateVal(b));
+    if (!months.includes(currentMonth)) months.push(currentMonth);
     const monthKey = period => {
         const date = Math.floor(parsePeriodDateVal(period) / 100);
         return String(date % 100).padStart(2, '0') + '.' + Math.floor(date / 100);
@@ -27,8 +41,8 @@ function renderDeputyTechReport() {
     }
     months.sort((a, b) => Number(a.slice(3) + a.slice(0, 2)) - Number(b.slice(3) + b.slice(0, 2)));
 
-    if (!periods.includes(deputyTechSelection.period)) deputyTechSelection.period = periods.at(-1);
-    if (!months.includes(deputyTechSelection.month)) deputyTechSelection.month = monthKey(deputyTechSelection.period);
+    if (!keepSelection || !periods.includes(deputyTechSelection.period)) deputyTechSelection.period = currentPeriod;
+    if (!keepSelection || !months.includes(deputyTechSelection.month)) deputyTechSelection.month = currentMonth;
     const { period, month } = deputyTechSelection;
     const monthlyPeriods = periods.filter(entry => monthKey(entry) === month);
     const [monthNumber, year] = month.split('.');
@@ -122,7 +136,7 @@ function renderDeputyTechReport() {
         control.addEventListener(event, () => {
             const values = field === 'period' ? periods : months;
             deputyTechSelection[field] = step ? values[values.indexOf(deputyTechSelection[field]) + Number(step)] : control.value;
-            renderDeputyTechReport();
+            renderDeputyTechReport(true);
             const replacement = container.querySelector(step
                 ? 'button[data-field="' + field + '"][data-step="' + step + '"]:not(:disabled)'
                 : 'select[data-field="' + field + '"]');
