@@ -173,7 +173,7 @@ function printCarCardReport() {
                 .calc-row { display: flex; justify-content: space-between; margin-bottom: 1px; }
                 .summary-box { margin-top: 4px; font-weight: bold; font-size: 9px; border-top: 1px solid #333; padding-top: 3px; }
                 @media print {
-                    @page { size: landscape; margin: 5mm; }
+                    @page { size: landscape; margin: 5mm; margin-bottom: 4mm; @bottom-left { content: "ПММ: Стропа & Компанія"; font: 8pt Arial, sans-serif; } @bottom-right { content: counter(page) "/" counter(pages); font: 8pt Arial, sans-serif; } }
                     body { -webkit-print-color-adjust: exact; }
                 }
             </style>
