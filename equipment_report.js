@@ -1201,7 +1201,7 @@ function printEquipmentReport() {
                 input { border: none; text-align: center; width: 100%; font-size: 10px; background: transparent; }
                 tfoot tr { font-weight: bold; background: #eee; }
                 @media print {
-                    @page { size: landscape; margin: 6mm; }
+                    @page { size: landscape; margin: 6mm; margin-bottom: 4mm; @bottom-left { content: "ПММ: Стропа & Компанія"; font: 8pt Arial, sans-serif; } @bottom-right { content: counter(page) "/" counter(pages); font: 8pt Arial, sans-serif; } }
                     body { -webkit-print-color-adjust: exact; }
                 }
             </style>
