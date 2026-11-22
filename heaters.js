@@ -39,7 +39,7 @@ function printHeatersTable() {
                 th, td { border: 1px solid #333; padding: 4px 6px; text-align: center; }
                 th { background-color: #2e7d32 !important; color: white !important; font-size: 11px; }
                 td:nth-child(2) { text-align: left; }
-                @media print { @page { size: landscape; margin: 10mm; } }
+                @media print { @page { size: landscape; margin: 10mm; margin-bottom: 4mm; @bottom-left { content: "ПММ: Стропа & Компанія"; font: 8pt Arial, sans-serif; } @bottom-right { content: counter(page) "/" counter(pages); font: 8pt Arial, sans-serif; } } }
             </style>
         </head>
         <body>
