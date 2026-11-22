@@ -97,7 +97,7 @@ function renderDeputyTechReport() {
 
     container.innerHTML = `
         ${buildSubdivisionTopPrintButtonHtml('printDeputyTechReport()')}
-        <h2>Зведений звіт по підрозділах для зампотехів</h2>
+        <h2>Зведений звіт по підрозділам для зампотехів</h2>
         <div class="deputy-tech-controls no-print">
             ${selector('period', 'Період', periods, value => value)}
             ${selector('month', 'Місяць', months, monthRange)}
