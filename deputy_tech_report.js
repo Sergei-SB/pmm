@@ -101,7 +101,7 @@ function renderDeputyTechReport(keepSelection = false) {
     };
     const selector = (field, title, values, label) => {
         const index = values.indexOf(deputyTechSelection[field]);
-        return '<div class="deputy-tech-selector"><label for="deputy-tech-' + field + '">' + title + '</label>' +
+        return '<div class="deputy-tech-selector card-period-box"><label for="deputy-tech-' + field + '">' + title + ':</label>' +
             '<button type="button" class="action-btn" aria-label="Попередній ' + title.toLowerCase() + '" data-field="' + field + '" data-step="-1"' + (index <= 0 ? ' disabled' : '') + '>◄</button>' +
             '<select id="deputy-tech-' + field + '" data-field="' + field + '">' + values.map(value =>
                 '<option value="' + escape(value) + '"' + (value === deputyTechSelection[field] ? ' selected' : '') + '>' + escape(label(value)) + '</option>'
@@ -110,13 +110,40 @@ function renderDeputyTechReport(keepSelection = false) {
     };
 
     container.innerHTML = `
-        ${buildSubdivisionTopPrintButtonHtml('printDeputyTechReport()')}
-        <h2>Зведений звіт по підрозділам для зампотехів</h2>
-        <div class="deputy-tech-controls no-print">
-            ${selector('period', 'Період', periods, value => value)}
-            ${selector('month', 'Місяць', months, monthRange)}
-        </div>
+        <header class="deputy-tech-toolbar">
+            <h2>Зведений звіт по підрозділам для зампотехів</h2>
+            <div class="deputy-tech-controls no-print">
+                ${selector('period', 'Період', periods, value => value)}
+                ${selector('month', 'Місяць', months, monthRange)}
+                <button type="button" class="action-btn print-btn" onclick="printDeputyTechReport()">🖨️ Друк звіту</button>
+            </div>
+        </header>
         <style>
+            .deputy-tech-report:has(.deputy-tech-toolbar) {
+                background: transparent; border: 0; padding: 0;
+            }
+            .deputy-tech-toolbar {
+                background: #d5dade; border: 1px solid #95a5a6;
+                padding: 10px 15px; margin-bottom: 15px;
+            }
+            .deputy-tech-toolbar h2 { margin: 0 0 14px; color: #2c3e50; }
+            .deputy-tech-toolbar .deputy-tech-controls {
+                align-items: center; gap: 10px 12px; margin: 0;
+            }
+            .deputy-tech-toolbar .deputy-tech-selector {
+                gap: 10px; padding: 6px 12px; background: #ecf0f1;
+                border: 1px solid #bdc3c7; border-radius: 4px;
+                color: #2c3e50; font-size: 13px; font-weight: 700;
+            }
+            .deputy-tech-toolbar .deputy-tech-selector button {
+                background: #34495e; color: #fff; font-size: 11px;
+            }
+            .deputy-tech-toolbar .deputy-tech-selector select {
+                padding: 4px 8px; border: 1px solid #7f8c8d; border-radius: 3px;
+                background: #fff; color: #2c3e50; font: inherit; cursor: pointer;
+            }
+            .deputy-tech-toolbar .print-btn { background: #337ab7; color: #fff; font-weight: 700; }
+            .deputy-tech-table { background: #fff; }
             .deputy-tech-table tfoot th, .deputy-tech-table tfoot td {
                 background: #d6ead8;
                 color: #143c22;
