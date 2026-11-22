@@ -129,7 +129,82 @@ const carTyreFields = [
     ['winterTyres', 'Зимова гума']
 ];
 
-function renderCarTyreFields(car) {
+const tyreMileageKey = 'fleet_tyre_mileage_history';
+const tyreModes = {off: 'Вимкнено', summer: 'Літо', winter: 'Зима'};
+
+function readTyreMileageHistory() {
+    const history = JSON.parse(localStorage.getItem(tyreMileageKey) ?? '[]');
+    if (!Array.isArray(history)) throw new Error('Invalid tyre mileage history');
+    return history;
+}
+
+function tyreMileageBySeason(history, carId, period, driven) {
+    const totals = {summer: 0, winter: 0};
+    let start = Math.min(driven, history[0]?.mileage[carId]?.[period] ?? 0);
+    for (let index = 0; index < history.length; index++) {
+        const mode = history[index].mode;
+        const next = history[index + 1];
+        const end = next ? Math.min(driven, next.mileage[carId]?.[period] ?? 0) : driven;
+        if (Object.hasOwn(totals, mode)) totals[mode] += Math.max(0, end - start);
+        start = Math.max(start, end);
+    }
+    return totals;
+}
+
+function installTyreModeSwitch() {
+    const anchor = document.getElementById('dev-notes-bell');
+    if (!anchor) return;
+    const label = document.createElement('label');
+    label.style.cssText = 'display:inline-flex;align-items:center;gap:6px;color:white;';
+    label.textContent = 'Пробіг шин';
+    const select = document.createElement('select');
+    for (const [mode, title] of Object.entries(tyreModes)) {
+        const option = document.createElement('option');
+        option.value = mode;
+        option.textContent = title;
+        select.append(option);
+    }
+    label.append(select);
+    anchor.after(label);
+    const refresh = () => {
+        try {
+            select.value = readTyreMileageHistory().at(-1)?.mode ?? 'off';
+            const role = window.getCurrentAppRole?.() ?? window.currentRole;
+            select.disabled = !['developer', 'admin'].includes(role);
+        } catch {
+            select.disabled = true;
+        }
+    };
+    select.addEventListener('change', () => {
+        try {
+            const role = window.getCurrentAppRole?.() ?? window.currentRole;
+            if (!['developer', 'admin'].includes(role) || !Object.hasOwn(tyreModes, select.value)) return;
+            const history = readTyreMileageHistory();
+            if ((history.at(-1)?.mode ?? 'off') === select.value) return;
+            const mileage = Object.create(null);
+            for (const car of window.carsData ?? []) {
+                mileage[car.id] = Object.create(null);
+                renderCarPeriodsAndStats(car, (period, driven) => {
+                    if (driven > 0) mileage[car.id][period] = driven;
+                });
+            }
+            history.push({mode: select.value, mileage});
+            localStorage.setItem(tyreMileageKey, JSON.stringify(history));
+        } catch (error) {
+            console.error(error);
+            alert('Не вдалося зберегти сезон шин.');
+        } finally {
+            refresh();
+        }
+    });
+    refresh();
+    // Cloud synchronization can update storage in this tab without a storage event.
+    setInterval(() => { if (document.activeElement !== select) refresh(); }, 2000);
+}
+
+document.addEventListener('DOMContentLoaded', installTyreModeSwitch);
+
+function renderCarTyreFields(car, totals) {
     const anchor = document.getElementById('det-total-fuel')?.closest('.stat-card');
     if (!anchor) return;
     for (const [key, title] of carTyreFields) {
@@ -146,10 +221,15 @@ function renderCarTyreFields(car) {
             input.id = id;
             input.type = 'text';
             input.style.cssText = 'width: 100%; box-sizing: border-box; text-align: center;';
-            card.append(heading, input);
+            const mileage = document.createElement('div');
+            mileage.id = id + '-mileage';
+            card.append(heading, input, mileage);
             anchor.before(card);
         }
         input.value = car[key] ?? '';
+        const mileage = document.getElementById(id + '-mileage');
+        const mode = key === 'summerTyres' ? 'summer' : 'winter';
+        mileage.textContent = new Intl.NumberFormat('uk-UA', {maximumFractionDigits: 2}).format(totals[mode]) + ' км';
     }
 }
 
@@ -207,8 +287,19 @@ function renderCarDetailsData() {
         catSelect.value = resolvedCat;
     }
 
-    renderCarPeriodsAndStats(car);
-    renderCarTyreFields(car);
+    const totals = {summer: 0, winter: 0};
+    let history = [];
+    try {
+        history = readTyreMileageHistory();
+    } catch (error) {
+        console.error(error);
+    }
+    renderCarPeriodsAndStats(car, (period, driven) => {
+        const mileage = tyreMileageBySeason(history, car.id, period, driven);
+        totals.summer += mileage.summer;
+        totals.winter += mileage.winter;
+    }, true);
+    renderCarTyreFields(car, totals);
     renderCarDocuments(car);
 }
 
@@ -342,10 +433,10 @@ window.saveCarDetailsToBasePath = function() {
     if (typeof switchView === 'function') switchView('base');
 };
 
-function renderCarPeriodsAndStats(car) {
+function renderCarPeriodsAndStats(car, onMileage, render = !onMileage) {
     const periodsTbody = document.getElementById('det-periods-tbody');
-    if (!periodsTbody) return;
-    periodsTbody.innerHTML = '';
+    if (render && !periodsTbody) return;
+    if (render) periodsTbody.innerHTML = '';
 
     let totalMileage = 0;
     let firstOdometer = null;
@@ -455,6 +546,8 @@ function renderCarPeriodsAndStats(car) {
                     if (rKm > 0) driven = rKm;
                 }
                 totalMileage += driven;
+                onMileage?.(period, driven);
+                if (!render) return;
 
                 // Отримано палива
                 let refFuel = 0;
@@ -557,6 +650,7 @@ function renderCarPeriodsAndStats(car) {
         periodsHtml = `<tr><td colspan="11" style="text-align: center; color: #7f8c8d; font-style: italic; padding: 15px;">Немає збережених звітів по цьому автомобілю в періодах</td></tr>`;
     }
 
+    if (!render) return;
     periodsTbody.innerHTML = periodsHtml;
 
     // Резервні джерела для визначення залишку палива, якщо в періодах він не зафіксований явно
