@@ -731,7 +731,7 @@ function printTenDaysReport() {
                 th { background-color: #2e7d32 !important; color: white !important; }
                 input, select { border: none; background: transparent; text-align: center; font-size: 9px; width: 100%; }
                 @media print {
-                    @page { size: landscape; margin: 5mm; }
+                    @page { size: landscape; margin: 5mm; margin-bottom: 4mm; @bottom-left { content: "ПММ: Стропа & Компанія"; font: 8pt Arial, sans-serif; } @bottom-right { content: counter(page) "/" counter(pages); font: 8pt Arial, sans-serif; } }
                     body { -webkit-print-color-adjust: exact; }
                 }
             </style>
@@ -1680,6 +1680,7 @@ function printSubdivisionReport() {
         printStyleEl.id = 'subdivision-print-style';
         printStyleEl.innerHTML = `
             @media print {
+                @page { margin-bottom: 4mm; @bottom-left { content: "ПММ: Стропа & Компанія"; font: 8pt Arial, sans-serif; } @bottom-right { content: counter(page) "/" counter(pages); font: 8pt Arial, sans-serif; } }
                 body * {
                     visibility: hidden !important;
                 }
