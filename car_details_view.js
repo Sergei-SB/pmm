@@ -124,6 +124,35 @@ function getActiveReportCar() {
     return carsData.find(c => Number(c.id) === Number(window.activeReportCarId)) || null;
 }
 
+const carTyreFields = [
+    ['summerTyres', 'Літня гума'],
+    ['winterTyres', 'Зимова гума']
+];
+
+function renderCarTyreFields(car) {
+    const anchor = document.getElementById('det-total-fuel')?.closest('.stat-card');
+    if (!anchor) return;
+    for (const [key, title] of carTyreFields) {
+        const id = 'det-input-' + key;
+        let input = document.getElementById(id);
+        if (!input) {
+            const card = anchor.cloneNode(false);
+            const heading = anchor.querySelector('h4').cloneNode(false);
+            const label = document.createElement('label');
+            label.htmlFor = id;
+            label.textContent = title;
+            heading.append(label);
+            input = document.createElement('input');
+            input.id = id;
+            input.type = 'text';
+            input.style.cssText = 'width: 100%; box-sizing: border-box; text-align: center;';
+            card.append(heading, input);
+            anchor.before(card);
+        }
+        input.value = car[key] ?? '';
+    }
+}
+
 function renderCarDetailsData() {
     const car = getActiveReportCar();
     if (!car) return;
@@ -179,6 +208,7 @@ function renderCarDetailsData() {
     }
 
     renderCarPeriodsAndStats(car);
+    renderCarTyreFields(car);
     renderCarDocuments(car);
 }
 
@@ -297,6 +327,11 @@ window.saveCarDetailsToBasePath = function() {
         } else {
             car.category = catSelect.value;
         }
+    }
+
+    for (const [key] of carTyreFields) {
+        const input = document.getElementById('det-input-' + key);
+        if (input) car[key] = input.value.trim();
     }
 
     if (typeof saveCarsToStorage === 'function') saveCarsToStorage();
