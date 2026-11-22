@@ -47,17 +47,36 @@ function renderDeputyTechReport() {
     const format = value => deputyTechLitres.format(value);
     const cells = (stats, fuel) => [stats.cars[fuel], stats.eq[fuel], stats.total[fuel]]
         .map(value => '<td>' + format(value) + '</td>').join('');
+    const fluidCells = ({total}) => [
+        formatFluidBreakdown(total.oilMap),
+        formatFluidBreakdown(total.washerMap),
+        format(total.adblue ?? 0)
+    ].map(value => '<td rowspan="2">' + escape(value) + '</td>').join('');
     const rows = (label, periodStats, monthStats) => ['dpFuel', 'abFuel'].map((fuel, index) =>
         '<tr>' + (index === 0 ? '<th rowspan="2" scope="rowgroup">' + escape(label) + '</th>' : '') +
         '<th scope="row" class="deputy-tech-fuel">' + (index === 0 ? 'ДП' : 'АБ') + '</th>' +
-        cells(periodStats, fuel) + cells(monthStats, fuel) + '</tr>'
+        cells(periodStats, fuel) + (index === 0 ? fluidCells(periodStats) : '') +
+        cells(monthStats, fuel) + (index === 0 ? fluidCells(monthStats) : '') + '</tr>'
     ).join('');
     const summary = { period: {cars: {dpFuel: 0, abFuel: 0}, eq: {dpFuel: 0, abFuel: 0}, total: {dpFuel: 0, abFuel: 0}}, month: {cars: {dpFuel: 0, abFuel: 0}, eq: {dpFuel: 0, abFuel: 0}, total: {dpFuel: 0, abFuel: 0}} };
+    for (const stats of Object.values(summary)) {
+        Object.assign(stats.total, {oilMap: {}, washerMap: {}, adblue: 0});
+    }
     const group = (label, calculate) => {
         const periodStats = calculate([period]);
         const monthStats = calculate(monthlyPeriods);
         // Equipment is stored by calendar month, including months without vehicle reports.
         monthStats.eq = calculateEquipmentSubdivisionTotals([equipmentMonth], label);
+        for (const [key, stats] of [['period', periodStats], ['month', monthStats]]) {
+            for (const field of ['oilMap', 'washerMap']) {
+                stats.total[field] = mergeFluidMaps(
+                    mergeFluidMaps({}, stats.cars[field] ?? {}), stats.eq[field] ?? {}
+                );
+                mergeFluidMaps(summary[key].total[field], stats.total[field]);
+            }
+            stats.total.adblue = (stats.cars.adblue ?? 0) + (stats.eq.adblue ?? 0);
+            summary[key].total.adblue += stats.total.adblue;
+        }
         for (const fuel of ['dpFuel', 'abFuel']) {
             monthStats.total[fuel] = monthStats.cars[fuel] + monthStats.eq[fuel];
             for (const [key, stats] of [['period', periodStats], ['month', monthStats]]) {
@@ -85,12 +104,12 @@ function renderDeputyTechReport() {
         </div>
         <div class="deputy-tech-table">
             <table>
-                <colgroup><col style="width:20%"><col style="width:8%">${'<col style="width:12%">'.repeat(6)}</colgroup>
+                <colgroup><col style="width:12%"><col style="width:4%">${'<col style="width:6%"><col style="width:7%"><col style="width:6%"><col style="width:10%"><col style="width:8%"><col style="width:5%">'.repeat(2)}</colgroup>
                 <thead>
                     <tr><th rowspan="2" scope="col">Підрозділ</th><th rowspan="2" scope="col">Пальне</th>
-                        <th colspan="3" scope="colgroup">Період ${escape(period)}</th>
-                        <th colspan="3" scope="colgroup">За місяць ${escape(monthRange(month))}</th></tr>
-                    <tr>${'<th scope="col">Авто, л</th><th scope="col">Обладнання, л</th><th scope="col">Усього, л</th>'.repeat(2)}</tr>
+                        <th colspan="6" scope="colgroup">Період ${escape(period)}</th>
+                        <th colspan="6" scope="colgroup">За місяць ${escape(monthRange(month))}</th></tr>
+                    <tr>${'<th scope="col">Авто, л</th><th scope="col">Обладнання, л</th><th scope="col">Усього, л</th><th scope="col">Мастила, л</th><th scope="col">Омивач, л</th><th scope="col">AdBlue, л</th>'.repeat(2)}</tr>
                 </thead>
                 ${reportSubdivisions.map(name => '<tbody>' + group(name, dates => calculateSubStatsDetailed(name, dates)) + '</tbody>').join('')}
                 <tfoot>${rows('ББССП — усього', summary.period, summary.month)}</tfoot>
@@ -122,9 +141,9 @@ function printDeputyTechReport() {
     }
     printWindow.document.write(`<!doctype html><html lang="uk"><meta charset="utf-8">
         <title>Звіт для зампотехів</title><style>
-        @page { size: A4 portrait; margin: 9mm; }
+        @page { size: A4 landscape; margin: 9mm; }
         body { margin: 0; font: 10pt Arial, sans-serif; color: #172533; }
-        main { width: 191mm; display: flow-root; }
+        main { width: 279mm; display: flow-root; }
         h2 { font-size: 14pt; text-align: center; margin: 0 0 3mm; }
         table { width: 100%; border-collapse: collapse; text-align: center; }
         th, td { border: 1px solid #a5adb2; padding: 1px 4px; overflow-wrap: anywhere; }
@@ -133,7 +152,7 @@ function printDeputyTechReport() {
         tbody th[scope="rowgroup"], tfoot th[scope="rowgroup"] { text-align: left; }
         thead, tfoot { background: #edf1f3; font-weight: bold; }
         td:nth-last-child(4), td:last-child { font-weight: bold; }
-        .ruler { position: absolute; height: 277mm; width: 0; visibility: hidden; }
+        .ruler { position: absolute; height: 190mm; width: 0; visibility: hidden; }
         </style><body><div class="ruler"></div><main></main></body></html>`);
     printWindow.document.close();
     const sheet = printWindow.document.querySelector('main');
