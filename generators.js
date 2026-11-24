@@ -460,14 +460,14 @@ function renderGeneratorsView() {
                             ${efBtn('serialNumber', 'Серійний номер')}
                         </div>
                     </th>
-                    <th style="width:75px;">Мотогодини ${efBtn('motoHours', 'Мотогодини')}</th>
+                    <th style="width: 68px; padding: 6px 2px; overflow-wrap: anywhere;">Мотогодини<br>${efBtn('motoHours', 'Мотогодини')}</th>
                     <th style="padding: 6px 4px; min-width: 80px;">
                         <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
                             <span>Примітка</span>
                             ${efBtn('note', 'Примітка')}
                         </div>
                     </th>
-                    <th style="padding: 6px 4px; min-width: 110px;">Наказ/ Акт</th>
+                    <th style="padding: 6px 4px; min-width: 180px;">Наказ/ Акт</th>
                     <th style="padding: 6px 4px; width: 60px;">Дія</th>
                 </tr>
             </thead>
