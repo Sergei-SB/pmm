@@ -280,7 +280,10 @@ function renderPumpsView() {
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" aria-label="Наказ/ Акт" value="${String(item.orderAct ?? '').replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')}" oninput="updatePumpsProp(${item.id}, 'orderAct', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
             <td style="text-align: center; padding: 3px 4px;"><button class="delete-row-btn" style="padding: 2px 6px; font-size: 10px;" onclick="deletePumpsRow(${item.id})">Видалити</button></td>
         `;
-        if (!canManagePumps()) tr.querySelectorAll('input, button').forEach(el => {el.disabled = true;});
+        if (!canManagePumps()) tr.querySelectorAll('input, button').forEach(el => {
+            el.disabled = !(window.isKesCabinetActive?.() && item.subdivision === 'КЕС' &&
+                el.getAttribute('list') === 'pumps-model-datalist');
+        });
         tbody.appendChild(tr);
     });
     if (!filtered.length) tbody.innerHTML = '<tr><td colspan="17" style="padding:24px;text-align:center;color:#64748b">Помп за цими умовами немає. Для нової позиції натисніть «+ Додати позицію».</td></tr>';
@@ -297,9 +300,9 @@ function updatePumpFilter(field, val) {
 }
 
 function updatePumpsProp(id, prop, val, rerender = true) {
-    if (!canManagePumps()) return;
     let list = getPumpsList();
     const item = list.find(i => Number(i.id) === Number(id));
+    if (!canManagePumps() && !(window.isKesCabinetActive?.() && item?.subdivision === 'КЕС' && prop === 'model')) return;
     if (item) {
         item[prop] = val;
         if (prop === 'locationSubdivision') item.subdivision = val;
@@ -332,10 +335,10 @@ function updatePumpsProp(id, prop, val, rerender = true) {
 }
 
 function addPumpsRow() {
-    if (!canManagePumps('eq_add_item')) return;
+    if (!window.isKesCabinetActive?.() && !canManagePumps('eq_add_item')) return;
     let list = getPumpsList();
     const newId = list.length > 0 ? Math.max(...list.map(i => i.id)) + 1 : 1;
-    list.push({ id: newId, model: "", kw: "", fuelType: "", consumption: "", max5Days: "", max10Days: "", max30Days: "", motoHoursDay: "", oilNorm10Days: "", subdivision: "", responsiblePerson: "", locationSubdivision: "", serialNumber: "", note: "" });
+    list.push({ id: newId, model: "", kw: "", fuelType: "", consumption: "", max5Days: "", max10Days: "", max30Days: "", motoHoursDay: "", oilNorm10Days: "", subdivision: window.isKesCabinetActive?.() ? "КЕС" : "", responsiblePerson: "", locationSubdivision: "", serialNumber: "", note: "" });
     savePumpsList(list);
     renderPumpsView();
 }

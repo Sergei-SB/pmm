@@ -140,6 +140,11 @@ function collectEquipmentReportInputs(period) {
     return data;
 }
 
+function isKesReportEquipment(item) {
+    return [item?.subdivision, item?.locationSubdivision, item?.inventoryLocation, item?.sub]
+        .some(value => String(value ?? '').trim().toUpperCase() === 'КЕС');
+}
+
 function getEquipmentReportItems(period, includeExcluded = false) {
     const data = readEquipmentReportData(period);
     const items = getAllEquipmentItemsUnified().map(item => ({...item, ...data[item.uniqueId]?._equipment,
@@ -160,7 +165,8 @@ function getEquipmentReportItems(period, includeExcluded = false) {
     };
     // Stable grouping keeps the existing order and distinct IDs within each category.
     items.sort((a,b) => rank(a) - rank(b));
-    return includeExcluded ? items : items.filter(item => data[item.uniqueId]?._excluded !== true);
+    return items.filter(item => !isKesReportEquipment(item) && !isKesReportEquipment(data[item.uniqueId]?._equipment) &&
+        (includeExcluded || data[item.uniqueId]?._excluded !== true));
 }
 
 function normalizeEquipmentGeneratorSearch(value) {
@@ -718,6 +724,7 @@ function getAllEquipmentItemsUnified() {
     sources.forEach(src => {
         if (Array.isArray(src.data)) {
             src.data.forEach((item, index) => {
+                if (isKesReportEquipment(item)) return;
                 const noteStr = String(item.note || "").toLowerCase();
                 if (noteStr.includes('знищ')) return; // Пропускаємо знищені позиції
 
@@ -1201,7 +1208,7 @@ function printEquipmentReport() {
                 input { border: none; text-align: center; width: 100%; font-size: 10px; background: transparent; }
                 tfoot tr { font-weight: bold; background: #eee; }
                 @media print {
-                    @page { size: landscape; margin: 6mm; margin-bottom: 4mm; @bottom-left { content: "ПММ: Стропа & Компанія"; font: 8pt Arial, sans-serif; } @bottom-right { content: counter(page) "/" counter(pages); font: 8pt Arial, sans-serif; } }
+                    @page { size: landscape; margin: 6mm; }
                     body { -webkit-print-color-adjust: exact; }
                 }
             </style>

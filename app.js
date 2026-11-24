@@ -576,7 +576,7 @@ function getAllEquipmentItemsUnified() {
             subdivision: item.locationSubdivision || item.subdivision || '',
             fuelType: item.fuelType || 'АБ', note: item.note || '', rawItem: item, arrayType: 'pumps'
         }));
-    return items;
+    return items.filter(item => !isKesReportEquipment(item.rawItem ?? item));
 }
 
 // Перевірка, чи є авто вантажним

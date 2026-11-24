@@ -4,6 +4,8 @@
     window.personalCabinetAllowsView = view => !login || views.has(view);
     window.isPersonalCabinetActive = () => Boolean(login);
 
+    window.isKesCabinetActive = () => login === 'КЕС';
+
     const storageKey = '__sync_local_personal_cabinets';
     const normalize = value => String(value ?? '').trim();
     async function hash(password, salt) {

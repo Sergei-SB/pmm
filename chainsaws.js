@@ -326,7 +326,7 @@ function updateChainsawsProp(id, prop, val) {
 function addChainsawsRow() {
     let list = getChainsawsList();
     const newId = list.length > 0 ? Math.max(...list.map(i => i.id)) + 1 : 1;
-    list.push({ id: newId, model: "", kw: "", fuelType: "", consumption: "", max5Days: "", max10Days: "", max30Days: "", motoHoursDay: "", oilNorm10Days: "", subdivision: "", responsiblePerson: "", locationSubdivision: "", serialNumber: "", note: "" });
+    list.push({ id: newId, model: "", kw: "", fuelType: "", consumption: "", max5Days: "", max10Days: "", max30Days: "", motoHoursDay: "", oilNorm10Days: "", subdivision: window.isKesCabinetActive?.() ? "КЕС" : "", responsiblePerson: "", locationSubdivision: "", serialNumber: "", note: "" });
     saveChainsawsList(list);
     renderChainsawsView();
 }
