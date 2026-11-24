@@ -35,6 +35,7 @@
     }
 
     const storageKey = '__sync_local_personal_cabinets';
+    const readAccounts = () => JSON.parse(localStorage.getItem(storageKey) || '[]');
     const normalize = value => String(value ?? '').trim();
     async function hash(password, salt) {
         const bytes = new TextEncoder().encode(salt + ':' + password);
@@ -43,16 +44,15 @@
     }
 
     async function request(action, body) {
-        const read = () => JSON.parse(localStorage.getItem(storageKey) || '[]');
         if (action === 'login') {
-            const account = read().find(entry => entry.login === body.login);
+            const account = readAccounts().find(entry => entry.login === body.login);
             if (!account || account.hash !== await hash(body.password, account.salt)) {
                 throw new Error('Невірний логін або пароль.');
             }
             return {login: account.login};
         }
         if (window.getCurrentAppRole?.() !== 'developer') throw new Error('Потрібен доступ розробника.');
-        const accounts = read();
+        const accounts = readAccounts();
         if (action === 'save') {
             const login = normalize(body.login);
             const existing = accounts.find(account => account.id === body.id);
@@ -63,6 +63,8 @@
             if (body.password) {
                 account.salt = crypto.randomUUID();
                 account.hash = await hash(body.password, account.salt);
+                if (body.allowReveal === 'on') account.revealablePassword = body.password;
+                else delete account.revealablePassword;
             }
             if (!existing) accounts.push(account);
             localStorage.setItem(storageKey, JSON.stringify(accounts));
@@ -163,6 +165,33 @@
 
     function showAccounts(form, accounts, selectedId) {
         const select = form.elements.namedItem('id');
+        const list = form.querySelector('#personal-cabinet-list');
+        list.replaceChildren();
+        for (const account of accounts) {
+            const row = document.createElement('div');
+            row.style.cssText = 'display:flex;align-items:center;gap:8px';
+            const name = document.createElement('strong');
+            name.textContent = account.login;
+            const password = document.createElement('span');
+            password.textContent = '••••••••';
+            const eye = document.createElement('button');
+            eye.type = 'button';
+            eye.textContent = '👁';
+            eye.setAttribute('aria-label', 'Показати пароль: ' + account.login);
+            eye.setAttribute('aria-pressed', 'false');
+            eye.onclick = () => {
+                if (window.getCurrentAppRole?.() !== 'developer') return;
+                const revealed = eye.getAttribute('aria-pressed') === 'true';
+                const saved = readAccounts().find(entry => entry.id === account.id);
+                password.textContent = revealed ? '••••••••' : saved?.revealablePassword ??
+                    'Щоб переглядати пароль, введи його нижче й познач «Запам’ятати пароль для перегляду».';
+                eye.setAttribute('aria-pressed', String(!revealed));
+                eye.setAttribute('aria-label', (revealed ? 'Показати пароль: ' : 'Сховати пароль: ') + account.login);
+            };
+            row.append(name, password, eye);
+            list.append(row);
+        }
+        if (!accounts.length) list.textContent = 'У цьому браузері ще немає кабінетів.';
         const newAccount = new Option('Новий кабінет', '');
         select.replaceChildren(...accounts.map(account => new Option(account.login, account.id)), newAccount);
         if (selectedId !== undefined) select.value = selectedId;

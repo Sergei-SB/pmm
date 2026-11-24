@@ -2376,11 +2376,13 @@ window.renderDeveloperPanel = function() {
                     <p>Паролі ролей і персональні PIN налаштовуються на сервері Render.</p>
                     <form id="personal-cabinet-settings" onsubmit="savePersonalCabinetSettings(event)" style="display:grid;gap:10px;margin-top:16px;max-width:360px">
                         <strong>Особисті кабінети</strong>
-                        <button type="button" class="action-btn" onclick="loadPersonalCabinetSettings(this.form)">Завантажити кабінети</button>
+                        <small>Паролі для перегляду зберігаються лише в цьому браузері.</small>
+                        <div id="personal-cabinet-list" style="display:grid;gap:8px"></div>
                         <fieldset hidden disabled style="border:0;padding:0;margin:0">
                             <label style="display:block;margin-bottom:8px">Кабінет <select name="id" onchange="selectPersonalCabinetSettings(this.form)"></select></label>
                             <label style="display:block;margin-bottom:8px">Логін <input name="login" maxlength="64" required></label>
                             <label style="display:block;margin-bottom:8px">Новий пароль <input name="password" type="password" maxlength="256" autocomplete="new-password"></label>
+                            <label style="display:block;margin-bottom:8px"><input type="checkbox" name="allowReveal"> Запам’ятати пароль для перегляду</label>
                             <button type="submit" class="action-btn">Зберегти кабінет</button>
                         </fieldset>
                         <div role="status"></div>
@@ -2591,6 +2593,8 @@ window.renderDeveloperPanel = function() {
         </nav><div class="dev-admin-content">
         ${subTabContentHtml}</div></div>
     `;
+    const cabinetSettings = container.querySelector?.("#personal-cabinet-settings");
+    if (cabinetSettings) window.loadPersonalCabinetSettings?.(cabinetSettings);
     if (currentDevSubTab === 'logs') window.renderPmmSharedActivity();
     if (currentDevSubTab === 'notes') window.renderDeveloperNotes();
     if (currentDevSubTab === 'transfer') {
