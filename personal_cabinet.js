@@ -89,13 +89,14 @@
         const account = await request('login', {...fields, login: fields.login.trim()});
         login = account.login;
         document.body.classList.add('personal-cabinet-active');
+        document.body.classList.toggle('personal-cabinet-kes', login === 'КЕС');
         document.getElementById('personal-cabinet-name').textContent = login;
         switchView('generators');
     });
 
     window.exitPersonalCabinet = () => {
         login = '';
-        document.body.classList.remove('personal-cabinet-active');
+        document.body.classList.remove('personal-cabinet-active', 'personal-cabinet-kes');
         switchView('base');
     };
 

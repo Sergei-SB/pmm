@@ -205,6 +205,8 @@
             background: #2c3e50; padding: 10px 20px; color: white;
         }
         #personal-cabinet-name { margin-right: 6px; }
+        .personal-cabinet-kes #generators-table tr > :is(th, td):is(:nth-child(7), :nth-child(8), :nth-child(9), :nth-child(15)) { display: none; }
+        .personal-cabinet-kes button[onclick="openEquipmentWriteOffGuide()"] { display: none !important; }
     </style>
     <header class="top-nav" id="personal-cabinet-nav">
         <strong id="personal-cabinet-name"></strong>
@@ -878,7 +880,7 @@
     <script src="documents.js?v=20261113-page"></script>
     <script src="doc_margins.js"></script>
     <script src="presence.js"></script>
-    <script src="personal_cabinet.js?v=20261125-local"></script>
+    <script src="personal_cabinet.js?v=20261125-kes-columns"></script>
     <script src="automatic_backup.js"></script>
     <script src="document_sync.js"></script>
     <script src="sync_conflicts.js?v=20261108-registry-additions"></script>
