@@ -82,17 +82,46 @@
         return field;
     }
 
-    window.openPersonalCabinetLogin = () => openDialog('Вхід до особистого кабінету', [
-        input('Логін', 'login', {required: true, maxLength: 64, autocomplete: 'username'}),
-        input('Пароль', 'password', {required: true, type: 'password', maxLength: 256, autocomplete: 'current-password'})
-    ], 'Увійти', async fields => {
-        const account = await request('login', {...fields, login: fields.login.trim()});
-        login = account.login;
+    function openPasswordLogin() {
+        openDialog('Вхід до особистого кабінету', [
+            input('Логін', 'login', {required: true, maxLength: 64, autocomplete: 'username'}),
+            input('Пароль', 'password', {required: true, type: 'password', maxLength: 256, autocomplete: 'current-password'})
+        ], 'Увійти', async fields => {
+            const account = await request('login', {...fields, login: fields.login.trim()});
+            enterCabinet(account.login);
+        });
+    }
+
+    function enterCabinet(name) {
+        login = name;
         document.body.classList.add('personal-cabinet-active');
         document.body.classList.toggle('personal-cabinet-kes', login === 'КЕС');
         document.getElementById('personal-cabinet-name').textContent = login;
         switchView('generators');
-    });
+    }
+
+    window.openPersonalCabinetLogin = async () => {
+        if (window.getCurrentAppRole?.() !== 'developer') return openPasswordLogin();
+        try {
+            const {accounts} = await request('list');
+            const field = document.createElement('label');
+            field.style.cssText = 'display:grid;gap:4px';
+            const select = document.createElement('select');
+            select.name = 'id';
+            select.required = true;
+            select.add(new Option(accounts.length ? 'Оберіть кабінет' : 'У цьому браузері ще немає кабінетів', ''));
+            for (const account of accounts) select.add(new Option(account.login, account.id));
+            field.append('Особистий кабінет', select);
+            openDialog('Особисті кабінети', [field], 'Відкрити', async ({id}) => {
+                const {accounts: current} = await request('list');
+                const account = current.find(entry => entry.id === id);
+                if (!account) throw new Error('Кабінет більше недоступний.');
+                enterCabinet(account.login);
+            });
+        } catch (error) {
+            alert(error.message);
+        }
+    };
 
     window.exitPersonalCabinet = () => {
         login = '';
