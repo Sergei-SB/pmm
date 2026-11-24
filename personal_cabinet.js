@@ -4,7 +4,7 @@
     window.personalCabinetAllowsView = view => !login || views.has(view);
     window.isPersonalCabinetActive = () => Boolean(login);
 
-    const storageKey = 'pmm_local_cabinets';
+    const storageKey = '__sync_local_personal_cabinets';
     const normalize = value => String(value ?? '').trim();
     async function hash(password, salt) {
         const bytes = new TextEncoder().encode(salt + ':' + password);
