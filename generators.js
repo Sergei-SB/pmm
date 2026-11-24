@@ -310,6 +310,25 @@ function printGeneratorsTable() {
     setTimeout(() => { printWindow.print(); printWindow.close(); }, 250);
 }
 
+function generatorOrderActUrl(value) {
+    const candidate = String(value ?? '').match(/https?:\/\/[^\s<>"']+|\bwww\.[^\s<>"']+/i)?.[0];
+    if (!candidate) return '';
+    try {
+        const url = new URL(/^www\./i.test(candidate) ? 'https://' + candidate : candidate);
+        return ['http:', 'https:'].includes(url.protocol) ? url.href : '';
+    } catch {
+        return '';
+    }
+}
+
+function updateGeneratorOrderActLink(input) {
+    const link = input.nextElementSibling;
+    const url = generatorOrderActUrl(input.value);
+    if (url) link.href = url;
+    else link.removeAttribute('href');
+    link.hidden = !url;
+}
+
 function getGeneratorOrderAct(model, orderActsByModel) {
     const values = orderActsByModel.get(String(model ?? '').trim().toLowerCase());
     return values?.size === 1 ? values.values().next().value : '';
@@ -529,7 +548,7 @@ function renderGeneratorsView() {
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.serialNumber || ''}" oninput="updateGeneratorProp(${item.id}, 'serialNumber', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
             <td title="${firstRefuels.has(String(item.id)) ? 'Введено в експлуатацію (перша заправка): ' + firstRefuels.get(String(item.id)).split('-').reverse().join('.') : 'У звітах немає дати першої заправки'}">${escapeHtml(generatorHoursText(item, hoursTotals))}</td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.note || ''}" oninput="updateGeneratorProp(${item.id}, 'note', this.value); if(/знищ/ui.test(this.value)) { renderGeneratorsView(); }" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" aria-label="Наказ/ Акт" value="${(String(item.orderAct ?? '').trim() || getGeneratorOrderAct(item.model, orderActsByModel)).replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')}" oninput="updateGeneratorProp(${item.id}, 'orderAct', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
+            <td style="padding: 3px 4px;"><div style="display: flex; align-items: center; gap: 4px;"><input type="text" class="table-cell-input" aria-label="Наказ/ Акт" value="${(String(item.orderAct ?? '').trim() || getGeneratorOrderAct(item.model, orderActsByModel)).replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')}" oninput="updateGeneratorProp(${item.id}, 'orderAct', this.value); updateGeneratorOrderActLink(this)" style="flex: 1; min-width: 0; box-sizing: border-box; padding: 3px;"><a href="${generatorOrderActUrl(String(item.orderAct ?? '').trim() || getGeneratorOrderAct(item.model, orderActsByModel)).replaceAll('&', '&amp;').replaceAll('"', '&quot;')}" target="_blank" rel="noopener noreferrer" title="Відкрити посилання" aria-label="Відкрити посилання" style="padding: 0 3px;"${generatorOrderActUrl(String(item.orderAct ?? '').trim() || getGeneratorOrderAct(item.model, orderActsByModel)) ? '' : ' hidden'}>↗</a></div></td>
             <td style="text-align: center; padding: 3px 4px;"><button class="delete-row-btn" style="padding: 2px 6px; font-size: 10px;" onclick="deleteGeneratorRow(${item.id})">Видалити</button></td>
         `;
         tbody.appendChild(tr);
@@ -577,7 +596,10 @@ function updateGeneratorProp(id, prop, val) {
                     updateEquipmentFuelLimitCells(duplicate, 'updateGeneratorProp');
                 }
                 const cell = document.querySelector?.(`#generators-tbody input[oninput="updateGeneratorProp(${Number(duplicate.id)}, '${prop}', this.value)"]`);
-                if (cell) cell.value = val;
+                if (cell) {
+                    cell.value = val;
+                    if (prop === 'orderAct') updateGeneratorOrderActLink(cell);
+                }
             }
         }
         saveGeneratorsList(list);
