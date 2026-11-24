@@ -25,6 +25,7 @@ import { createServer as createViteServer } from 'vite';
 import { archiveSnapshot, writeSnapshotWithBackup, registryChangeBlocked } from './storage_backups.ts';
 import { configuredGitHubStorage } from './github_storage.ts';
 import { protectRouteRows } from './route_locks.ts';
+import { installCabinetAuth, type CabinetAccount } from './cabinet_auth.ts';
 import { installRolePasswordRoute } from './role_passwords.ts';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -56,6 +57,7 @@ interface FileRecord {
 }
 
 interface Store {
+  cabinetAccounts: CabinetAccount[];
   schemaVersion: number;
   revision: number;
   changedAt: string;
@@ -241,6 +243,7 @@ function errorMessage(err: unknown): string {
 // --- Сховище --------------------------------------------------------------
 function emptyStore(): Store {
   return {
+    cabinetAccounts: [],
     schemaVersion: 2,
     revision: 0,
     changedAt: new Date().toISOString(),
@@ -263,6 +266,11 @@ function ensureDataDir(): void {
 
 function normalizeStore(parsed: JsonObject): Store {
   const store = emptyStore();
+  if (Array.isArray(parsed.cabinetAccounts)) {
+    store.cabinetAccounts = parsed.cabinetAccounts.filter((entry): entry is CabinetAccount =>
+      entry && typeof entry.id === 'string' && typeof entry.login === 'string' &&
+      /^[a-f0-9]{32}$/.test(entry.salt) && /^[a-f0-9]{64}$/.test(entry.hash));
+  }
   store.revision = asNumber(parsed.revision);
   store.changedAt = asString(parsed.changedAt, store.changedAt);
   store.filesVersion = asNumber(parsed.filesVersion);
@@ -582,6 +590,13 @@ async function startServer(): Promise<void> {
   });
 
   app.use(express.json({ limit: MAX_BODY }));
+  installCabinetAuth(app, async () => {
+    await mutationQueue.catch(() => {});
+    return store.cabinetAccounts;
+  }, change => durableChange(() => {
+    store.cabinetAccounts = change(store.cabinetAccounts);
+    return store.cabinetAccounts;
+  }));
   installRolePasswordRoute(app, (id, role) => {
     const record = store.keys.dev_managed_users;
     if (!record || record.deleted) return false;
@@ -731,6 +746,7 @@ async function startServer(): Promise<void> {
     }
   });
   // Backup archives must not be served by Vite's development file handler.
+  app.use('/data/shared_site_storage.json', (_req, res) => { res.sendStatus(404); });
   app.use('/data/backups', (_req, res) => { res.sendStatus(404); });
 
   // 7) Файли документів (IndexedDB -> сервер)
