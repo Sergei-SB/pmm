@@ -240,6 +240,10 @@
             marker.setAttribute('aria-label', 'Права · ' + entry.name);
             marker.style.left = Math.max(0, Math.min(rect.left + rect.width / 2 - 9, innerWidth - 18)) + 'px';
             marker.style.top = Math.max(0, rect.top - 15) + 'px';
+            if (entry.element.matches('tr[data-permission-key^="card_spec_"]')) {
+                marker.style.left = Math.max(0, Math.min(rect.left + 4, innerWidth - 18)) + 'px';
+                marker.style.top = Math.max(0, rect.top + (rect.height - 18) / 2) + 'px';
+            }
             marker.onclick = () => openMenu(entry, marker);
             fragment.append(marker);
         }
