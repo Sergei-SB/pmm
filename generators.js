@@ -279,7 +279,7 @@ function printGeneratorsTable() {
                 th, td { border: 1px solid #333; padding: 4px 6px; text-align: center; }
                 th { background-color: #2e7d32 !important; color: white !important; font-size: 11px; }
                 td:nth-child(2) { text-align: left; }
-                @media print { @page { size: landscape; margin: 10mm; margin-bottom: 4mm; @bottom-left { content: "ПММ: Стропа & Компанія"; font: 8pt Arial, sans-serif; } @bottom-right { content: counter(page) "/" counter(pages); font: 8pt Arial, sans-serif; } } }
+                @media print { @page { size: landscape; margin: 10mm; } }
             </style>
         </head>
         <body>
@@ -462,6 +462,7 @@ function renderGeneratorsView() {
                             ${efBtn('note', 'Примітка')}
                         </div>
                     </th>
+                    <th style="padding: 6px 4px; min-width: 110px;">Наказ/ Акт</th>
                     <th style="padding: 6px 4px; width: 60px;">Дія</th>
                 </tr>
             </thead>
@@ -515,6 +516,7 @@ function renderGeneratorsView() {
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.serialNumber || ''}" oninput="updateGeneratorProp(${item.id}, 'serialNumber', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
             <td title="${firstRefuels.has(String(item.id)) ? 'Введено в експлуатацію (перша заправка): ' + firstRefuels.get(String(item.id)).split('-').reverse().join('.') : 'У звітах немає дати першої заправки'}">${escapeHtml(generatorHoursText(item, hoursTotals))}</td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.note || ''}" oninput="updateGeneratorProp(${item.id}, 'note', this.value); if(/знищ/ui.test(this.value)) { renderGeneratorsView(); }" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" aria-label="Наказ/ Акт" value="${String(item.orderAct ?? '').replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')}" oninput="updateGeneratorProp(${item.id}, 'orderAct', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
             <td style="text-align: center; padding: 3px 4px;"><button class="delete-row-btn" style="padding: 2px 6px; font-size: 10px;" onclick="deleteGeneratorRow(${item.id})">Видалити</button></td>
         `;
         tbody.appendChild(tr);
@@ -544,6 +546,11 @@ function updateGeneratorProp(id, prop, val) {
             ? list.filter(other => other !== item && String(other.model ?? '').trim().toLowerCase() === model)
             : [];
         if (prop === 'model') {
+            if (model && !String(item.orderAct ?? '').trim()) {
+                const values = new Set(matches
+                    .map(other => String(other.orderAct ?? '').trim()).filter(Boolean));
+                if (values.size === 1) item.orderAct = values.values().next().value;
+            }
             for (const field of sharedFields) {
                 if (String(item[field] ?? '').trim()) continue;
                 const values = new Set(matches.map(other => String(other[field] ?? '').trim()).filter(Boolean));

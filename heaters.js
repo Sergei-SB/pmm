@@ -39,7 +39,7 @@ function printHeatersTable() {
                 th, td { border: 1px solid #333; padding: 4px 6px; text-align: center; }
                 th { background-color: #2e7d32 !important; color: white !important; font-size: 11px; }
                 td:nth-child(2) { text-align: left; }
-                @media print { @page { size: landscape; margin: 10mm; margin-bottom: 4mm; @bottom-left { content: "ПММ: Стропа & Компанія"; font: 8pt Arial, sans-serif; } @bottom-right { content: counter(page) "/" counter(pages); font: 8pt Arial, sans-serif; } } }
+                @media print { @page { size: landscape; margin: 10mm; } }
             </style>
         </head>
         <body>
@@ -219,6 +219,7 @@ function renderHeatersView() {
                             ${efBtn('note', 'Примітка')}
                         </div>
                     </th>
+                    <th style="padding: 6px 4px; min-width: 110px;">Наказ/ Акт</th>
                     <th style="padding: 6px 4px; width: 60px;">Дія</th>
                 </tr>
             </thead>
@@ -271,6 +272,7 @@ function renderHeatersView() {
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${item.locationSubdivision || ''}" oninput="updateHeatersProp(${item.id}, 'locationSubdivision', this.value)"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.serialNumber || ''}" oninput="updateHeatersProp(${item.id}, 'serialNumber', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.note || ''}" oninput="updateHeatersProp(${item.id}, 'note', this.value); if(/знищ/ui.test(this.value)) { renderHeatersView(); }" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" aria-label="Наказ/ Акт" value="${String(item.orderAct ?? '').replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')}" oninput="updateHeatersProp(${item.id}, 'orderAct', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
             <td style="text-align: center; padding: 3px 4px;"><button class="delete-row-btn" style="padding: 2px 6px; font-size: 10px;" onclick="deleteHeatersRow(${item.id})">Видалити</button></td>
         `;
         tbody.appendChild(tr);
@@ -294,6 +296,12 @@ function updateHeatersProp(id, prop, val) {
         item[prop] = val;
         if (prop === 'locationSubdivision') item.subdivision = val;
         if (prop === 'model') {
+            const model = val.trim().toLowerCase();
+            if (model && !String(item.orderAct ?? '').trim()) {
+                const values = new Set(list.filter(other => other !== item && String(other.model ?? '').trim().toLowerCase() === model)
+                    .map(other => String(other.orderAct ?? '').trim()).filter(Boolean));
+                if (values.size === 1) item.orderAct = values.values().next().value;
+            }
             const foundRef = defaultHeatersData.find(ref => ref.model.toLowerCase().trim() === val.toLowerCase().trim());
             if (foundRef) {
                 item.kw = foundRef.kw;

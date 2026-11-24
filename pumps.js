@@ -44,7 +44,7 @@ function printPumpsTable() {
                 th, td { border: 1px solid #333; padding: 4px 6px; text-align: center; }
                 th { background-color: #2e7d32 !important; color: white !important; font-size: 11px; }
                 td:nth-child(2) { text-align: left; }
-                @media print { @page { size: landscape; margin: 10mm; margin-bottom: 4mm; @bottom-left { content: "ПММ: Стропа & Компанія"; font: 8pt Arial, sans-serif; } @bottom-right { content: counter(page) "/" counter(pages); font: 8pt Arial, sans-serif; } } }
+                @media print { @page { size: landscape; margin: 10mm; } }
             </style>
         </head>
         <body>
@@ -224,6 +224,7 @@ function renderPumpsView() {
                             ${efBtn('note', 'Примітка')}
                         </div>
                     </th>
+                    <th style="padding: 6px 4px; min-width: 110px;">Наказ/ Акт</th>
                     <th style="padding: 6px 4px; width: 60px;">Дія</th>
                 </tr>
             </thead>
@@ -276,12 +277,13 @@ function renderPumpsView() {
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" style="text-align:center; width: 100%; box-sizing: border-box; padding: 3px;" value="${escapePumpValue(item.locationSubdivision)}" oninput="updatePumpsProp(${item.id}, 'locationSubdivision', this.value)"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${escapePumpValue(item.serialNumber)}" oninput="updatePumpsProp(${item.id}, 'serialNumber', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${escapePumpValue(item.note)}" oninput="updatePumpsProp(${item.id}, 'note', this.value); if(/знищ/ui.test(this.value)) { renderPumpsView(); }" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" aria-label="Наказ/ Акт" value="${String(item.orderAct ?? '').replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')}" oninput="updatePumpsProp(${item.id}, 'orderAct', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
             <td style="text-align: center; padding: 3px 4px;"><button class="delete-row-btn" style="padding: 2px 6px; font-size: 10px;" onclick="deletePumpsRow(${item.id})">Видалити</button></td>
         `;
         if (!canManagePumps()) tr.querySelectorAll('input, button').forEach(el => {el.disabled = true;});
         tbody.appendChild(tr);
     });
-    if (!filtered.length) tbody.innerHTML = '<tr><td colspan="16" style="padding:24px;text-align:center;color:#64748b">Помп за цими умовами немає. Для нової позиції натисніть «+ Додати позицію».</td></tr>';
+    if (!filtered.length) tbody.innerHTML = '<tr><td colspan="17" style="padding:24px;text-align:center;color:#64748b">Помп за цими умовами немає. Для нової позиції натисніть «+ Додати позицію».</td></tr>';
 }
 
 function updatePumpFilter(field, val) {
@@ -302,6 +304,12 @@ function updatePumpsProp(id, prop, val, rerender = true) {
         item[prop] = val;
         if (prop === 'locationSubdivision') item.subdivision = val;
         if (prop === 'model') {
+            const model = val.trim().toLowerCase();
+            if (rerender && model && !String(item.orderAct ?? '').trim()) {
+                const values = new Set(list.filter(other => other !== item && String(other.model ?? '').trim().toLowerCase() === model)
+                    .map(other => String(other.orderAct ?? '').trim()).filter(Boolean));
+                if (values.size === 1) item.orderAct = values.values().next().value;
+            }
             const foundRef = defaultPumpsData.find(ref => ref.model.toLowerCase().trim() === val.toLowerCase().trim());
             if (foundRef) {
                 item.kw = foundRef.kw;
