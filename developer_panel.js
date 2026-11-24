@@ -2374,6 +2374,17 @@ window.renderDeveloperPanel = function() {
                 <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px;">
                     <h3 style="margin: 0 0 14px 0; color: #2c3e50; font-size: 16px;">🔑 Системні паролі кабінетів</h3>
                     <p>Паролі ролей і персональні PIN налаштовуються на сервері Render.</p>
+                    <form id="personal-cabinet-settings" onsubmit="savePersonalCabinetSettings(event)" style="display:grid;gap:10px;margin-top:16px;max-width:360px">
+                        <strong>Особисті кабінети</strong>
+                        <button type="button" class="action-btn" onclick="loadPersonalCabinetSettings(this.form)">Завантажити кабінети</button>
+                        <fieldset hidden disabled style="border:0;padding:0;margin:0">
+                            <label style="display:block;margin-bottom:8px">Кабінет <select name="id" onchange="selectPersonalCabinetSettings(this.form)"></select></label>
+                            <label style="display:block;margin-bottom:8px">Логін <input name="login" maxlength="64" required></label>
+                            <label style="display:block;margin-bottom:8px">Новий пароль <input name="password" type="password" maxlength="256" autocomplete="new-password"></label>
+                            <button type="submit" class="action-btn">Зберегти кабінет</button>
+                        </fieldset>
+                        <div role="status"></div>
+                    </form>
                 </div>
 
                 <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px;">

@@ -562,6 +562,7 @@ function saveCurrentReportSilently() {
 }
 
 window.getCurrentAppRole = function() {
+    if (window.isPersonalCabinetActive?.()) return 'user';
     let r = '';
     try {
         if (typeof window.currentRole !== 'undefined' && window.currentRole) r = window.currentRole;
@@ -731,7 +732,7 @@ function printTenDaysReport() {
                 th { background-color: #2e7d32 !important; color: white !important; }
                 input, select { border: none; background: transparent; text-align: center; font-size: 9px; width: 100%; }
                 @media print {
-                    @page { size: landscape; margin: 5mm; margin-bottom: 4mm; @bottom-left { content: "ПММ: Стропа & Компанія"; font: 8pt Arial, sans-serif; } @bottom-right { content: counter(page) "/" counter(pages); font: 8pt Arial, sans-serif; } }
+                    @page { size: landscape; margin: 5mm; }
                     body { -webkit-print-color-adjust: exact; }
                 }
             </style>
@@ -846,13 +847,6 @@ function openReportCarCard(carId, period) {
     select.value = period;
     // This is navigation. Loading the target period must not save the previous one.
     loadCarDataForActivePeriod();
-}
-
-function readTenDayRouteCard(period, carId) {
-    if (!period) return null;
-    try {
-        return JSON.parse(localStorage.getItem(`isolated_car_routes_${period}_${carId}`) || 'null')?.topFields;
-    } catch (_) { return null; }
 }
 
 function getTenDayVehicleValues(car, saved, previousReport, previousCard, card) {
@@ -1003,8 +997,15 @@ function renderReportTable() {
         }
         tr.setAttribute('data-fuel-type', (car.fuelType || '').toUpperCase());
 
+        function cardTop(period) {
+            if (!period) return null;
+            try {
+                return JSON.parse(localStorage.getItem(`isolated_car_routes_${period}_${car.id}`) || 'null')?.topFields;
+            } catch (_) { return null; }
+        }
+
         carData = getTenDayVehicleValues(car, carData, prevPeriodSavedData[car.id],
-            readTenDayRouteCard(prevPeriodKey, car.id), readTenDayRouteCard(periodStr, car.id));
+            cardTop(prevPeriodKey), cardTop(periodStr));
         const trailerReading = trailerMileage.get(String(car.id));
         if (trailerReading) {
             carData.prevOdo = trailerReading.prevOdo;
@@ -1680,7 +1681,6 @@ function printSubdivisionReport() {
         printStyleEl.id = 'subdivision-print-style';
         printStyleEl.innerHTML = `
             @media print {
-                @page { margin-bottom: 4mm; @bottom-left { content: "ПММ: Стропа & Компанія"; font: 8pt Arial, sans-serif; } @bottom-right { content: counter(page) "/" counter(pages); font: 8pt Arial, sans-serif; } }
                 body * {
                     visibility: hidden !important;
                 }
@@ -1749,12 +1749,6 @@ function calculateEquipmentSubdivisionTotals(periods, subdivision, assignedOnly 
     return totals;
 }
 
-function getSubdivisionVehicleReceipt(car, period, saved) {
-    const card = readTenDayRouteCard(period, car.id);
-    if (!saved && !card) return null;
-    return { ...saved, ...getTenDayVehicleValues(car, saved, null, null, card) };
-}
-
 function calculateSubStatsDetailed(subName, periodList) {
     let carsStat = { dpFuel: 0, abFuel: 0, adblue: 0, oilMap: {}, washerMap: {} };
     let eqStat = calculateEquipmentSubdivisionTotals(periodList, typeof subName === 'undefined' ? null : subName);
@@ -1777,7 +1771,21 @@ function calculateSubStatsDetailed(subName, periodList) {
         } catch(e) {}
 
         subCars.forEach(car => {
-            const carRec = getSubdivisionVehicleReceipt(car, p, repData?.[car.id]);
+            let carRec = repData[car.id];
+            if (!carRec) {
+                try {
+                    const cardRaw = localStorage.getItem(`isolated_car_routes_${p}_${car.id}`);
+                    if (cardRaw) {
+                        const cardObj = JSON.parse(cardRaw);
+                        if (cardObj && cardObj.topFields) {
+                            carRec = {
+                                refuelFuel: cardObj.topFields.fuelReceived || '',
+                                refuelAdBlue: cardObj.topFields.adblueReceived || ''
+                            };
+                        }
+                    }
+                } catch (e) {}
+            }
 
             if (carRec) {
                 const refFuel = evaluateExpression(carRec.refuelFuel);
@@ -1841,7 +1849,21 @@ function calculateNoSubStatsDetailed(periodList) {
         } catch(e) {}
 
         subCars.forEach(car => {
-            const carRec = getSubdivisionVehicleReceipt(car, p, repData?.[car.id]);
+            let carRec = repData[car.id];
+            if (!carRec) {
+                try {
+                    const cardRaw = localStorage.getItem(`isolated_car_routes_${p}_${car.id}`);
+                    if (cardRaw) {
+                        const cardObj = JSON.parse(cardRaw);
+                        if (cardObj && cardObj.topFields) {
+                            carRec = {
+                                refuelFuel: cardObj.topFields.fuelReceived || '',
+                                refuelAdBlue: cardObj.topFields.adblueReceived || ''
+                            };
+                        }
+                    }
+                } catch (e) {}
+            }
 
             if (carRec) {
                 const refFuel = evaluateExpression(carRec.refuelFuel);
@@ -1905,7 +1927,21 @@ function calculatePolkStatsDetailed(periodList) {
         } catch(e) {}
 
         activePolkCars.forEach(car => {
-            const carRec = getSubdivisionVehicleReceipt(car, p, repData?.[car.id]);
+            let carRec = repData[car.id];
+            if (!carRec) {
+                try {
+                    const cardRaw = localStorage.getItem(`isolated_car_routes_${p}_${car.id}`);
+                    if (cardRaw) {
+                        const cardObj = JSON.parse(cardRaw);
+                        if (cardObj && cardObj.topFields) {
+                            carRec = {
+                                refuelFuel: cardObj.topFields.fuelReceived || '',
+                                refuelAdBlue: cardObj.topFields.adblueReceived || ''
+                            };
+                        }
+                    }
+                } catch (e) {}
+            }
 
             if (carRec) {
                 const refFuel = evaluateExpression(carRec.refuelFuel);

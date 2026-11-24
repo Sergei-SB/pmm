@@ -197,6 +197,21 @@
 <body>
 
     <!-- ВЕРХНЯ НАВІГАЦІЯ -->
+    <style>
+        #personal-cabinet-nav { display: none; }
+        .personal-cabinet-active > .top-nav:not(#personal-cabinet-nav) { display: none !important; }
+        .personal-cabinet-active #personal-cabinet-nav {
+            display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+            background: #2c3e50; padding: 10px 20px; color: white;
+        }
+        #personal-cabinet-name { margin-right: 6px; }
+    </style>
+    <header class="top-nav" id="personal-cabinet-nav">
+        <strong id="personal-cabinet-name"></strong>
+        <button type="button" class="nav-btn" onclick="switchView('generators')">Облік обладнання</button>
+        <button type="button" class="nav-btn" onclick="switchView('aggregates-calc')">Розрахунок агрегатів</button>
+        <button type="button" class="nav-btn" onclick="exitPersonalCabinet()" style="margin-left:auto">Вийти</button>
+    </header>
     <header class="top-nav" style="background: #2c3e50; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
         <div class="nav-left" style="display: flex; gap: 8px; flex-wrap: wrap;">
             <button class="nav-btn active" id="nav-btn-base" onclick="switchView('base')">База (Реєстр)</button>
@@ -242,7 +257,7 @@
                 
                 <!-- ПРАВА ЧАСТИНА: ПАНЕЛЬ ВИБОРУ РОЛЕЙ ТА ПОЗИВНИЙ -->
                 <div style="display: flex; align-items: center; justify-content: flex-end; margin-left: auto; gap: 8px; flex-wrap: wrap;">
-                    <div id="user-callsign-badge-container" data-permission-key="user_callsign" data-permission-name="Позивний: вказати" data-permission-group="base" onclick="promptSetUserCallsign()" title="Натисніть щоб вказати або змінити свій позивний / ПІБ" style="display: flex; align-items: center; gap: 6px; background: #2c3e50; padding: 4px 10px; border-radius: 4px; border: 1px solid #34495e; color: #ecf0f1; font-size: 11px; font-weight: bold; cursor: pointer; user-select: none;">
+                    <div id="user-callsign-badge-container" data-permission-key="user_callsign" data-permission-name="Позивний: вказати" data-permission-group="base" onclick="openPersonalCabinetLogin()" title="Увійти до особистого кабінету" style="display: flex; align-items: center; gap: 6px; background: #2c3e50; padding: 4px 10px; border-radius: 4px; border: 1px solid #34495e; color: #ecf0f1; font-size: 11px; font-weight: bold; cursor: pointer; user-select: none;">
                         <span style="color: #bdc3c7;">👤 Позивний:</span>
                         <strong id="user-callsign-display" style="color: #38bdf8;">Вказати ✎</strong>
                     </div>
@@ -863,6 +878,7 @@
     <script src="documents.js?v=20261113-page"></script>
     <script src="doc_margins.js"></script>
     <script src="presence.js"></script>
+    <script src="personal_cabinet.js?v=20261124"></script>
     <script src="automatic_backup.js"></script>
     <script src="document_sync.js"></script>
     <script src="sync_conflicts.js?v=20261108-registry-additions"></script>

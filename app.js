@@ -173,7 +173,7 @@ function printCarCardReport() {
                 .calc-row { display: flex; justify-content: space-between; margin-bottom: 1px; }
                 .summary-box { margin-top: 4px; font-weight: bold; font-size: 9px; border-top: 1px solid #333; padding-top: 3px; }
                 @media print {
-                    @page { size: landscape; margin: 5mm; margin-bottom: 4mm; @bottom-left { content: "ПММ: Стропа & Компанія"; font: 8pt Arial, sans-serif; } @bottom-right { content: counter(page) "/" counter(pages); font: 8pt Arial, sans-serif; } }
+                    @page { size: landscape; margin: 5mm; }
                     body { -webkit-print-color-adjust: exact; }
                 }
             </style>
@@ -264,8 +264,7 @@ function loadCarsModifications() {
                 'vehicleType', 'category', 'subdivision', 'consumption',
                 'fuelType', 'year', 'transmission', 'tankCapacity', 'drive',
                 'emptyWeight', 'totalWeight', 'gears', 'engineVolume', 'kw',
-                'hasAdBlue', 'isMiles', 'formulas', 'destroyDate', 'destroyTime', 'destroyLocation',
-                'summerTyres', 'winterTyres'
+                'hasAdBlue', 'isMiles', 'formulas', 'destroyDate', 'destroyTime', 'destroyLocation'
             ];
             carsData.forEach(car => {
                 if (mods[car.id]) {
@@ -304,8 +303,6 @@ function saveCarsModificationsToStorage() {
             note: car.note,
             driver: car.driver,
             passportNo: car.passportNo,
-            summerTyres: car.summerTyres,
-            winterTyres: car.winterTyres,
             engineNo: car.engineNo,
             vin: car.vin,
             vehicleType: car.vehicleType,
@@ -369,11 +366,12 @@ function evaluateExpression(val) {
 }
 
 function switchView(viewName) {
+    if (window.personalCabinetAllowsView?.(viewName) === false) return;
     const role = (typeof window.getCurrentAppRole === 'function')
         ? window.getCurrentAppRole()
         : ((typeof window.currentRole !== 'undefined') ? window.currentRole : ((typeof currentRole !== 'undefined') ? currentRole : 'user'));
 
-    if (role !== 'developer') {
+    if (role !== 'developer' && !window.isPersonalCabinetActive?.()) {
         let modKey = viewName;
         if (viewName === 'generators') modKey = 'equipment';
         if (viewName === 'equipment-report-view' || viewName === 'equipment-report') modKey = 'equipment_report';
