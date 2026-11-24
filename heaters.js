@@ -26,7 +26,7 @@ function saveHeatersList(list) { localStorage.setItem('heaters_custom_data', JSO
 
 function printHeatersTable() {
     const printWindow = window.open('', '_blank');
-    let list = getHeatersList().filter(item => !/знищ/ui.test(String(item.note || item.comment || '')));
+    let list = getHeatersList().filter(item => window.isEquipmentVisibleInCurrentInventory?.(item) !== false).filter(item => !/знищ/ui.test(String(item.note || item.comment || '')));
     let html = `
         <!DOCTYPE html>
         <html>
@@ -234,7 +234,7 @@ function renderHeatersView() {
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    let list = getHeatersList();
+    let list = getHeatersList().filter(item => window.isEquipmentVisibleInCurrentInventory?.(item) !== false);
     if (typeof applyCategoryExcelSort === 'function') {
         list = applyCategoryExcelSort(list, 'heaters');
     }
@@ -273,7 +273,7 @@ function renderHeatersView() {
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.serialNumber || ''}" oninput="updateHeatersProp(${item.id}, 'serialNumber', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.note || ''}" oninput="updateHeatersProp(${item.id}, 'note', this.value); if(/знищ/ui.test(this.value)) { renderHeatersView(); }" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" aria-label="Наказ/ Акт" value="${String(item.orderAct ?? '').replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')}" oninput="updateHeatersProp(${item.id}, 'orderAct', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
-            <td style="text-align: center; padding: 3px 4px;"><button class="delete-row-btn" style="padding: 2px 6px; font-size: 10px;" onclick="deleteHeatersRow(${item.id})">Видалити</button></td>
+            <td style="text-align: center; padding: 3px 4px;"><button class="delete-row-btn" style="padding: 2px 6px; font-size: 10px;" onclick="deleteHeatersRow(${item.id})">Видалити</button>${window.kesEquipmentPublishButton?.('heaters', item) || ''}</td>
         `;
         tbody.appendChild(tr);
     });
@@ -326,7 +326,7 @@ function updateHeatersProp(id, prop, val) {
 function addHeatersRow() {
     let list = getHeatersList();
     const newId = list.length > 0 ? Math.max(...list.map(i => i.id)) + 1 : 1;
-    list.push({ id: newId, model: "", kw: "", fuelType: "", consumption: "", max5Days: "", max10Days: "", max30Days: "", motoHoursDay: "", oilNorm10Days: "", subdivision: window.isKesCabinetActive?.() ? "КЕС" : "", responsiblePerson: "", locationSubdivision: "", serialNumber: "", note: "" });
+    list.push({ id: newId, model: "", ...(window.isKesCabinetActive?.() ? {kesOnly: true} : {}), kw: "", fuelType: "", consumption: "", max5Days: "", max10Days: "", max30Days: "", motoHoursDay: "", oilNorm10Days: "", subdivision: window.isKesCabinetActive?.() ? "КЕС" : "", responsiblePerson: "", locationSubdivision: "", serialNumber: "", note: "" });
     saveHeatersList(list);
     renderHeatersView();
 }
@@ -334,7 +334,13 @@ function addHeatersRow() {
 function deleteHeatersRow(id) {
     if (!confirm("Ви впевнені, що хочете видалити цей запис?")) return;
     let list = getHeatersList();
-    list = list.filter(i => Number(i.id) !== Number(id));
+    if (window.isKesCabinetActive?.()) {
+        const item = list.find(row => Number(row.id) === Number(id));
+        if (!item) return;
+        item.kesHidden = true;
+    } else {
+        list = list.filter(i => Number(i.id) !== Number(id));
+    }
     saveHeatersList(list);
     renderHeatersView();
 }

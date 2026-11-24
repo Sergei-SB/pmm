@@ -32,7 +32,7 @@ function saveWebastoList(list) { localStorage.setItem('webasto_custom_data', JSO
 
 function printWebastoTable() {
     const printWindow = window.open('', '_blank');
-    let list = getWebastoList().filter(item => !/знищ/ui.test(String(item.note || item.comment || '')));
+    let list = getWebastoList().filter(item => window.isEquipmentVisibleInCurrentInventory?.(item) !== false).filter(item => !/знищ/ui.test(String(item.note || item.comment || '')));
     let html = `
         <!DOCTYPE html>
         <html>
@@ -240,7 +240,7 @@ function renderWebastoView() {
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    let list = getWebastoList();
+    let list = getWebastoList().filter(item => window.isEquipmentVisibleInCurrentInventory?.(item) !== false);
     if (typeof applyCategoryExcelSort === 'function') {
         list = applyCategoryExcelSort(list, 'webasto');
     }
@@ -279,7 +279,7 @@ function renderWebastoView() {
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.serialNumber || ''}" oninput="updateWebastoProp(${item.id}, 'serialNumber', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.note || ''}" oninput="updateWebastoProp(${item.id}, 'note', this.value); if(/знищ/ui.test(this.value)) { renderWebastoView(); }" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" aria-label="Наказ/ Акт" value="${String(item.orderAct ?? '').replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')}" oninput="updateWebastoProp(${item.id}, 'orderAct', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
-            <td style="text-align: center; padding: 3px 4px;"><button class="delete-row-btn" style="padding: 2px 6px; font-size: 10px;" onclick="deleteWebastoRow(${item.id})">Видалити</button></td>
+            <td style="text-align: center; padding: 3px 4px;"><button class="delete-row-btn" style="padding: 2px 6px; font-size: 10px;" onclick="deleteWebastoRow(${item.id})">Видалити</button>${window.kesEquipmentPublishButton?.('webasto', item) || ''}</td>
         `;
         tbody.appendChild(tr);
     });
@@ -332,7 +332,7 @@ function updateWebastoProp(id, prop, val) {
 function addWebastoRow() {
     let list = getWebastoList();
     const newId = list.length > 0 ? Math.max(...list.map(i => i.id)) + 1 : 1;
-    list.push({ id: newId, model: "", kw: "", fuelType: "", consumption: "", max5Days: "", max10Days: "", max30Days: "", motoHoursDay: "", oilNorm10Days: "", subdivision: window.isKesCabinetActive?.() ? "КЕС" : "", responsiblePerson: "", locationSubdivision: "", serialNumber: "", note: "" });
+    list.push({ id: newId, model: "", ...(window.isKesCabinetActive?.() ? {kesOnly: true} : {}), kw: "", fuelType: "", consumption: "", max5Days: "", max10Days: "", max30Days: "", motoHoursDay: "", oilNorm10Days: "", subdivision: window.isKesCabinetActive?.() ? "КЕС" : "", responsiblePerson: "", locationSubdivision: "", serialNumber: "", note: "" });
     saveWebastoList(list);
     renderWebastoView();
 }
@@ -340,7 +340,13 @@ function addWebastoRow() {
 function deleteWebastoRow(id) {
     if (!confirm("Ви впевнені, що хочете видалити цей запис?")) return;
     let list = getWebastoList();
-    list = list.filter(i => Number(i.id) !== Number(id));
+    if (window.isKesCabinetActive?.()) {
+        const item = list.find(row => Number(row.id) === Number(id));
+        if (!item) return;
+        item.kesHidden = true;
+    } else {
+        list = list.filter(i => Number(i.id) !== Number(id));
+    }
     saveWebastoList(list);
     renderWebastoView();
 }

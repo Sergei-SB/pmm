@@ -31,7 +31,7 @@ function savePumpsList(list) { localStorage.setItem('pumps_custom_data', JSON.st
 
 function printPumpsTable() {
     const printWindow = window.open('', '_blank');
-    let list = getPumpsList().filter(item => !/знищ/ui.test(String(item.note || item.comment || '')));
+    let list = getPumpsList().filter(item => window.isEquipmentVisibleInCurrentInventory?.(item) !== false).filter(item => !/знищ/ui.test(String(item.note || item.comment || '')));
     let html = `
         <!DOCTYPE html>
         <html>
@@ -239,7 +239,7 @@ function renderPumpsView() {
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    let list = getPumpsList();
+    let list = getPumpsList().filter(item => window.isEquipmentVisibleInCurrentInventory?.(item) !== false);
     if (typeof applyCategoryExcelSort === 'function') {
         list = applyCategoryExcelSort(list, 'pumps');
     }
@@ -278,11 +278,12 @@ function renderPumpsView() {
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${escapePumpValue(item.serialNumber)}" oninput="updatePumpsProp(${item.id}, 'serialNumber', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${escapePumpValue(item.note)}" oninput="updatePumpsProp(${item.id}, 'note', this.value); if(/знищ/ui.test(this.value)) { renderPumpsView(); }" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" aria-label="Наказ/ Акт" value="${String(item.orderAct ?? '').replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')}" oninput="updatePumpsProp(${item.id}, 'orderAct', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
-            <td style="text-align: center; padding: 3px 4px;"><button class="delete-row-btn" style="padding: 2px 6px; font-size: 10px;" onclick="deletePumpsRow(${item.id})">Видалити</button></td>
+            <td style="text-align: center; padding: 3px 4px;"><button class="delete-row-btn" style="padding: 2px 6px; font-size: 10px;" onclick="deletePumpsRow(${item.id})">Видалити</button>${window.kesEquipmentPublishButton?.('pumps', item) || ''}</td>
         `;
         if (!canManagePumps()) tr.querySelectorAll('input, button').forEach(el => {
-            el.disabled = !(window.isKesCabinetActive?.() && item.subdivision === 'КЕС' &&
-                el.getAttribute('list') === 'pumps-model-datalist');
+            el.disabled = !(window.isKesCabinetActive?.() && (
+                (item.subdivision === 'КЕС' && el.getAttribute('list') === 'pumps-model-datalist') ||
+                el.classList.contains('delete-row-btn') || el.matches('[onclick^=publishKesEquipment]')));
         });
         tbody.appendChild(tr);
     });
@@ -338,16 +339,22 @@ function addPumpsRow() {
     if (!window.isKesCabinetActive?.() && !canManagePumps('eq_add_item')) return;
     let list = getPumpsList();
     const newId = list.length > 0 ? Math.max(...list.map(i => i.id)) + 1 : 1;
-    list.push({ id: newId, model: "", kw: "", fuelType: "", consumption: "", max5Days: "", max10Days: "", max30Days: "", motoHoursDay: "", oilNorm10Days: "", subdivision: window.isKesCabinetActive?.() ? "КЕС" : "", responsiblePerson: "", locationSubdivision: "", serialNumber: "", note: "" });
+    list.push({ id: newId, model: "", ...(window.isKesCabinetActive?.() ? {kesOnly: true} : {}), kw: "", fuelType: "", consumption: "", max5Days: "", max10Days: "", max30Days: "", motoHoursDay: "", oilNorm10Days: "", subdivision: window.isKesCabinetActive?.() ? "КЕС" : "", responsiblePerson: "", locationSubdivision: "", serialNumber: "", note: "" });
     savePumpsList(list);
     renderPumpsView();
 }
 
 function deletePumpsRow(id) {
-    if (!canManagePumps()) return;
+    if (!window.isKesCabinetActive?.() && !canManagePumps()) return;
     if (!confirm("Ви впевнені, що хочете видалити цей запис?")) return;
     let list = getPumpsList();
-    list = list.filter(i => Number(i.id) !== Number(id));
+    if (window.isKesCabinetActive?.()) {
+        const item = list.find(row => Number(row.id) === Number(id));
+        if (!item) return;
+        item.kesHidden = true;
+    } else {
+        list = list.filter(i => Number(i.id) !== Number(id));
+    }
     savePumpsList(list);
     renderPumpsView();
 }

@@ -266,7 +266,7 @@ function generatorHoursText(item, totals) {
 function printGeneratorsTable() {
     const hoursTotals = generatorHoursTotals();
     const printWindow = window.open('', '_blank');
-    let list = getGeneratorsList().filter(item => !/знищ/ui.test(String(item.note || item.comment || '')));
+    let list = getGeneratorsList().filter(item => window.isEquipmentVisibleInCurrentInventory?.(item) !== false).filter(item => !/знищ/ui.test(String(item.note || item.comment || '')));
     let html = `
         <!DOCTYPE html>
         <html>
@@ -501,7 +501,7 @@ function renderGeneratorsView() {
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    let list = getGeneratorsList();
+    let list = getGeneratorsList().filter(item => window.isEquipmentVisibleInCurrentInventory?.(item) !== false);
     const orderActsByModel = new Map();
     for (const item of list) {
         const model = String(item.model ?? '').trim().toLowerCase();
@@ -549,7 +549,7 @@ function renderGeneratorsView() {
             <td title="${firstRefuels.has(String(item.id)) ? 'Введено в експлуатацію (перша заправка): ' + firstRefuels.get(String(item.id)).split('-').reverse().join('.') : 'У звітах немає дати першої заправки'}">${escapeHtml(generatorHoursText(item, hoursTotals))}</td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.note || ''}" oninput="updateGeneratorProp(${item.id}, 'note', this.value); if(/знищ/ui.test(this.value)) { renderGeneratorsView(); }" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
             <td style="padding: 3px 4px;"><div style="display: flex; align-items: center; gap: 4px;"><input type="text" class="table-cell-input" aria-label="Наказ/ Акт" data-order-act-id="${Number(item.id)}" value="${(String(item.orderAct ?? '').trim() || getGeneratorOrderAct(item.model, orderActsByModel)).replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')}" oninput="updateGeneratorProp(${item.id}, 'orderAct', this.value); updateGeneratorOrderActLink(this)" style="flex: 1; min-width: 0; box-sizing: border-box; padding: 3px;"><a href="${generatorOrderActUrl(String(item.orderAct ?? '').trim() || getGeneratorOrderAct(item.model, orderActsByModel)).replaceAll('&', '&amp;').replaceAll('"', '&quot;')}" target="_blank" rel="noopener noreferrer" title="Відкрити посилання" aria-label="Відкрити посилання" style="padding: 0 3px;"${generatorOrderActUrl(String(item.orderAct ?? '').trim() || getGeneratorOrderAct(item.model, orderActsByModel)) ? '' : ' hidden'}>↗</a></div></td>
-            <td style="text-align: center; padding: 3px 4px;"><button class="delete-row-btn" style="padding: 2px 6px; font-size: 10px;" onclick="deleteGeneratorRow(${item.id})">Видалити</button></td>
+            <td style="text-align: center; padding: 3px 4px;"><button class="delete-row-btn" style="padding: 2px 6px; font-size: 10px;" onclick="deleteGeneratorRow(${item.id})">Видалити</button>${window.kesEquipmentPublishButton?.('generators', item) || ''}</td>
         `;
         tbody.appendChild(tr);
     });
@@ -612,7 +612,7 @@ function updateGeneratorProp(id, prop, val) {
 function addGeneratorRow() {
     let list = getGeneratorsList();
     const newId = list.length > 0 ? Math.max(...list.map(i => i.id)) + 1 : 1;
-    list.push({ id: newId, model: "", kw: "", fuelType: "", consumption: "", max5Days: "", max10Days: "", max30Days: "", motoHoursDay: "", oilNorm10Days: "", subdivision: window.isKesCabinetActive?.() ? "КЕС" : "", responsiblePerson: "", locationSubdivision: "", serialNumber: "", note: "" });
+    list.push({ id: newId, model: "", ...(window.isKesCabinetActive?.() ? {kesOnly: true} : {}), kw: "", fuelType: "", consumption: "", max5Days: "", max10Days: "", max30Days: "", motoHoursDay: "", oilNorm10Days: "", subdivision: window.isKesCabinetActive?.() ? "КЕС" : "", responsiblePerson: "", locationSubdivision: "", serialNumber: "", note: "" });
     saveGeneratorsList(list);
     renderGeneratorsView();
 }
@@ -620,7 +620,13 @@ function addGeneratorRow() {
 function deleteGeneratorRow(id) {
     if (!confirm("Ви впевнені, що хочете видалити цей запис?")) return;
     let list = getGeneratorsList();
-    list = list.filter(i => Number(i.id) !== Number(id));
+    if (window.isKesCabinetActive?.()) {
+        const item = list.find(row => Number(row.id) === Number(id));
+        if (!item) return;
+        item.kesHidden = true;
+    } else {
+        list = list.filter(i => Number(i.id) !== Number(id));
+    }
     saveGeneratorsList(list);
     renderGeneratorsView();
 }

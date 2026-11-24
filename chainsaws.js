@@ -26,7 +26,7 @@ function saveChainsawsList(list) { localStorage.setItem('chainsaws_custom_data',
 
 function printChainsawsTable() {
     const printWindow = window.open('', '_blank');
-    let list = getChainsawsList().filter(item => !/знищ/ui.test(String(item.note || item.comment || '')));
+    let list = getChainsawsList().filter(item => window.isEquipmentVisibleInCurrentInventory?.(item) !== false).filter(item => !/знищ/ui.test(String(item.note || item.comment || '')));
     let html = `
         <!DOCTYPE html>
         <html>
@@ -234,7 +234,7 @@ function renderChainsawsView() {
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    let list = getChainsawsList();
+    let list = getChainsawsList().filter(item => window.isEquipmentVisibleInCurrentInventory?.(item) !== false);
     if (typeof applyCategoryExcelSort === 'function') {
         list = applyCategoryExcelSort(list, 'chainsaws');
     }
@@ -273,7 +273,7 @@ function renderChainsawsView() {
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.serialNumber || ''}" oninput="updateChainsawsProp(${item.id}, 'serialNumber', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.note || ''}" oninput="updateChainsawsProp(${item.id}, 'note', this.value); if(/знищ/ui.test(this.value)) { renderChainsawsView(); }" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" aria-label="Наказ/ Акт" value="${String(item.orderAct ?? '').replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')}" oninput="updateChainsawsProp(${item.id}, 'orderAct', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
-            <td style="text-align: center; padding: 3px 4px;"><button class="delete-row-btn" style="padding: 2px 6px; font-size: 10px;" onclick="deleteChainsawsRow(${item.id})">Видалити</button></td>
+            <td style="text-align: center; padding: 3px 4px;"><button class="delete-row-btn" style="padding: 2px 6px; font-size: 10px;" onclick="deleteChainsawsRow(${item.id})">Видалити</button>${window.kesEquipmentPublishButton?.('chainsaws', item) || ''}</td>
         `;
         tbody.appendChild(tr);
     });
@@ -326,7 +326,7 @@ function updateChainsawsProp(id, prop, val) {
 function addChainsawsRow() {
     let list = getChainsawsList();
     const newId = list.length > 0 ? Math.max(...list.map(i => i.id)) + 1 : 1;
-    list.push({ id: newId, model: "", kw: "", fuelType: "", consumption: "", max5Days: "", max10Days: "", max30Days: "", motoHoursDay: "", oilNorm10Days: "", subdivision: window.isKesCabinetActive?.() ? "КЕС" : "", responsiblePerson: "", locationSubdivision: "", serialNumber: "", note: "" });
+    list.push({ id: newId, model: "", ...(window.isKesCabinetActive?.() ? {kesOnly: true} : {}), kw: "", fuelType: "", consumption: "", max5Days: "", max10Days: "", max30Days: "", motoHoursDay: "", oilNorm10Days: "", subdivision: window.isKesCabinetActive?.() ? "КЕС" : "", responsiblePerson: "", locationSubdivision: "", serialNumber: "", note: "" });
     saveChainsawsList(list);
     renderChainsawsView();
 }
@@ -334,7 +334,13 @@ function addChainsawsRow() {
 function deleteChainsawsRow(id) {
     if (!confirm("Ви впевнені, що хочете видалити цей запис?")) return;
     let list = getChainsawsList();
-    list = list.filter(i => Number(i.id) !== Number(id));
+    if (window.isKesCabinetActive?.()) {
+        const item = list.find(row => Number(row.id) === Number(id));
+        if (!item) return;
+        item.kesHidden = true;
+    } else {
+        list = list.filter(i => Number(i.id) !== Number(id));
+    }
     saveChainsawsList(list);
     renderChainsawsView();
 }

@@ -141,7 +141,7 @@ function collectEquipmentReportInputs(period) {
 }
 
 function isKesReportEquipment(item) {
-    return [item?.subdivision, item?.locationSubdivision, item?.inventoryLocation, item?.sub]
+    return item?.kesOnly === true || [item?.subdivision, item?.locationSubdivision, item?.inventoryLocation, item?.sub]
         .some(value => String(value ?? '').trim().toUpperCase() === 'КЕС');
 }
 

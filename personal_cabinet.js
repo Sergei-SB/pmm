@@ -5,6 +5,34 @@
     window.isPersonalCabinetActive = () => Boolean(login);
 
     window.isKesCabinetActive = () => login === 'КЕС';
+    let developerPreview = false;
+
+    window.isEquipmentVisibleInCurrentInventory = item =>
+        window.isKesCabinetActive() ? !item.kesHidden : !item.kesOnly;
+
+    window.kesEquipmentPublishButton = (category, item) =>
+        developerPreview && window.isKesCabinetActive() && String(item.model ?? '').trim()
+            ? '<button type="button" class="action-btn" title="Додати до загального обліку" aria-label="Додати до загального обліку" onclick="publishKesEquipment(&quot;' + category + '&quot;,' + Number(item.id) + ')"' + (item.kesOnly ? '' : ' disabled') + '>+</button>'
+            : '';
+
+    window.publishKesEquipment = (category, id) => {
+        if (!developerPreview || !window.isKesCabinetActive()) return;
+        const suffix = {generators: 'Generators', webasto: 'Webasto', heaters: 'Heaters', chainsaws: 'Chainsaws', pumps: 'Pumps'}[category];
+        if (!suffix) return;
+        const items = window['get' + suffix + 'List']();
+        const item = items.find(entry => Number(entry.id) === id);
+        if (!item?.kesOnly || item.kesHidden || !String(item.model ?? '').trim()) return;
+        delete item.kesOnly;
+        item.subdivision = 'КЕС';
+        window['save' + suffix + 'List'](items);
+        window['render' + suffix + 'View']();
+    };
+
+
+    if (typeof window.getAllEquipmentList === 'function') {
+        const getAllEquipment = window.getAllEquipmentList;
+        window.getAllEquipmentList = () => getAllEquipment().filter(window.isEquipmentVisibleInCurrentInventory);
+    }
 
     const storageKey = '__sync_local_personal_cabinets';
     const normalize = value => String(value ?? '').trim();
@@ -95,6 +123,7 @@
     }
 
     function enterCabinet(name) {
+        developerPreview = window.getCurrentAppRole?.() === 'developer';
         login = name;
         document.body.classList.add('personal-cabinet-active');
         document.body.classList.toggle('personal-cabinet-kes', login === 'КЕС');
@@ -126,6 +155,7 @@
     };
 
     window.exitPersonalCabinet = () => {
+        developerPreview = false;
         login = '';
         document.body.classList.remove('personal-cabinet-active', 'personal-cabinet-kes');
         switchView('base');
