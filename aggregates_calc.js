@@ -25,7 +25,8 @@ function saveAggCalcState() {
                 start: document.getElementById(`b-start-${i}`)?.value || '',
                 autoStart: document.getElementById(`b-start-${i}`)?.dataset?.auto === 'true',
                 rec: document.getElementById(`b-rec-${i}`)?.value || '',
-                receiptDate: document.getElementById(`b-receipt-date-${i}`)?.value || '',
+                receiptDate: document.getElementById(`b-receipt-date-${i}`)?.dataset.auto === 'true'
+                    ? '' : document.getElementById(`b-receipt-date-${i}`)?.value || '',
                 end: document.getElementById(`b-end-${i}`)?.value || '',
                 spent: document.getElementById(`b-spent-${i}`)?.value || ''
             });
@@ -379,7 +380,10 @@ function resetAggregatesCalc() {
         }
         if (recIn) recIn.value = '';
         const receiptDate = document.getElementById(`b-receipt-date-${i}`);
-        if (receiptDate) receiptDate.value = '';
+        if (receiptDate) {
+            receiptDate.value = '';
+            delete receiptDate.dataset.auto;
+        }
         if (endIn) endIn.value = '';
         if (spentIn) spentIn.value = '';
     }
@@ -480,6 +484,7 @@ function toggleVariantBSummaryRounding() {
 
 // Підсумок таблиці залишків
 function updateVariantBSummary() {
+    updateAggregateReceiptDates();
     let totalDays = 0;
     let firstStart = 0;
     let totalRec = 0;
@@ -796,6 +801,7 @@ function aggregateReceiptDayMonth(value) {
 }
 
 function formatAggregateReceiptInput(input) {
+    input.dataset.auto = 'false';
     const digits = input.value.replace(/\D/g, '').slice(0, 4);
     const formatted = digits.length > 2 ? digits.slice(0, 2) + '.' + digits.slice(2) : digits;
     if (input.value !== formatted) input.value = formatted;
@@ -810,8 +816,27 @@ function openAggregateReceiptPicker(picker) {
 }
 
 function pickAggregateReceiptDate(picker, row) {
-    picker.previousElementSibling.value = aggregateReceiptDayMonth(picker.value);
+    const input = picker.previousElementSibling;
+    input.dataset.auto = 'false';
+    input.value = aggregateReceiptDayMonth(picker.value);
     onDaysInputChange(row);
+}
+
+function updateAggregateReceiptDates() {
+    let nextDate = NaN;
+    for (let row = 1; row <= 10; row++) {
+        const input = document.getElementById(`b-receipt-date-${row}`);
+        if (!input) break;
+        if (input.dataset.auto === 'true' || (!input.value && input.dataset.auto !== 'false')) {
+            input.value = Number.isFinite(nextDate)
+                ? new Date(nextDate).toISOString().slice(5, 10).split('-').reverse().join('.') : '';
+            input.dataset.auto = 'true';
+        }
+        const days = Number(document.getElementById(`b-days-${row}`)?.value);
+        const date = aggregateReceiptDate(row);
+        nextDate = Number.isInteger(days) && days > 0 && Number.isFinite(date)
+            ? date + (days - 1) * 86400000 : NaN;
+    }
 }
 
 function aggregateReceiptDate(row) {
