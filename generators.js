@@ -310,6 +310,11 @@ function printGeneratorsTable() {
     setTimeout(() => { printWindow.print(); printWindow.close(); }, 250);
 }
 
+function getGeneratorOrderAct(model, orderActsByModel) {
+    const values = orderActsByModel.get(String(model ?? '').trim().toLowerCase());
+    return values?.size === 1 ? values.values().next().value : '';
+}
+
 function renderGeneratorsView() {
     const hoursTotals = generatorHoursTotals();
     const firstRefuels = generatorFirstRefuelDates();
@@ -478,6 +483,14 @@ function renderGeneratorsView() {
     tbody.innerHTML = '';
 
     let list = getGeneratorsList();
+    const orderActsByModel = new Map();
+    for (const item of list) {
+        const model = String(item.model ?? '').trim().toLowerCase();
+        const orderAct = String(item.orderAct ?? '').trim();
+        if (!model || !orderAct) continue;
+        if (!orderActsByModel.has(model)) orderActsByModel.set(model, new Set());
+        orderActsByModel.get(model).add(orderAct);
+    }
     if (typeof applyCategoryExcelSort === 'function') {
         list = applyCategoryExcelSort(list, 'generators');
     }
@@ -516,7 +529,7 @@ function renderGeneratorsView() {
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.serialNumber || ''}" oninput="updateGeneratorProp(${item.id}, 'serialNumber', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
             <td title="${firstRefuels.has(String(item.id)) ? 'Введено в експлуатацію (перша заправка): ' + firstRefuels.get(String(item.id)).split('-').reverse().join('.') : 'У звітах немає дати першої заправки'}">${escapeHtml(generatorHoursText(item, hoursTotals))}</td>
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" value="${item.note || ''}" oninput="updateGeneratorProp(${item.id}, 'note', this.value); if(/знищ/ui.test(this.value)) { renderGeneratorsView(); }" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
-            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" aria-label="Наказ/ Акт" value="${String(item.orderAct ?? '').replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')}" oninput="updateGeneratorProp(${item.id}, 'orderAct', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
+            <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" aria-label="Наказ/ Акт" value="${(String(item.orderAct ?? '').trim() || getGeneratorOrderAct(item.model, orderActsByModel)).replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')}" oninput="updateGeneratorProp(${item.id}, 'orderAct', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
             <td style="text-align: center; padding: 3px 4px;"><button class="delete-row-btn" style="padding: 2px 6px; font-size: 10px;" onclick="deleteGeneratorRow(${item.id})">Видалити</button></td>
         `;
         tbody.appendChild(tr);
@@ -539,18 +552,13 @@ function updateGeneratorProp(id, prop, val) {
     if (item) {
         item[prop] = val;
         if (prop === 'locationSubdivision') item.subdivision = val;
-        const sharedFields = ['kw', 'fuelType', 'consumption', 'oilNorm10Days'];
+        const sharedFields = ['kw', 'fuelType', 'consumption', 'oilNorm10Days', 'orderAct'];
         const model = String(item.model ?? '').trim().toLowerCase();
         const sharedEdit = sharedFields.includes(prop);
         const matches = model && (prop === 'model' || sharedEdit)
             ? list.filter(other => other !== item && String(other.model ?? '').trim().toLowerCase() === model)
             : [];
         if (prop === 'model') {
-            if (model && !String(item.orderAct ?? '').trim()) {
-                const values = new Set(matches
-                    .map(other => String(other.orderAct ?? '').trim()).filter(Boolean));
-                if (values.size === 1) item.orderAct = values.values().next().value;
-            }
             for (const field of sharedFields) {
                 if (String(item[field] ?? '').trim()) continue;
                 const values = new Set(matches.map(other => String(other[field] ?? '').trim()).filter(Boolean));
