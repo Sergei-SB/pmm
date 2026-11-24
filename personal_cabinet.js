@@ -39,7 +39,7 @@
             if (!existing) accounts.push(account);
             localStorage.setItem(storageKey, JSON.stringify(accounts));
         }
-        return {accounts: accounts.map(({id, login, hash}) => ({id, login, hasPassword: Boolean(hash)}))};
+        return {accounts: accounts.map(({id, login}) => ({id, login}))};
     }
 
     function openDialog(title, fields, submitLabel, submit) {
@@ -133,25 +133,6 @@
 
     function showAccounts(form, accounts, selectedId) {
         const select = form.elements.namedItem('id');
-        const list = form.querySelector('#personal-cabinet-list');
-        list.replaceChildren();
-        for (const account of accounts) {
-            const row = document.createElement('li');
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.textContent = account.login;
-            button.onclick = () => {
-                select.value = account.id;
-                window.selectPersonalCabinetSettings(form);
-            };
-            row.append(button, account.hasPassword ? ' — пароль задано' : ' — пароль відсутній');
-            list.append(row);
-        }
-        if (!accounts.length) {
-            const row = document.createElement('li');
-            row.textContent = 'У цьому браузері ще немає створених кабінетів.';
-            list.append(row);
-        }
         const newAccount = new Option('Новий кабінет', '');
         select.replaceChildren(...accounts.map(account => new Option(account.login, account.id)), newAccount);
         if (selectedId !== undefined) select.value = selectedId;
