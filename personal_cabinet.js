@@ -36,40 +36,34 @@
 
     const storageKey = '__sync_local_personal_cabinets';
     const readAccounts = () => JSON.parse(localStorage.getItem(storageKey) || '[]');
-    const normalize = value => String(value ?? '').trim();
-    async function hash(password, salt) {
-        const bytes = new TextEncoder().encode(salt + ':' + password);
-        return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)),
-            byte => byte.toString(16).padStart(2, '0')).join('');
+    let developerPassword = '';
+
+    async function request(action, body = {}) {
+        const base = window.APP_SERVER_URL || 'https://pmm-server.onrender.com';
+        const response = await fetch(base + '/api/personal-cabinets/' + action, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(action === 'login' ? body : {...body, developerPassword}),
+            signal: AbortSignal.timeout(70000)
+        });
+        if (response.status === 401) {
+            if (action !== 'login') developerPassword = '';
+            throw new Error(action === 'login' ? 'Невірний логін або пароль.' : 'Невірний пароль розробника.');
+        }
+        if (response.status === 400) throw new Error('Перевір логін і пароль. Логін має бути унікальним.');
+        if (response.status === 429) throw new Error('Забагато спроб. Спробуй за хвилину.');
+        if (!response.ok) throw new Error('Онлайн-вхід до кабінетів поки недоступний.');
+        return response.json();
     }
 
-    async function request(action, body) {
-        if (action === 'login') {
-            const account = readAccounts().find(entry => entry.login === body.login);
-            if (!account || account.hash !== await hash(body.password, account.salt)) {
-                throw new Error('Невірний логін або пароль.');
-            }
-            return {login: account.login};
-        }
-        if (window.getCurrentAppRole?.() !== 'developer') throw new Error('Потрібен доступ розробника.');
-        const accounts = readAccounts();
-        if (action === 'save') {
-            const login = normalize(body.login);
-            const existing = accounts.find(account => account.id === body.id);
-            if (!login || accounts.some(account => account !== existing && account.login === login)
-                || (!existing && !body.password)) throw new Error('Вкажи унікальний логін і пароль для нового кабінету.');
-            const account = existing || {id: crypto.randomUUID()};
-            account.login = login;
-            if (body.password) {
-                account.salt = crypto.randomUUID();
-                account.hash = await hash(body.password, account.salt);
-                if (body.allowReveal === 'on') account.revealablePassword = body.password;
-                else delete account.revealablePassword;
-            }
-            if (!existing) accounts.push(account);
-            localStorage.setItem(storageKey, JSON.stringify(accounts));
-        }
-        return {accounts: accounts.map(({id, login}) => ({id, login}))};
+    function withDeveloperPassword(action) {
+        if (developerPassword) return action();
+        return openDialog('Підтвердження ролі розробника', [
+            input('Пароль розробника', 'password', {type: 'password', required: true, autocomplete: 'current-password'})
+        ], 'Продовжити', async ({password}) => {
+            developerPassword = password;
+            await action();
+        });
     }
 
     function openDialog(title, fields, submitLabel, submit) {
@@ -133,9 +127,9 @@
         switchView('generators');
     }
 
-    window.openPersonalCabinetLogin = async () => {
+    window.openPersonalCabinetLogin = () => {
         if (window.getCurrentAppRole?.() !== 'developer') return openPasswordLogin();
-        try {
+        return withDeveloperPassword(async () => {
             const {accounts} = await request('list');
             const field = document.createElement('label');
             field.style.cssText = 'display:grid;gap:4px';
@@ -151,9 +145,7 @@
                 if (!account) throw new Error('Кабінет більше недоступний.');
                 enterCabinet(account.login);
             });
-        } catch (error) {
-            alert(error.message);
-        }
+        });
     };
 
     window.exitPersonalCabinet = () => {
@@ -182,7 +174,7 @@
             eye.onclick = () => {
                 if (window.getCurrentAppRole?.() !== 'developer') return;
                 const revealed = eye.getAttribute('aria-pressed') === 'true';
-                const saved = readAccounts().find(entry => entry.id === account.id);
+                const saved = readAccounts().find(entry => entry.login === account.login);
                 password.textContent = revealed ? '••••••••' : saved?.revealablePassword ??
                     'Щоб переглядати пароль, введи його нижче й познач «Запам’ятати пароль для перегляду».';
                 eye.setAttribute('aria-pressed', String(!revealed));
@@ -221,6 +213,11 @@
         try {
             const {accounts} = await request(action, body);
             const saved = action === 'save' ? accounts.find(account => account.login === body.login.trim()) : null;
+            if (saved && body.password) {
+                const cached = readAccounts().filter(entry => entry.login !== saved.login);
+                if (body.allowReveal === 'on') cached.push({login: saved.login, revealablePassword: body.password});
+                localStorage.setItem(storageKey, JSON.stringify(cached));
+            }
             showAccounts(form, accounts, saved?.id);
             status.textContent = saved ? 'Кабінет збережено.' : '';
         } catch (error) {
@@ -235,7 +232,7 @@
         const fields = form.querySelector('fieldset');
         fields.hidden = true;
         fields.disabled = true;
-        return updateSettings(form, 'list');
+        return withDeveloperPassword(() => updateSettings(form, 'list'));
     };
 
     window.savePersonalCabinetSettings = event => {
