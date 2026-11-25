@@ -28,7 +28,9 @@
     };
 
     const equipmentSuffix = {generators: 'Generators', webasto: 'Webasto', heaters: 'Heaters', chainsaws: 'Chainsaws', pumps: 'Pumps'};
-    const canReviewKes = () => developerPreview || window.getCurrentAppRole?.() === 'developer';
+    const isDeveloper = () => window.getCurrentAppRole?.() === 'developer';
+    const canReviewKes = () => isDeveloper() && (!window.isPersonalCabinetActive() || developerPreview);
+    const canPublishKes = () => isDeveloper() && developerPreview && window.isKesCabinetActive();
     window.decorateKesEquipmentRow = (row, item) => {
         if (!canReviewKes()) return;
         if (item.kesOnly && String(item.model ?? '').trim()) {
@@ -88,12 +90,12 @@
     };
 
     window.kesEquipmentPublishButton = (category, item) =>
-        developerPreview && window.isKesCabinetActive() && String(item.model ?? '').trim()
-            ? '<button type="button" class="action-btn kes-equipment-publish" title="Додати до загального обліку" aria-label="Додати до загального обліку" onclick="publishKesEquipment(&quot;' + category + '&quot;,' + Number(item.id) + ')"' + (item.kesOnly ? '' : ' disabled') + '>+</button>'
+        canPublishKes() && item.kesOnly && !item.kesHidden && String(item.model ?? '').trim()
+            ? '<button type="button" class="action-btn kes-equipment-publish" title="Додати до загального обліку" aria-label="Додати до загального обліку" onclick="publishKesEquipment(&quot;' + category + '&quot;,' + Number(item.id) + ')"' + '>+</button>'
             : '';
 
     window.publishKesEquipment = (category, id) => {
-        if (!developerPreview || !window.isKesCabinetActive()) return;
+        if (!canPublishKes()) return;
         const suffix = equipmentSuffix[category];
         if (!suffix) return;
         const items = window['get' + suffix + 'List']();
@@ -195,8 +197,8 @@
         });
     }
 
-    function enterCabinet(name) {
-        developerPreview = window.getCurrentAppRole?.() === 'developer';
+    function enterCabinet(name, preview = false) {
+        developerPreview = preview && isDeveloper();
         login = name;
         document.body.classList.add('personal-cabinet-active');
         document.body.classList.toggle('personal-cabinet-kes', login === 'КЕС');
@@ -220,7 +222,7 @@
                 const {accounts: current} = await request('list');
                 const account = current.find(entry => entry.id === id);
                 if (!account) throw new Error('Кабінет більше недоступний.');
-                enterCabinet(account.login);
+                enterCabinet(account.login, true);
             });
         });
     };
