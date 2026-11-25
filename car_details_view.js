@@ -7,6 +7,7 @@ window.activeReportCarId = null;
 // Допоміжна функція для визначення ключа категорії автомобіля
 function resolveCarCategoryKey(car) {
     if (!car) return 'passenger';
+    if (isHmmwvCar(car)) return 'hmmwv';
     const towedCategory = getTowedVehicleCategory(car);
     if (towedCategory) return towedCategory;
     const cat = String(car.category || '').toLowerCase().trim();
