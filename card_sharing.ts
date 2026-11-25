@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
 import type { Express } from 'express';
 
 const recipients = ['admin', 'moderator', 'user'] as const;
@@ -26,36 +26,41 @@ export function installCardSharing(app: Express, storage: {
       res.sendStatus(400);
       return;
     }
-    const {action, session, recipient, snapshot} = req.body ?? {};
+    const {action, session, recipient, snapshot, viewRole, baseVersion} = req.body ?? {};
     const authenticated = typeof session === 'string' ? sessions.get(session) : undefined;
     if (session && (!authenticated || authenticated.expires <= Date.now())) {
       res.sendStatus(401);
       return;
     }
-    const role = authenticated?.role ?? 'user';
+    const authenticatedRole = authenticated?.role ?? 'user';
+    const role: Role = authenticatedRole === 'developer' && recipients.includes(viewRole)
+      ? viewRole : authenticatedRole;
     const key = carId + ':' + period;
+    const version = (value: unknown) => createHash('sha256').update(JSON.stringify(value ?? null)).digest('hex');
+    const current = (data: {drafts: CardDrafts; shared: SharedCards}) =>
+      data.drafts[key]?.[role] ?? (role !== 'developer' ? data.shared[key]?.[role]?.snapshot : null) ?? null;
     try {
       if (action === 'read') {
         const {drafts, shared, legacyDraft} = await storage.read(carId, period);
         res.json({
-          draft: role === 'developer' ? drafts[key]?.developer ?? legacyDraft ?? null : null,
-          received: role === 'developer' ? null : shared[key]?.[role] ?? null,
+          draft: current({drafts, shared}) ?? (role === 'developer' ? legacyDraft ?? null : null),
+          version: version(current({drafts, shared})),
         });
       } else if (action === 'save') {
-        if (role !== 'developer') {
-          res.sendStatus(403);
-          return;
-        }
         if (!snapshot || !snapshot.topFields || typeof snapshot.topFields !== 'object' ||
             Array.isArray(snapshot.topFields) || !Array.isArray(snapshot.rows) ||
             snapshot.rows.length > 1000 || JSON.stringify(snapshot).length > 500_000) {
           res.sendStatus(400);
           return;
         }
-        await storage.change(({drafts}) => {
+        let conflict = false;
+        await storage.change(data => {
+          if (baseVersion !== version(current(data))) { conflict = true; return; }
+          const {drafts} = data;
           (drafts[key] ??= {})[role] = snapshot;
         });
-        res.json({ok: true});
+        if (conflict) res.status(409).json({error:'card_conflict'});
+        else res.json({ok: true, version: version(snapshot)});
       } else if (action === 'send') {
         if (role !== 'developer') {
           res.sendStatus(403);
@@ -72,6 +77,7 @@ export function installCardSharing(app: Express, storage: {
           (shared[key] ??= {})[recipient as Recipient] = {
             snapshot: structuredClone(draft), sentAt: new Date().toISOString(),
           };
+          (drafts[key] ??= {})[recipient as Recipient] = structuredClone(draft);
           sent = true;
         });
         if (sent) res.json({ok: true});

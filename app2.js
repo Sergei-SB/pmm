@@ -124,6 +124,7 @@ function getPrevPeriodKey(currPeriod) {
 }
 
 function getRoutesKey(carId, period) {
+    if (window.vehicleCardSharing) return window.vehicleCardSharing.storageKey(carId, period);
     return `isolated_car_routes_${period}_${carId}`;
 }
 
@@ -327,7 +328,7 @@ function loadCarDataForActivePeriod() {
     const safeCars = (typeof carsData !== 'undefined' && Array.isArray(carsData)) ? carsData : [];
     const car = safeCars.find(c => Number(c.id) === Number(currentCarId));
     const truckActive = (car && typeof isCarTruck === 'function') ? isCarTruck(car) : false;
-    const trailerReadings = getTowedVehicleCategory(car)
+    const trailerReadings = !window.vehicleCardSharing && getTowedVehicleCategory(car)
         ? getTrailerMileageForPeriod(period, safeCars).get(String(car.id)) : null;
 
     const tbody = document.getElementById('routes-tbody');
@@ -394,7 +395,7 @@ function loadCarDataForActivePeriod() {
         } catch (e) {}
 
         try {
-            const repStored = localStorage.getItem('report_data_' + prevKey);
+            const repStored = window.vehicleCardSharing ? null : localStorage.getItem('report_data_' + prevKey);
             if (repStored) {
                 const repData = JSON.parse(repStored);
                 if (repData && repData[currentCarId]) {
