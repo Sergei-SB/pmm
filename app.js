@@ -1432,8 +1432,8 @@ function updateRouteTotals(renderRestoredDays = false) {
 
     let fuelStart = evaluateExpression(document.getElementById('fuel-start')?.value);
     let fuelReceived = evaluateExpression(document.getElementById('fuel-received')?.value);
-    const fuelDigits = hmmwvResult ? 0 : 2;
-    const fuelSpent = hmmwvResult ? totalFuelRounded : calcResult.totalFuel;
+    const fuelDigits = 0;
+    const fuelSpent = totalFuelRounded;
     const fuelLeft = fmt(fuelReceived + fuelStart - fuelSpent, fuelDigits);
     if (dailyResult && (renderRestoredDays || !isRestoringState)) {
         window.renderDailyRoutes(dailyResult, fuelLeft);
@@ -1447,9 +1447,9 @@ function updateRouteTotals(renderRestoredDays = false) {
 
     if (formulasContainer) {
         const number = value => new Intl.NumberFormat('uk-UA', {maximumFractionDigits: 3, useGrouping: false}).format(value);
-        const summaryRow = (label, value) =>
-            `<div class="calc-row" style="grid-template-columns: 140px 1fr"><span class="c-label">${label}:</span><span>${value}</span></div>`;
-        let fuelTotal = `${number(calcResult.totalFuel)} л ≈ ${totalFuelRounded} л`;
+        const summaryRow = (label, value, result = '') =>
+            `<div class="calc-row" style="grid-template-columns: 165px 230px 80px"><span class="c-label">${label}:</span><span>${value}</span><span class="c-val">${result}</span></div>`;
+        let fuelTotal = calcResult.calculatedResults.filter(item => !['work', 'adblue'].includes(item.type) && item.resVal !== 0).map(item => number(Number(item.resVal.toFixed(2)))).join(' + ');
         if (hmmwvResult) {
             const {highwayMiles, bzMiles, highwayFuel, bzFuel} = hmmwvResult;
             const distance = (miles, modifier, fuel) =>
@@ -1457,14 +1457,14 @@ function updateRouteTotals(renderRestoredDays = false) {
             formulasContainer.innerHTML =
                 summaryRow('Траса', distance(highwayMiles, '− 5%', highwayFuel)) +
                 summaryRow('БЗ', distance(bzMiles, '+ 20%', bzFuel));
-            fuelTotal = `${number(highwayFuel)} + ${number(bzFuel)} = ${fuelTotal}`;
+            fuelTotal = `${number(highwayFuel)} + ${number(bzFuel)}`;
         }
         const fuelType = /^АБ|^бензин/i.test(String(car?.fuelType ?? '').trim()) ? 'АБ' : 'ДП';
         formulasContainer.insertAdjacentHTML('afterbegin',
             summaryRow('Всього пройдено', `${number(totalKm)} ${isMilesCar ? 'mil' : 'км'}`));
         formulasContainer.insertAdjacentHTML('beforeend',
-            summaryRow('Всього', fuelTotal) +
-            summaryRow(`Залишок ${fuelType}`, `${number(fuelStart)} + ${number(fuelReceived)} − ${fmt(fuelSpent, fuelDigits)} = ${fuelLeft} л`));
+            summaryRow('Всього', `${fuelTotal ? fuelTotal + ' ≈ ' : ''}${number(calcResult.totalFuel)} л ≈`, `${totalFuelRounded} л`) +
+            summaryRow(`Залишок ${fuelType}`, `${number(fuelStart)} + ${number(fuelReceived)} − ${fuelSpent} =`, `${fuelLeft} л`));
     }
 
 
@@ -1479,10 +1479,10 @@ function updateRouteTotals(renderRestoredDays = false) {
         let adblueLeft = adblueReceived + adblueStart - adblueSpent;
 
         const adblueSpentEl = document.getElementById('adblue-spent');
-        if (adblueSpentEl) adblueSpentEl.textContent = fmt(adblueSpent, 2);
+        if (adblueSpentEl) adblueSpentEl.textContent = adblueSpent.toFixed(1);
 
         const adblueLeftEl = document.getElementById('adblue-left');
-        if (adblueLeftEl) adblueLeftEl.textContent = fmt(adblueLeft, 2);
+        if (adblueLeftEl) adblueLeftEl.textContent = adblueLeft.toFixed(1);
     }
     if (typeof refreshDriverRouteView === 'function') refreshDriverRouteView(car);
 }
