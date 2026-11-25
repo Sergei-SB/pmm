@@ -473,6 +473,7 @@ window.applyCarsReportColumnRoleStyle = function(canShowReportCol) {
 };
 
 window.updateRoleUI = function() {
+    window.vehicleCardSharing?.refreshRole();
     if (typeof syncRegistryDeveloperVisibility === 'function') syncRegistryDeveloperVisibility();
     const role = (typeof window.getCurrentAppRole === 'function')
         ? window.getCurrentAppRole()
@@ -985,7 +986,8 @@ window.exportFullDatabaseBackup = async function() {
         const allStorage = {};
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
-            if (!key || key === '__sync_local_developer_notes' || window.isLegacyPasswordStorageKey?.(key)) continue;
+            if (!key || key === '__sync_local_developer_notes' || key.startsWith('__sync_local_vehicle_card_') ||
+                window.isLegacyPasswordStorageKey?.(key)) continue;
             const raw = localStorage.getItem(key);
             const rawVal = window.sanitizeRoleStorage?.(key, raw) ?? raw;
             try {

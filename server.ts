@@ -27,6 +27,7 @@ import { configuredGitHubStorage } from './github_storage.ts';
 import { protectRouteRows } from './route_locks.ts';
 import { installCabinetAuth, type CabinetAccount } from './cabinet_auth.ts';
 import { installRolePasswordRoute } from './role_passwords.ts';
+import { installCardSharing, type CardDrafts, type SharedCards } from './card_sharing.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -58,6 +59,8 @@ interface FileRecord {
 
 interface Store {
   cabinetAccounts: CabinetAccount[];
+  cardDrafts: CardDrafts;
+  sharedCards: SharedCards;
   schemaVersion: number;
   revision: number;
   changedAt: string;
@@ -244,6 +247,8 @@ function errorMessage(err: unknown): string {
 function emptyStore(): Store {
   return {
     cabinetAccounts: [],
+    cardDrafts: {},
+    sharedCards: {},
     schemaVersion: 2,
     revision: 0,
     changedAt: new Date().toISOString(),
@@ -266,6 +271,8 @@ function ensureDataDir(): void {
 
 function normalizeStore(parsed: JsonObject): Store {
   const store = emptyStore();
+  store.cardDrafts = asObject(parsed.cardDrafts) as CardDrafts;
+  store.sharedCards = asObject(parsed.sharedCards) as SharedCards;
   if (Array.isArray(parsed.cabinetAccounts)) {
     store.cabinetAccounts = parsed.cabinetAccounts.filter((entry): entry is CabinetAccount =>
       entry && typeof entry.id === 'string' && typeof entry.login === 'string' &&
@@ -597,12 +604,30 @@ async function startServer(): Promise<void> {
     store.cabinetAccounts = change(store.cabinetAccounts);
     return store.cabinetAccounts;
   }));
+  const issueCardSession = installCardSharing(app, {
+    read: async (carId, period) => {
+      await mutationQueue.catch(() => {});
+      // Keep previously saved route cards available to the developer when
+      // enabling role-specific snapshots; do not publish them automatically.
+      let legacyDraft = null;
+      const record = store.keys[`isolated_car_routes_${period}_${carId}`];
+      if (record && !record.deleted) {
+        try {
+          const card = JSON.parse(record.value);
+          if (card?.topFields && typeof card.topFields === 'object' &&
+              !Array.isArray(card.topFields) && Array.isArray(card.rows)) legacyDraft = card;
+        } catch {}
+      }
+      return {drafts: store.cardDrafts, shared: store.sharedCards, legacyDraft};
+    },
+    change: update => durableChange(() => update({drafts: store.cardDrafts, shared: store.sharedCards})),
+  });
   installRolePasswordRoute(app, (id, role) => {
     const record = store.keys.dev_managed_users;
     if (!record || record.deleted) return false;
     const users = JSON.parse(record.value) as JsonObject[];
     return users.some(user => String(user.id) === id && user.role === role && user.status !== 'banned');
-  });
+  }, process.env, issueCardSession);
 
   // 2) Перевірка живості
   app.get('/api/health', (_req, res) => {

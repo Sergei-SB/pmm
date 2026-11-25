@@ -47,7 +47,13 @@ async function verifyRolePassword(role, password) {
             alert('Забагато спроб входу. Спробуйте за хвилину.');
             return null;
         }
-        if (response.ok && (await response.json()).ok === true) return true;
+        if (response.ok) {
+            const result = await response.json();
+            if (result.ok === true) {
+                window.vehicleCardSharing?.setSession(role, result.cardSession);
+                return true;
+            }
+        }
     } catch (_) {}
     alert('Сервер входу недоступний. Спробуйте ще раз пізніше.');
     return null;

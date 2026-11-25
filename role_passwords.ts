@@ -9,7 +9,8 @@ type Role = typeof roles[number];
 export function installRolePasswordRoute(
   app: Express,
   canUsePersonalPassword: (id: string, role: Role) => boolean,
-  env = process.env
+  env = process.env,
+  issueCardSession?: (role: Role) => string
 ) {
   const salt = randomBytes(16);
   const credentials = new Map<Role, Buffer>();
@@ -69,7 +70,7 @@ export function installRolePasswordRoute(
         timingSafeEqual(hash, candidate) && canUsePersonalPassword(id, role));
       if (timingSafeEqual(hash, credential) || personalMatch) {
         attempts.delete(client);
-        res.json({ ok: true });
+        res.json({ ok: true, cardSession: issueCardSession?.(role) });
       } else {
         res.status(401).json({ ok: false });
       }
