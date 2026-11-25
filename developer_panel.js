@@ -1002,7 +1002,7 @@ window.exportFullDatabaseBackup = async function() {
         try {
             for (let i = 0; i < sessionStorage.length; i++) {
                 const key = sessionStorage.key(i);
-                if (!key) continue;
+                if (!key || key.startsWith('__sync_local_vehicle_card_')) continue;
                 const rawVal = sessionStorage.getItem(key);
                 try {
                     allSessionStorage[key] = JSON.parse(rawVal);

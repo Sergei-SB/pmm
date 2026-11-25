@@ -1,6 +1,13 @@
 (() => {
     const labels = {admin: 'Адмін', moderator: 'Модератор', user: 'Юзер'};
     const sessions = new Map();
+    const sessionKey = '__sync_local_vehicle_card_sessions';
+    try {
+        const saved = JSON.parse(sessionStorage.getItem(sessionKey) || '{}');
+        for (const owner of ['developer', 'admin', 'moderator']) {
+            if (typeof saved[owner] === 'string') sessions.set(owner, saved[owner]);
+        }
+    } catch {}
     const cards = new Map();
     const controls = document.createElement('span');
     const status = document.createElement('span');
@@ -45,6 +52,8 @@
         controls.replaceChildren();
         if (!active) return;
         const card = active;
+        controls.hidden = card.owner !== 'developer';
+        status.hidden = card.owner !== 'developer';
         const readOnly = card.owner !== 'developer' || !card.ready;
         document.querySelectorAll('#routes-tbody, #driver-routes-tbody, #add-card-route-row, #fuel-start, #fuel-received, #adblue-start, #adblue-received, #odo-1, #card-save-btn, #transfer-data-btn, .preset-buttons-group')
             .forEach(element => { element.inert = readOnly; });
@@ -72,29 +81,31 @@
                 } finally { send.disabled = false; }
             });
             send.disabled = !card.ready;
-        } else {
-            addButton('Оновити картку', () => fetchCard(card));
         }
     }
 
     async function fetchCard(card) {
+        if (card.fetching || (card.owner !== 'user' && !card.session)) return;
+        card.fetching = true;
         try {
             const data = await request(card, 'read');
             if (active !== card || currentRole() !== card.owner) return;
+            const changed = !card.ready || JSON.stringify(card.received) !== JSON.stringify(data.received);
             if (!card.ready) card.draft = data.draft;
             card.ready = true;
             card.received = data.received;
             if (!card.unsaved) result(card.owner !== 'developer' && !card.received ? 'Розробник ще не переніс картку для цієї ролі.' : '');
-            redraw();
+            if (changed) redraw();
         } catch (error) {
             if (active === card && currentRole() === card.owner) result(error.message);
-        }
+        } finally { card.fetching = false; }
     }
 
     window.vehicleCardSharing = {
         setSession(owner, token) {
             if (typeof token === 'string' && token) sessions.set(owner, token);
             else sessions.delete(owner);
+            try { sessionStorage.setItem(sessionKey, JSON.stringify(Object.fromEntries(sessions))); } catch {}
             if (owner === role) {
                 cards.clear();
                 active = null;
@@ -104,7 +115,6 @@
         refreshRole() {
             const next = currentRole();
             if (role === next) return;
-            sessions.delete(role);
             cards.clear();
             role = next;
             active = null;
@@ -166,4 +176,8 @@
 
     const toolbar = document.querySelector('.card-period-box');
     if (toolbar) toolbar.append(controls, status);
+    // Recipients see newly transferred snapshots without a manual refresh.
+    setInterval(() => {
+        if (!document.hidden && active && active.owner !== 'developer' && currentRole() === active.owner) fetchCard(active);
+    }, 5000);
 })();

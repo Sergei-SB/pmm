@@ -1,5 +1,7 @@
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
+const vm = require('node:vm');
+const fs = require('node:fs');
 
 async function fixture() {
     const {installCardSharing} = await import('../card_sharing.ts');
@@ -58,3 +60,34 @@ test('Existing route cards remain available to developer without being shared au
     assert.equal(user.data.draft,null);
     assert.equal(user.data.received,null);
 });
+
+for (const role of ['admin', 'moderator', 'user']) {
+    test(`${role} has no refresh button or login notice and receives updates automatically`, async () => {
+        const elements = [], callbacks = [];
+        const makeElement = () => {
+            const element = {children:[],setAttribute(){},append(...items){this.children.push(...items);},replaceChildren(){this.children=[];}};
+            elements.push(element); return element;
+        };
+        let value = '10', reads = 0;
+        const c = {console, AbortSignal, Map, JSON, Object, Promise,
+            sessionStorage: {getItem:()=>JSON.stringify({[role]:'valid-session'}),setItem(){}},
+            document: {hidden:false,createElement:makeElement,querySelector:()=>({append(){}}),querySelectorAll:()=>[]},
+            getCurrentAppRole:()=>role, loadCarDataForActivePeriod(){},
+            setInterval:fn=>callbacks.push(fn),
+            fetch:async()=>{reads++;return {ok:true,json:async()=>({draft:null,received:{snapshot:{topFields:{fuelStart:value},rows:[]}}})};}
+        };
+        c.window=c;vm.createContext(c);
+        vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../card_sharing.js'),'utf8'),c);
+        c.vehicleCardSharing.refreshRole();
+        c.vehicleCardSharing.read(123,'11.11-20.11');
+        await new Promise(resolve=>setImmediate(resolve));
+        assert.equal(elements[0].hidden,true);
+        assert.equal(elements[1].hidden,true);
+        assert.equal(elements[0].children.length,0);
+        assert.equal(reads,1);
+        value='25';callbacks[0]();
+        await new Promise(resolve=>setImmediate(resolve));
+        assert.equal(JSON.parse(c.vehicleCardSharing.previous(123,'11.11-20.11')).topFields.fuelStart,'25');
+        assert.equal(reads,2);
+    });
+}
