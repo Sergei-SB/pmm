@@ -273,6 +273,8 @@ function executeAddCarWithCategory(categoryKey, vehicleTypeStr, categoryDisplayN
     const newId = carsData.length > 0 ? Math.max(...carsData.map(i => Number(i.id) || 0)) + 1 : 1;
     const upperKey = (categoryKey || 'PASSENGER').toUpperCase();
 
+    if (upperKey === 'HMMWV') vehicleTypeStr = 'hmmwv';
+
     let assignedFormulas = [1, 2, 3, 4];
     if (upperKey === 'TRUCK' || upperKey === 'SPECIAL' || upperKey === 'ADBLUE' || upperKey === 'MINIBUS' ||
         Object.hasOwn(TOWED_VEHICLE_TYPES, upperKey.toLowerCase())) {
@@ -317,7 +319,7 @@ function executeAddCarWithCategory(categoryKey, vehicleTypeStr, categoryDisplayN
         category: categoryKey.toLowerCase(),
         vehicleType: vehicleTypeStr,     
         hasAdBlue: hasAdBlueFlag,
-        isMiles: upperKey === 'MILES',
+        isMiles: upperKey === 'MILES' || upperKey === 'HMMWV',
         formulas: assignedFormulas
     };
 
@@ -421,9 +423,9 @@ function applyCategoryChangesToCar(car, newCategoryKey) {
     }
 
     car.formulas = assignedFormulas;
-    car.vehicleType = vehicleTypeUA;
+    car.vehicleType = upperKey === 'HMMWV' ? 'hmmwv' : vehicleTypeUA;
     car.hasAdBlue = (upperKey === 'ADBLUE');
-    car.isMiles = (upperKey === 'MILES');
+    car.isMiles = upperKey === 'MILES' || upperKey === 'HMMWV';
 
     // Оновлюємо відображення панелі AdBlue, якщо це авто зараз відкрите в Картці
     if (typeof currentCarId !== 'undefined' && Number(currentCarId) === Number(car.id)) {
