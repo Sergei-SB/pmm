@@ -31,7 +31,7 @@ function savePumpsList(list) { localStorage.setItem('pumps_custom_data', JSON.st
 
 function printPumpsTable() {
     const printWindow = window.open('', '_blank');
-    let list = getPumpsList().filter(item => window.isEquipmentVisibleInCurrentInventory?.(item) !== false).filter(item => !/знищ/ui.test(String(item.note || item.comment || '')));
+    let list = getPumpsList().filter(item => window.isEquipmentVisibleInCurrentInventory?.(item) !== false).map(item => window.kesEquipmentView?.(item) ?? item).filter(item => !/знищ/ui.test(String(item.note || item.comment || '')));
     let html = `
         <!DOCTYPE html>
         <html>
@@ -239,7 +239,7 @@ function renderPumpsView() {
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    let list = getPumpsList().filter(item => window.isEquipmentVisibleInCurrentInventory?.(item) !== false);
+    let list = getPumpsList().filter(item => window.isEquipmentVisibleInCurrentInventory?.(item) !== false).map(item => window.kesEquipmentView?.(item) ?? item);
     if (typeof applyCategoryExcelSort === 'function') {
         list = applyCategoryExcelSort(list, 'pumps');
     }
@@ -285,8 +285,10 @@ function renderPumpsView() {
                 (item.subdivision === 'КЕС' && el.getAttribute('list') === 'pumps-model-datalist') ||
                 el.classList.contains('delete-row-btn') || el.matches('[onclick^=publishKesEquipment]')));
         });
+        window.decorateKesEquipmentRow?.(tr, item);
         tbody.appendChild(tr);
     });
+    window.showKesEquipmentNotice?.(tbody, getPumpsList());
     if (!filtered.length) tbody.innerHTML = '<tr><td colspan="17" style="padding:24px;text-align:center;color:#64748b">Помп за цими умовами немає. Для нової позиції натисніть «+ Додати позицію».</td></tr>';
 }
 
@@ -305,6 +307,11 @@ function updatePumpsProp(id, prop, val, rerender = true) {
     const item = list.find(i => Number(i.id) === Number(id));
     if (!canManagePumps() && !(window.isKesCabinetActive?.() && item?.subdivision === 'КЕС' && prop === 'model')) return;
     if (item) {
+        if (window.recordKesEquipmentChange?.(item, prop, val)) {
+            savePumpsList(list);
+            if (prop === 'model' && rerender) renderPumpsView();
+            return;
+        }
         item[prop] = val;
         if (prop === 'locationSubdivision') item.subdivision = val;
         if (prop === 'model') {

@@ -266,7 +266,7 @@ function generatorHoursText(item, totals) {
 function printGeneratorsTable() {
     const hoursTotals = generatorHoursTotals();
     const printWindow = window.open('', '_blank');
-    let list = getGeneratorsList().filter(item => window.isEquipmentVisibleInCurrentInventory?.(item) !== false).filter(item => !/знищ/ui.test(String(item.note || item.comment || '')));
+    let list = getGeneratorsList().filter(item => window.isEquipmentVisibleInCurrentInventory?.(item) !== false).map(item => window.kesEquipmentView?.(item) ?? item).filter(item => !/знищ/ui.test(String(item.note || item.comment || '')));
     let html = `
         <!DOCTYPE html>
         <html>
@@ -501,7 +501,7 @@ function renderGeneratorsView() {
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    let list = getGeneratorsList().filter(item => window.isEquipmentVisibleInCurrentInventory?.(item) !== false);
+    let list = getGeneratorsList().filter(item => window.isEquipmentVisibleInCurrentInventory?.(item) !== false).map(item => window.kesEquipmentView?.(item) ?? item);
     const orderActsByModel = new Map();
     for (const item of list) {
         const model = String(item.model ?? '').trim().toLowerCase();
@@ -551,8 +551,10 @@ function renderGeneratorsView() {
             <td style="padding: 3px 4px;"><div style="display: flex; align-items: center; gap: 4px;"><input type="text" class="table-cell-input" aria-label="Наказ/ Акт" data-order-act-id="${Number(item.id)}" value="${(String(item.orderAct ?? '').trim() || getGeneratorOrderAct(item.model, orderActsByModel)).replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')}" oninput="updateGeneratorProp(${item.id}, 'orderAct', this.value); updateGeneratorOrderActLink(this)" style="flex: 1; min-width: 0; box-sizing: border-box; padding: 3px;"><a href="${generatorOrderActUrl(String(item.orderAct ?? '').trim() || getGeneratorOrderAct(item.model, orderActsByModel)).replaceAll('&', '&amp;').replaceAll('"', '&quot;')}" target="_blank" rel="noopener noreferrer" title="Відкрити посилання" aria-label="Відкрити посилання" style="padding: 0 3px;"${generatorOrderActUrl(String(item.orderAct ?? '').trim() || getGeneratorOrderAct(item.model, orderActsByModel)) ? '' : ' hidden'}>↗</a></div></td>
             <td style="text-align: center; padding: 3px 4px;"><button class="delete-row-btn" style="padding: 2px 6px; font-size: 10px;" onclick="deleteGeneratorRow(${item.id})">Видалити</button>${window.kesEquipmentPublishButton?.('generators', item) || ''}</td>
         `;
+        window.decorateKesEquipmentRow?.(tr, item);
         tbody.appendChild(tr);
     });
+    window.showKesEquipmentNotice?.(tbody, getGeneratorsList());
 }
 
 function updateGenFilter(field, val) {
@@ -569,13 +571,18 @@ function updateGeneratorProp(id, prop, val) {
     let list = getGeneratorsList();
     const item = list.find(i => Number(i.id) === Number(id));
     if (item) {
+        if (window.recordKesEquipmentChange?.(item, prop, val)) {
+            saveGeneratorsList(list);
+            if (prop === 'model') renderGeneratorsView();
+            return;
+        }
         item[prop] = val;
         if (prop === 'locationSubdivision') item.subdivision = val;
         const sharedFields = ['kw', 'fuelType', 'consumption', 'oilNorm10Days', 'orderAct'];
         const model = String(item.model ?? '').trim().toLowerCase();
         const sharedEdit = sharedFields.includes(prop);
         const matches = model && (prop === 'model' || sharedEdit)
-            ? list.filter(other => other !== item && String(other.model ?? '').trim().toLowerCase() === model)
+            ? list.filter(other => other !== item && Boolean(other.kesOnly) === Boolean(item.kesOnly) && String(other.model ?? '').trim().toLowerCase() === model)
             : [];
         if (prop === 'model') {
             for (const field of sharedFields) {

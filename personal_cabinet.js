@@ -10,6 +10,55 @@
     window.isEquipmentVisibleInCurrentInventory = item =>
         window.isKesCabinetActive() ? !item.kesHidden : !item.kesOnly;
 
+    window.kesEquipmentView = item =>
+        window.isKesCabinetActive() && item.kesChanges ? {...item, ...item.kesChanges} : item;
+
+    window.recordKesEquipmentChange = (item, field, value) => {
+        if (!window.isKesCabinetActive() || item.kesOnly) return false;
+        const changes = {...item.kesChanges};
+        if (String(item[field] ?? '') === value) delete changes[field];
+        else changes[field] = value;
+        if (Object.keys(changes).length) item.kesChanges = changes;
+        else delete item.kesChanges;
+        return true;
+    };
+
+    const canReviewKes = () => developerPreview || window.getCurrentAppRole?.() === 'developer';
+    window.decorateKesEquipmentRow = (row, item) => {
+        if (!canReviewKes()) return;
+        if (item.kesOnly && String(item.model ?? '').trim()) {
+            row.classList.add('kes-equipment-new');
+            row.title = 'КЕС додав новий агрегат. Очікує додавання до загального обліку.';
+            return;
+        }
+        const changes = item.kesChanges;
+        if (!changes) return;
+        for (const control of row.querySelectorAll('input, select, textarea')) {
+            const handler = control.getAttribute('onchange') || control.getAttribute('oninput') || '';
+            const field = handler.match(/update\w+Prop\([^,]+,\s*['"]([\w]+)['"]/)?.[1];
+            if (!field || !Object.hasOwn(changes, field)) continue;
+            control.classList.add('kes-equipment-change');
+            control.title = 'Зміна в КЕС: ' + (changes[field] || 'значення очищено');
+            control.setAttribute('aria-description', control.title);
+        }
+    };
+
+    window.showKesEquipmentNotice = (tableBody, items) => {
+        const table = tableBody.closest('table');
+        const container = document.getElementById('equipment-table-wrapper');
+        const prior = container?.querySelector('.kes-equipment-notice');
+        prior?.remove();
+        if (!table || !container || !canReviewKes()) return;
+        const names = items.filter(item => item.kesOnly && !item.kesHidden && String(item.model ?? '').trim());
+        if (!names.length) return;
+        const notice = document.createElement('div');
+        notice.className = 'kes-equipment-notice';
+        notice.setAttribute('role', 'status');
+        notice.textContent = (names.length === 1 ? 'КЕС додав новий агрегат: ' : 'КЕС додав нові агрегати: ') +
+            names.map(item => item.model).join(', ') + '. Очікують додавання до загального обліку.';
+        container.append(notice);
+    };
+
     window.kesEquipmentPublishButton = (category, item) =>
         developerPreview && window.isKesCabinetActive() && String(item.model ?? '').trim()
             ? '<button type="button" class="action-btn" title="Додати до загального обліку" aria-label="Додати до загального обліку" onclick="publishKesEquipment(&quot;' + category + '&quot;,' + Number(item.id) + ')"' + (item.kesOnly ? '' : ' disabled') + '>+</button>'
@@ -31,7 +80,7 @@
 
     if (typeof window.getAllEquipmentList === 'function') {
         const getAllEquipment = window.getAllEquipmentList;
-        window.getAllEquipmentList = () => getAllEquipment().filter(window.isEquipmentVisibleInCurrentInventory);
+        window.getAllEquipmentList = () => getAllEquipment().filter(window.isEquipmentVisibleInCurrentInventory).map(window.kesEquipmentView);
     }
 
     const storageKey = '__sync_local_personal_cabinets';

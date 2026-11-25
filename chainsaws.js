@@ -26,7 +26,7 @@ function saveChainsawsList(list) { localStorage.setItem('chainsaws_custom_data',
 
 function printChainsawsTable() {
     const printWindow = window.open('', '_blank');
-    let list = getChainsawsList().filter(item => window.isEquipmentVisibleInCurrentInventory?.(item) !== false).filter(item => !/знищ/ui.test(String(item.note || item.comment || '')));
+    let list = getChainsawsList().filter(item => window.isEquipmentVisibleInCurrentInventory?.(item) !== false).map(item => window.kesEquipmentView?.(item) ?? item).filter(item => !/знищ/ui.test(String(item.note || item.comment || '')));
     let html = `
         <!DOCTYPE html>
         <html>
@@ -234,7 +234,7 @@ function renderChainsawsView() {
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    let list = getChainsawsList().filter(item => window.isEquipmentVisibleInCurrentInventory?.(item) !== false);
+    let list = getChainsawsList().filter(item => window.isEquipmentVisibleInCurrentInventory?.(item) !== false).map(item => window.kesEquipmentView?.(item) ?? item);
     if (typeof applyCategoryExcelSort === 'function') {
         list = applyCategoryExcelSort(list, 'chainsaws');
     }
@@ -275,8 +275,10 @@ function renderChainsawsView() {
             <td style="padding: 3px 4px;"><input type="text" class="table-cell-input" aria-label="Наказ/ Акт" value="${String(item.orderAct ?? '').replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')}" oninput="updateChainsawsProp(${item.id}, 'orderAct', this.value)" style="width: 100%; box-sizing: border-box; padding: 3px;"></td>
             <td style="text-align: center; padding: 3px 4px;"><button class="delete-row-btn" style="padding: 2px 6px; font-size: 10px;" onclick="deleteChainsawsRow(${item.id})">Видалити</button>${window.kesEquipmentPublishButton?.('chainsaws', item) || ''}</td>
         `;
+        window.decorateKesEquipmentRow?.(tr, item);
         tbody.appendChild(tr);
     });
+    window.showKesEquipmentNotice?.(tbody, getChainsawsList());
 }
 
 function updateChainFilter(field, val) {
@@ -293,6 +295,11 @@ function updateChainsawsProp(id, prop, val) {
     let list = getChainsawsList();
     const item = list.find(i => Number(i.id) === Number(id));
     if (item) {
+        if (window.recordKesEquipmentChange?.(item, prop, val)) {
+            saveChainsawsList(list);
+            if (prop === 'model') renderChainsawsView();
+            return;
+        }
         item[prop] = val;
         if (prop === 'locationSubdivision') item.subdivision = val;
         if (prop === 'model') {
