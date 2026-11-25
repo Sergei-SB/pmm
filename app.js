@@ -279,6 +279,7 @@ function loadCarsModifications() {
     } catch(e) {
         console.error(e);
     }
+    carsData.forEach(car => { if (isHmmwvCar(car)) car.isMiles = true; });
 }
 
 function saveCarsModificationsToStorage() {
@@ -614,6 +615,7 @@ function getCarGroup(car) {
     const vType = String(car.vehicleType || "").toLowerCase().trim();
     const cat = String(car.category || "").toLowerCase().trim();
     
+    if (vType === 'hmmwv' || cat === 'hmmwv') return 'hmmwv';
     if (vType === 'мотоцикл' || cat === 'motorcycle') return 'мотоцикл';
     if (vType === 'квадроцикл' || cat === 'quad') return 'квадроцикл';
     if (vType === 'вантажний' || cat === 'truck' || cat === 'adblue' || cat === 'truck_adblue') return 'вантажний';
@@ -646,6 +648,7 @@ function filterCarsByCategory(category) {
     
     const btnMap = {
         'all': 'btn-cat-all',
+        'hmmwv': 'btn-cat-hmmwv',
         'легковий': 'btn-cat-car',
         'вантажний': 'btn-cat-truck',
         'мотоцикл': 'btn-cat-moto',
@@ -681,7 +684,10 @@ function updateCarVehicleType(carId, newType) {
     const car = safeCars.find(c => Number(c.id) === Number(carId));
     if (car) {
         car.vehicleType = newType;
-        if (newType === 'мотоцикл') car.category = 'motorcycle';
+        if (newType === 'hmmwv') {
+            car.category = 'hmmwv';
+            car.isMiles = true;
+        } else if (newType === 'мотоцикл') car.category = 'motorcycle';
         else if (newType === 'квадроцикл') car.category = 'quad';
         else if (newType === 'вантажний') car.category = 'truck';
         else car.category = getTowedVehicleCategory({vehicleType: newType}) || 'passenger';
@@ -801,6 +807,7 @@ function renderCarsTable(filterQuery = '') {
                     <option value="легковий" ${group === 'легковий' ? 'selected' : ''}>Легковий</option>
                     <option value="вантажний" ${group === 'вантажний' ? 'selected' : ''}>Вантажний</option>
                     <option value="мотоцикл" ${group === 'мотоцикл' ? 'selected' : ''}>Мотоцикл</option>
+                    <option value="hmmwv" ${group === 'hmmwv' ? 'selected' : ''}>HMMWV</option>
                     <option value="квадроцикл" ${group === 'квадроцикл' ? 'selected' : ''}>Квадроцикл</option>
                     <option value="причіп" ${group === 'причіп' ? 'selected' : ''}>Причіп</option>
                     <option value="лафета" ${group === 'лафета' ? 'selected' : ''}>Лафета</option>
