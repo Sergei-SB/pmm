@@ -1375,6 +1375,8 @@ function updateRouteTotals(renderRestoredDays = false) {
     const formulasContainer = document.getElementById('formulas-group-container');
     const inlineTotal = document.querySelector('.total-group-inline');
     if (inlineTotal) inlineTotal.style.display = hmmwvResult ? 'none' : '';
+    const slashSeparator = document.querySelector('.slash-separator');
+    if (slashSeparator) slashSeparator.style.display = hmmwvResult ? 'none' : '';
     if (formulasContainer && !hmmwvResult) {
         formulasContainer.innerHTML = calcResult.calculatedResults.map(item => {
             if (item.type === 'work') {
