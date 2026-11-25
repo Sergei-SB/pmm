@@ -16,6 +16,10 @@
     window.recordKesEquipmentChange = (item, field, value) => {
         if (!window.isKesCabinetActive() || item.kesOnly) return false;
         const changes = {...item.kesChanges};
+        if (Object.hasOwn(item.kesDismissedChanges ?? {}, field) && changes[field] !== value) {
+            delete item.kesDismissedChanges[field];
+            if (!Object.keys(item.kesDismissedChanges).length) delete item.kesDismissedChanges;
+        }
         if (String(item[field] ?? '') === value) delete changes[field];
         else changes[field] = value;
         if (Object.keys(changes).length) item.kesChanges = changes;
@@ -23,6 +27,7 @@
         return true;
     };
 
+    const equipmentSuffix = {generators: 'Generators', webasto: 'Webasto', heaters: 'Heaters', chainsaws: 'Chainsaws', pumps: 'Pumps'};
     const canReviewKes = () => developerPreview || window.getCurrentAppRole?.() === 'developer';
     window.decorateKesEquipmentRow = (row, item) => {
         if (!canReviewKes()) return;
@@ -36,10 +41,33 @@
         for (const control of row.querySelectorAll('input, select, textarea')) {
             const handler = control.getAttribute('onchange') || control.getAttribute('oninput') || '';
             const field = handler.match(/update\w+Prop\([^,]+,\s*['"]([\w]+)['"]/)?.[1];
-            if (!field || !Object.hasOwn(changes, field)) continue;
+            if (!field || !Object.hasOwn(changes, field) || item.kesDismissedChanges?.[field] === changes[field]) continue;
             control.classList.add('kes-equipment-change');
             control.title = 'Зміна в КЕС: ' + (changes[field] || 'значення очищено');
             control.setAttribute('aria-description', control.title);
+            if (window.isPersonalCabinetActive()) continue;
+            const cell = control.closest('td');
+            if (!cell) continue;
+            const dismiss = document.createElement('button');
+            dismiss.type = 'button';
+            dismiss.className = 'kes-equipment-dismiss';
+            dismiss.textContent = '×';
+            dismiss.title = 'Прибрати сповіщення про зміну КЕС';
+            dismiss.setAttribute('aria-label', dismiss.title);
+            dismiss.onclick = () => {
+                if (window.isPersonalCabinetActive() || window.getCurrentAppRole?.() !== 'developer') return;
+                const category = row.closest('tbody')?.id.replace(/-tbody$/, '');
+                const suffix = equipmentSuffix[category];
+                if (!suffix) return;
+                const items = window['get' + suffix + 'List']();
+                const current = items.find(entry => String(entry.id) === String(item.id));
+                if (!current || current.kesChanges?.[field] !== changes[field]) return;
+                current.kesDismissedChanges = {...current.kesDismissedChanges, [field]: changes[field]};
+                window['save' + suffix + 'List'](items);
+                window['render' + suffix + 'View']();
+            };
+            cell.classList.add('kes-equipment-change-cell');
+            cell.append(dismiss);
         }
     };
 
@@ -61,12 +89,12 @@
 
     window.kesEquipmentPublishButton = (category, item) =>
         developerPreview && window.isKesCabinetActive() && String(item.model ?? '').trim()
-            ? '<button type="button" class="action-btn" title="Додати до загального обліку" aria-label="Додати до загального обліку" onclick="publishKesEquipment(&quot;' + category + '&quot;,' + Number(item.id) + ')"' + (item.kesOnly ? '' : ' disabled') + '>+</button>'
+            ? '<button type="button" class="action-btn kes-equipment-publish" title="Додати до загального обліку" aria-label="Додати до загального обліку" onclick="publishKesEquipment(&quot;' + category + '&quot;,' + Number(item.id) + ')"' + (item.kesOnly ? '' : ' disabled') + '>+</button>'
             : '';
 
     window.publishKesEquipment = (category, id) => {
         if (!developerPreview || !window.isKesCabinetActive()) return;
-        const suffix = {generators: 'Generators', webasto: 'Webasto', heaters: 'Heaters', chainsaws: 'Chainsaws', pumps: 'Pumps'}[category];
+        const suffix = equipmentSuffix[category];
         if (!suffix) return;
         const items = window['get' + suffix + 'List']();
         const item = items.find(entry => Number(entry.id) === id);
