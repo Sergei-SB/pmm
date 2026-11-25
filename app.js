@@ -1359,7 +1359,7 @@ function updateRouteTotals(renderRestoredDays = false) {
 
     if (baseLineEl) {
         if (markupPercent > 0 && !hmmwvResult) {
-            baseLineEl.innerHTML = `<span>Витрата палива базова : <span id="base-val-text">${fmt(baseConsumption, 1)}</span> л + <span class="markup-percent-text">${markupPercent}</span>% = <strong id="adjusted-base-text">${Number(baseRate).toFixed(1)}</strong> л</span>`;
+            baseLineEl.innerHTML = `<span>Витрата палива базова : <span id="base-val-text">${fmt(baseConsumption, 1)}</span> л + <span class="markup-percent-text">${markupPercent}</span>% = <strong id="adjusted-base-text">${fmt(baseRate, 1).replace('.', ',')}</strong> л</span>`;
         } else {
             baseLineEl.innerHTML = `<span>Витрата палива базова : <span id="base-val-text">${fmt(baseConsumption, 1)}</span> л</span>`;
         }
@@ -1413,7 +1413,7 @@ function updateRouteTotals(renderRestoredDays = false) {
                     <div class="calc-row">
                         <span class="c-label">${item.label}</span>
                         <span class="c-km">${fmtKm(item.km, isMilesCar)}</span>
-                        <span class="c-rate">* <span class="current-base-rate">${fmt(baseRate, 2)}</span> / 100</span>
+                        <span class="c-rate">* <span class="current-base-rate">${fmt(baseRate, 1).replace('.', ',')}</span> / 100</span>
                         <span class="c-mod">${item.textOp}</span>
                         <span class="c-eq">=</span>
                         <span class="c-val">${fmt(item.resVal, 2)} л</span>
