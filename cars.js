@@ -9,6 +9,7 @@ const VEHICLE_CATEGORIES = {
     SUV: "Позашляховики",
     MINIBUS: "Мікроавтобуси",
     MILES: "Автомобілі з милями",
+    HMMWV: "HMMWV",
     HQ: "Штабні автомобілі",
     SPECIAL: "Спецтехніка",
     MOTORCYCLE: "Мотоцикли",
@@ -18,6 +19,10 @@ const VEHICLE_CATEGORIES = {
 };
 
 const TOWED_VEHICLE_TYPES = {trailer: 'причіп', laffette: 'лафета'};
+
+function isHmmwvCar(car) {
+    return [car?.vehicleType, car?.category].some(value => String(value ?? '').trim().toLowerCase() === 'hmmwv');
+}
 
 function getTowedVehicleCategory(car) {
     const type = String(car?.vehicleType || '').trim().toLowerCase();
@@ -391,6 +396,7 @@ window.reloadCarsFromStorage = function() {
             const parsed = JSON.parse(saved);
             if (Array.isArray(parsed)) {
                 carsData = parsed.filter(c => isValidPlate(c.plate));
+                carsData.forEach(car => { if (isHmmwvCar(car)) car.isMiles = true; });
                 window.carsData = carsData;
             }
         } else {
@@ -473,6 +479,7 @@ function renderCarsTable(filterQuery = '') {
                     <option value="легковий" ${group === 'легковий' ? 'selected' : ''}>Легковий</option>
                     <option value="вантажний" ${group === 'вантажний' ? 'selected' : ''}>Вантажний</option>
                     <option value="мотоцикл" ${group === 'мотоцикл' ? 'selected' : ''}>Мотоцикл</option>
+                    <option value="hmmwv" ${group === 'hmmwv' ? 'selected' : ''}>HMMWV</option>
                     <option value="квадроцикл" ${group === 'квадроцикл' ? 'selected' : ''}>Квадроцикл</option>
                     <option value="причіп" ${group === 'причіп' ? 'selected' : ''}>Причіп</option>
                     <option value="лафета" ${group === 'лафета' ? 'selected' : ''}>Лафета</option>
