@@ -1359,7 +1359,7 @@ function updateRouteTotals(renderRestoredDays = false) {
 
     if (baseLineEl) {
         if (markupPercent > 0 && !hmmwvResult) {
-            baseLineEl.innerHTML = `<span>Витрата палива базова : <span id="base-val-text">${fmt(baseConsumption, 1)}</span> л + <span class="markup-percent-text">${markupPercent}</span>% = <strong id="adjusted-base-text">${fmt(baseRate, 2)}</strong> л</span>`;
+            baseLineEl.innerHTML = `<span>Витрата палива базова : <span id="base-val-text">${fmt(baseConsumption, 1)}</span> л + <span class="markup-percent-text">${markupPercent}</span>% = <strong id="adjusted-base-text">${Number(baseRate).toFixed(1)}</strong> л</span>`;
         } else {
             baseLineEl.innerHTML = `<span>Витрата палива базова : <span id="base-val-text">${fmt(baseConsumption, 1)}</span> л</span>`;
         }
