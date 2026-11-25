@@ -225,10 +225,6 @@ window.saveActiveCardPeriodData = function() {
     isRestoringState = false;
     const period = getStrictActivePeriod();
     const targetCarId = (typeof currentCarId !== 'undefined' && currentCarId) ? currentCarId : 1;
-    if (window.vehicleCardSharing) {
-        window.vehicleCardSharing.saveCurrent(targetCarId, period);
-        return;
-    }
 
     if (typeof updateRouteTotals === 'function') {
         updateRouteTotals();
@@ -323,7 +319,8 @@ function loadCarDataForActivePeriod() {
 
     try {
         const sharing = window.vehicleCardSharing;
-        const stored = sharing ? sharing.read(currentCarId, period) : localStorage.getItem(dataKey);
+        const received = sharing?.read(currentCarId, period);
+        const stored = localStorage.getItem(dataKey) || received;
         if (stored) periodData = JSON.parse(stored);
     } catch (e) {}
 
@@ -379,7 +376,7 @@ function loadCarDataForActivePeriod() {
     if (prevKey) {
         try {
             const sharing = window.vehicleCardSharing;
-            const prevStored = sharing ? sharing.previous(currentCarId, prevKey) : localStorage.getItem(getRoutesKey(currentCarId, prevKey));
+            const prevStored = localStorage.getItem(getRoutesKey(currentCarId, prevKey)) || sharing?.previous(currentCarId, prevKey);
             if (prevStored) {
                 const prevData = JSON.parse(prevStored);
                 if (prevData && prevData.topFields) {
@@ -397,7 +394,7 @@ function loadCarDataForActivePeriod() {
         } catch (e) {}
 
         try {
-            const repStored = window.vehicleCardSharing ? null : localStorage.getItem('report_data_' + prevKey);
+            const repStored = localStorage.getItem('report_data_' + prevKey);
             if (repStored) {
                 const repData = JSON.parse(repStored);
                 if (repData && repData[currentCarId]) {
@@ -522,7 +519,6 @@ function saveCarRoutesForPeriod(periodToSave, carIdToSave, isManualSave = false)
     const period = periodToSave || getStrictActivePeriod();
     if (!period || !isLoadedCarRoute(targetCarId, period)) return;
     const sharing = window.vehicleCardSharing;
-    if (sharing && !sharing.canSave(targetCarId, period)) return;
     if (typeof isAwaitingRouteProtection === 'function' && isAwaitingRouteProtection()) return;
 
     if (typeof updateRouteTotals === 'function') {
@@ -577,8 +573,8 @@ function saveCarRoutesForPeriod(periodToSave, carIdToSave, isManualSave = false)
     const isTowed = typeof getTowedVehicleCategory === 'function' &&
         getTowedVehicleCategory(carsData.find(car => Number(car.id) === Number(targetCarId)));
     if (isTowed) {
-        const previous = (sharing ? JSON.parse(sharing.previous(targetCarId, period) || 'null')
-            : readTrailerRouteSnapshot(dataKey))?.topFields || {};
+        const previous = (readTrailerRouteSnapshot(dataKey) ||
+            JSON.parse(sharing?.previous(targetCarId, period) || 'null'))?.topFields || {};
         if (document.getElementById('odo-1')?.dataset.trailerBaseEdited) {
             const base = parseTrailerOdometer(odo1Val);
             if (odo1Val.trim() !== '' && base === null) return;
@@ -589,11 +585,8 @@ function saveCarRoutesForPeriod(periodToSave, carIdToSave, isManualSave = false)
             if (Object.hasOwn(previous, 'trailerOdometerBase')) topFields.trailerOdometerBase = previous.trailerOdometerBase;
         }
     }
-    if (sharing) {
-        sharing.save(targetCarId, period, {topFields, rows: rowsData});
-        return;
-    }
     writeCarRouteSnapshot(dataKey, topFields, rowsData);
+    if (sharing?.canSave(targetCarId, period)) sharing.save(targetCarId, period, {topFields, rows: rowsData});
     if (isTowed) return;
 
     const periods = getSortedPeriods();

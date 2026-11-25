@@ -54,9 +54,8 @@
         const card = active;
         controls.hidden = card.owner !== 'developer';
         status.hidden = card.owner !== 'developer';
-        const readOnly = card.owner !== 'developer' || !card.ready;
         document.querySelectorAll('#routes-tbody, #driver-routes-tbody, #add-card-route-row, #fuel-start, #fuel-received, #adblue-start, #adblue-received, #odo-1, #card-save-btn, #transfer-data-btn, .preset-buttons-group')
-            .forEach(element => { element.inert = readOnly; });
+            .forEach(element => { element.inert = false; });
         if (card.owner === 'developer') {
             if (!card.ready) addButton('Завантажити картку', () => fetchCard(card));
             const select = document.createElement('select');

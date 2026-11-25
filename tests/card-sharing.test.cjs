@@ -2,6 +2,26 @@ const {test} = require('node:test');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const fs = require('node:fs');
+const ts = require('typescript');
+
+test('Save changes keeps the normal save path even when card sharing is unavailable', () => {
+    const file = require('node:path').join(__dirname, '../app2.js');
+    const ast = ts.createSourceFile(file,fs.readFileSync(file,'utf8'),ts.ScriptTarget.Latest,true);
+    let source;
+    function visit(node) {
+        if (ts.isBinaryExpression(node) && node.left.getText(ast)==='window.saveActiveCardPeriodData') source=node.getText(ast);
+        ts.forEachChild(node,visit);
+    }
+    visit(ast);assert.ok(source);
+    const saved=[];
+    const c={currentCarId:123,getStrictActivePeriod:()=> '21.11-30.11',
+        vehicleCardSharing:{saveCurrent(){throw Error('must not replace normal saving');}},
+        saveCarRoutesForPeriod:(...args)=>saved.push(args),
+        document:{getElementById:()=>null},showDevNotification(){}};
+    c.window=c;vm.createContext(c);vm.runInContext(source,c);
+    c.saveActiveCardPeriodData();
+    assert.deepEqual(saved, [['21.11-30.11',123,true]]);
+});
 
 async function fixture() {
     const {installCardSharing} = await import('../card_sharing.ts');
@@ -69,9 +89,10 @@ for (const role of ['admin', 'moderator', 'user']) {
             elements.push(element); return element;
         };
         let value = '10', reads = 0;
+        const editable = [{inert:true},{inert:true}];
         const c = {console, AbortSignal, Map, JSON, Object, Promise,
             sessionStorage: {getItem:()=>JSON.stringify({[role]:'valid-session'}),setItem(){}},
-            document: {hidden:false,createElement:makeElement,querySelector:()=>({append(){}}),querySelectorAll:()=>[]},
+            document: {hidden:false,createElement:makeElement,querySelector:()=>({append(){}}),querySelectorAll:()=>editable},
             getCurrentAppRole:()=>role, loadCarDataForActivePeriod(){},
             setInterval:fn=>callbacks.push(fn),
             fetch:async()=>{reads++;return {ok:true,json:async()=>({draft:null,received:{snapshot:{topFields:{fuelStart:value},rows:[]}}})};}
@@ -84,6 +105,7 @@ for (const role of ['admin', 'moderator', 'user']) {
         assert.equal(elements[0].hidden,true);
         assert.equal(elements[1].hidden,true);
         assert.equal(elements[0].children.length,0);
+        assert.ok(editable.every(element => element.inert === false));
         assert.equal(reads,1);
         value='25';callbacks[0]();
         await new Promise(resolve=>setImmediate(resolve));
