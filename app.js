@@ -1142,6 +1142,14 @@ function addRouteRow(routeName = 'Виконання БЗ Харків', dateVal
     }
 }
 
+function calculateHmmwvFuel(miles, rate) {
+    const bzMiles = Math.round(miles * 0.21);
+    const highwayMiles = miles - bzMiles;
+    const highwayFuel = highwayMiles * 1.6 * rate / 100 * 0.95;
+    const bzFuel = bzMiles * 1.6 * rate / 100 * 1.2;
+    return {highwayMiles, bzMiles, highwayFuel, bzFuel, totalFuel: highwayFuel + bzFuel, calculatedResults: []};
+}
+
 function applyPresetToActiveRow(text) {
     if (typeof isAwaitingRouteProtection === 'function' && isAwaitingRouteProtection()) return;
     if (!lastActiveRow || !lastActiveRow.isConnected) {
@@ -1261,7 +1269,11 @@ function updateRouteTotals(renderRestoredDays = false) {
         <button type="button" class="preset-btn" onclick="applyPresetToActiveRow('Міста-мільйонники (Харків, Київ, Львів)')">Міста-мільйонники (Харків, Київ, Львів)</button>
     `;
 
-    if (group === 'мотоцикл') {
+    if (group === 'hmmwv') {
+        presetButtonsHtml = `
+            <button type="button" class="preset-btn" onclick="applyPresetToActiveRow('Виконання БЗ Харків')">Виконання БЗ Харків</button>
+        `;
+    } else if (group === 'мотоцикл') {
         carFormulas = [8, 9];
         presetButtonsHtml = `
             <button type="button" class="preset-btn" onclick="applyPresetToActiveRow('Виконання БЗ Харків')">Виконання БЗ Харків</button>
@@ -1315,17 +1327,19 @@ function updateRouteTotals(renderRestoredDays = false) {
 
     let baseRate = baseConsumption * (1 + markupPercent / 100);
 
+    const hmmwvResult = group === 'hmmwv' ? calculateHmmwvFuel(totalKm, baseConsumption) : null;
     let dailyResult = null;
-    if (window.isDailyRouteCalculation?.()) {
+    if (!hmmwvResult && window.isDailyRouteCalculation?.()) {
         const dailyFormulas = carFormulas.filter(id => id !== 7);
         if (hasAdBlue) dailyFormulas.push(7);
         dailyResult = window.calculateDailyRoutes(rows, baseRate, dailyFormulas, isMilesCar);
     }
-    const calcResult = dailyResult || calculateRouteFuel(rows, baseRate, carFormulas, isMilesCar);
+    const calcResult = hmmwvResult || dailyResult || calculateRouteFuel(rows, baseRate, carFormulas, isMilesCar);
 
     totalFuelRounded = Math.round(calcResult.totalFuel);
 
     if (fuelSummaryLine) {
+        fuelSummaryLine.style.display = hmmwvResult ? 'none' : '';
         if (isMilesCar) {
             let convertedKm = totalKm * 1.61;
             fuelSummaryLine.innerHTML = `
@@ -1344,7 +1358,7 @@ function updateRouteTotals(renderRestoredDays = false) {
     const subLineEl = document.querySelector('.fuel-sub-line');
 
     if (baseLineEl) {
-        if (markupPercent > 0) {
+        if (markupPercent > 0 && !hmmwvResult) {
             baseLineEl.innerHTML = `<span>Витрата палива базова : <span id="base-val-text">${fmt(baseConsumption, 1)}</span> л + <span class="markup-percent-text">${markupPercent}</span>% = <strong id="adjusted-base-text">${fmt(baseRate, 2)}</strong> л</span>`;
         } else {
             baseLineEl.innerHTML = `<span>Витрата палива базова : <span id="base-val-text">${fmt(baseConsumption, 1)}</span> л</span>`;
@@ -1352,14 +1366,16 @@ function updateRouteTotals(renderRestoredDays = false) {
     }
 
     if (subLineEl) {
-        subLineEl.innerHTML = `<span id="markup-desc-text">${descriptionText}</span>`;
+        subLineEl.innerHTML = `<span id="markup-desc-text">${hmmwvResult ? '' : descriptionText}</span>`;
     }
     if (typeof renderRouteTrailerSummary === 'function') {
         renderRouteTrailerSummary(rows, truckActive && !getTowedVehicleCategory(car));
     }
 
     const formulasContainer = document.getElementById('formulas-group-container');
-    if (formulasContainer) {
+    const inlineTotal = document.querySelector('.total-group-inline');
+    if (inlineTotal) inlineTotal.style.display = hmmwvResult ? 'none' : '';
+    if (formulasContainer && !hmmwvResult) {
         formulasContainer.innerHTML = calcResult.calculatedResults.map(item => {
             if (item.type === 'work') {
                 return `
@@ -1414,17 +1430,35 @@ function updateRouteTotals(renderRestoredDays = false) {
 
     let fuelStart = evaluateExpression(document.getElementById('fuel-start')?.value);
     let fuelReceived = evaluateExpression(document.getElementById('fuel-received')?.value);
-    let fuelSpent = calcResult.totalFuel;
-    const fuelLeft = fmt(fuelReceived + fuelStart - fuelSpent, 2);
+    const fuelDigits = hmmwvResult ? 0 : 2;
+    const fuelSpent = hmmwvResult ? totalFuelRounded : calcResult.totalFuel;
+    const fuelLeft = fmt(fuelReceived + fuelStart - fuelSpent, fuelDigits);
     if (dailyResult && (renderRestoredDays || !isRestoringState)) {
         window.renderDailyRoutes(dailyResult, fuelLeft);
     }
 
     const fuelSpentEl = document.getElementById('fuel-spent');
-    if (fuelSpentEl) fuelSpentEl.textContent = fmt(fuelSpent, 2);
+    if (fuelSpentEl) fuelSpentEl.textContent = fmt(fuelSpent, fuelDigits);
 
     const fuelLeftEl = document.getElementById('fuel-left');
     if (fuelLeftEl) fuelLeftEl.textContent = fuelLeft;
+
+    if (hmmwvResult && formulasContainer) {
+        const number = value => new Intl.NumberFormat('uk-UA', {maximumFractionDigits: 3, useGrouping: false}).format(value);
+        const {highwayMiles, bzMiles, highwayFuel, bzFuel, totalFuel} = hmmwvResult;
+        const distance = (miles, modifier, fuel) =>
+            `${number(miles)} × 1,6 × ${number(baseConsumption)} / 100 ${modifier} = ${number(fuel)} л`;
+        const lines = [
+            ['Пройдено', `${number(totalKm)} mil`],
+            ['Траса', distance(highwayMiles, '− 5%', highwayFuel)],
+            ['БЗ', distance(bzMiles, '+ 20%', bzFuel)],
+            ['Всього', `${number(highwayFuel)} + ${number(bzFuel)} = ${number(totalFuel)} л ≈ ${totalFuelRounded} л`],
+            ['Залишок ДП', `${number(fuelStart)} + ${number(fuelReceived)} − ${totalFuelRounded} = ${fuelLeft} л`]
+        ];
+        formulasContainer.innerHTML = lines.map(([label, value]) =>
+            `<div class="calc-row" style="grid-template-columns: 110px 1fr"><span class="c-label">${label}:</span><span>${value}</span></div>`
+        ).join('');
+    }
 
     if (car && car.hasAdBlue) {
         let adblueStart = evaluateExpression(document.getElementById('adblue-start')?.value);
