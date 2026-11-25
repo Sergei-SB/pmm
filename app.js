@@ -1339,7 +1339,7 @@ function updateRouteTotals(renderRestoredDays = false) {
     totalFuelRounded = Math.round(calcResult.totalFuel);
 
     if (fuelSummaryLine) {
-        fuelSummaryLine.style.display = hmmwvResult ? 'none' : '';
+        fuelSummaryLine.style.display = 'none';
         if (isMilesCar) {
             let convertedKm = totalKm * 1.61;
             fuelSummaryLine.innerHTML = `
@@ -1374,9 +1374,9 @@ function updateRouteTotals(renderRestoredDays = false) {
 
     const formulasContainer = document.getElementById('formulas-group-container');
     const inlineTotal = document.querySelector('.total-group-inline');
-    if (inlineTotal) inlineTotal.style.display = hmmwvResult ? 'none' : '';
+    if (inlineTotal) inlineTotal.style.display = 'none';
     const slashSeparator = document.querySelector('.slash-separator');
-    if (slashSeparator) slashSeparator.style.display = hmmwvResult ? 'none' : '';
+    if (slashSeparator) slashSeparator.style.display = 'none';
     if (formulasContainer && !hmmwvResult) {
         formulasContainer.innerHTML = calcResult.calculatedResults.map(item => {
             if (item.type === 'work') {
@@ -1445,22 +1445,28 @@ function updateRouteTotals(renderRestoredDays = false) {
     const fuelLeftEl = document.getElementById('fuel-left');
     if (fuelLeftEl) fuelLeftEl.textContent = fuelLeft;
 
-    if (hmmwvResult && formulasContainer) {
+    if (formulasContainer) {
         const number = value => new Intl.NumberFormat('uk-UA', {maximumFractionDigits: 3, useGrouping: false}).format(value);
-        const {highwayMiles, bzMiles, highwayFuel, bzFuel, totalFuel} = hmmwvResult;
-        const distance = (miles, modifier, fuel) =>
-            `${number(miles)} × 1,6 × ${number(baseConsumption)} / 100 ${modifier} = ${number(fuel)} л`;
-        const lines = [
-            ['Пройдено', `${number(totalKm)} mil`],
-            ['Траса', distance(highwayMiles, '− 5%', highwayFuel)],
-            ['БЗ', distance(bzMiles, '+ 20%', bzFuel)],
-            ['Всього', `${number(highwayFuel)} + ${number(bzFuel)} = ${number(totalFuel)} л ≈ ${totalFuelRounded} л`],
-            ['Залишок ДП', `${number(fuelStart)} + ${number(fuelReceived)} − ${totalFuelRounded} = ${fuelLeft} л`]
-        ];
-        formulasContainer.innerHTML = lines.map(([label, value]) =>
-            `<div class="calc-row" style="grid-template-columns: 110px 1fr"><span class="c-label">${label}:</span><span>${value}</span></div>`
-        ).join('');
+        const summaryRow = (label, value) =>
+            `<div class="calc-row" style="grid-template-columns: 140px 1fr"><span class="c-label">${label}:</span><span>${value}</span></div>`;
+        let fuelTotal = `${number(calcResult.totalFuel)} л ≈ ${totalFuelRounded} л`;
+        if (hmmwvResult) {
+            const {highwayMiles, bzMiles, highwayFuel, bzFuel} = hmmwvResult;
+            const distance = (miles, modifier, fuel) =>
+                `${number(miles)} × 1,6 × ${number(baseConsumption)} / 100 ${modifier} = ${number(fuel)} л`;
+            formulasContainer.innerHTML =
+                summaryRow('Траса', distance(highwayMiles, '− 5%', highwayFuel)) +
+                summaryRow('БЗ', distance(bzMiles, '+ 20%', bzFuel));
+            fuelTotal = `${number(highwayFuel)} + ${number(bzFuel)} = ${fuelTotal}`;
+        }
+        const fuelType = /^АБ|^бензин/i.test(String(car?.fuelType ?? '').trim()) ? 'АБ' : 'ДП';
+        formulasContainer.insertAdjacentHTML('afterbegin',
+            summaryRow('Всього пройдено', `${number(totalKm)} ${isMilesCar ? 'mil' : 'км'}`));
+        formulasContainer.insertAdjacentHTML('beforeend',
+            summaryRow('Всього', fuelTotal) +
+            summaryRow(`Залишок ${fuelType}`, `${number(fuelStart)} + ${number(fuelReceived)} − ${fmt(fuelSpent, fuelDigits)} = ${fuelLeft} л`));
     }
+
 
     if (car && car.hasAdBlue) {
         let adblueStart = evaluateExpression(document.getElementById('adblue-start')?.value);
