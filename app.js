@@ -1267,6 +1267,7 @@ function updateRouteTotals(renderRestoredDays = false) {
     let presetButtonsHtml = `
         <button type="button" class="preset-btn" onclick="applyPresetToActiveRow('Виконання БЗ Харків')">Виконання БЗ Харків</button>
         <button type="button" class="preset-btn" onclick="applyPresetToActiveRow('Міста-мільйонники (Харків, Київ, Львів)')">Міста-мільйонники (Харків, Київ, Львів)</button>
+        <button type="button" class="preset-btn" onclick="applyPresetToActiveRow('Харків – Київ')">Харків – Київ</button>
     `;
 
     if (group === 'hmmwv') {
